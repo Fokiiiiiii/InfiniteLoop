@@ -900,11 +900,6 @@ namespace AscNet.GameServer.Handlers
             return (data, equips);
         }
 
-        /// <summary>
-        /// Leap/enhance deployment for a premade robot: one active skill per owned enhance group,
-        /// at Robot.tsv EnhanceSkillLevel. A robot in its base form blocks that skill through
-        /// RemoveSkillId, so an absent level or a removed skill yields no entry.
-        /// </summary>
         internal static List<CharacterSkill> BuildRobotEnhanceSkills(RobotTable robot)
         {
             List<CharacterSkill> enhanceSkills = [];
@@ -919,7 +914,6 @@ namespace AscNet.GameServer.Handlers
 
             foreach (int groupId in enhance.SkillGroupId.Where(id => id > 0).Distinct())
             {
-                // Client XEnhanceSkillGroup selects the group's first configured skill as active.
                 int skillId = TableReaderV2.Parse<EnhanceSkillGroupTable>()
                     .Find(row => row.Id == groupId)?.SkillId.FirstOrDefault(id => id > 0) ?? 0;
                 if (skillId <= 0 || removedSkillIds.Contains(skillId))

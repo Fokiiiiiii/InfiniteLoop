@@ -24193,7 +24193,6 @@ namespace AscNet.Test
             AssertStudyRobotEquipPayload(weaponOnlyFight, 1_142, StudyRobotRow(1_142),
                 "Study weapon-only robot stage 30100883");
 
-            // Verify authored enhance-skill deployment for base, level-1, and leap robot variants.
             PreFightResponse baseWeaveFight = AssertStudyStageRobotDeployment(
                 stageId: 30_100_971,
                 cardIds: [],
@@ -24404,7 +24403,6 @@ namespace AscNet.Test
             AssertEqual(expectedRobotId, RequiredDynamicInteger(npcData, "RobotId", name), $"{name}.RobotId");
         }
 
-        // Verifies the table-authored enhance-skill list in the fight payload.
         private static void AssertRobotDeployedEnhanceSkills(
             PreFightResponse preFightResponse,
             int robotId,
