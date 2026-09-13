@@ -8,6 +8,7 @@ using AscNet.Table.V2.share.equip;
 using AscNet.Table.V2.share.partner;
 using AscNet.Table.V2.share.team;
 using AscNet.Table.V2.share.character;
+using AscNet.Table.V2.share.character.enhanceskill;
 using AscNet.Table.V2.share.character.skill;
 using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.share.fashion;
@@ -889,6 +890,7 @@ namespace AscNet.GameServer.Handlers
                         Level = Math.Min(Convert.ToInt32(robot.SkillLevel), TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
                             .Where(row => row.SkillId == id).Select(row => row.Level).DefaultIfEmpty(1).Max())
                     }).ToList(),
+                EnhanceSkillList = BuildRobotEnhanceSkills(robot),
                 FashionId = fashionId,
                 TrustLv = 1,
                 Ability = robot.ShowAbility ?? 0,
@@ -896,6 +898,41 @@ namespace AscNet.GameServer.Handlers
                 CharacterHeadInfo = new() { HeadFashionId = fashionId }
             };
             return (data, equips);
+        }
+
+        /// <summary>
+        /// Leap/enhance deployment for a premade robot: one active skill per owned enhance group,
+        /// at Robot.tsv EnhanceSkillLevel. A robot in its base form blocks that skill through
+        /// RemoveSkillId, so an absent level or a removed skill yields no entry.
+        /// </summary>
+        internal static List<CharacterSkill> BuildRobotEnhanceSkills(RobotTable robot)
+        {
+            List<CharacterSkill> enhanceSkills = [];
+            if (robot.EnhanceSkillLevel <= 0)
+                return enhanceSkills;
+
+            HashSet<int> removedSkillIds = robot.RemoveSkillId?.ToHashSet() ?? [];
+            EnhanceSkillTable? enhance = TableReaderV2.Parse<EnhanceSkillTable>()
+                .Find(row => row.CharacterId == robot.CharacterId);
+            if (enhance is null)
+                return enhanceSkills;
+
+            foreach (int groupId in enhance.SkillGroupId.Where(id => id > 0).Distinct())
+            {
+                // Client XEnhanceSkillGroup selects the group's first configured skill as active.
+                int skillId = TableReaderV2.Parse<EnhanceSkillGroupTable>()
+                    .Find(row => row.Id == groupId)?.SkillId.FirstOrDefault(id => id > 0) ?? 0;
+                if (skillId <= 0 || removedSkillIds.Contains(skillId))
+                    continue;
+
+                int maxLevel = Character.EnhanceSkillMaxLevel(skillId);
+                enhanceSkills.Add(new CharacterSkill
+                {
+                    Id = (uint)skillId,
+                    Level = Math.Clamp(robot.EnhanceSkillLevel, 1, Math.Max(1, maxLevel))
+                });
+            }
+            return enhanceSkills;
         }
 
         private static List<ResonanceInfo> BuildRobotResonance(string? templates, string? types, int characterId)
