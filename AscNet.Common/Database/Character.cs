@@ -73,6 +73,15 @@ namespace AscNet.Common.Database
             return character;
         }
 
+        public static int GetLiberateLevel(uint characterId, IReadOnlyCollection<int> gatherRewards)
+        {
+            return TableReaderV2.Parse<ExhibitionRewardTable>()
+                .Where(reward => reward.CharacterId == (int)characterId && gatherRewards.Contains(reward.Id))
+                .Select(reward => reward.LevelId)
+                .DefaultIfEmpty()
+                .Max();
+        }
+
 
         public static bool IsOwnableEquipTemplate(EquipTable equip)
         {
@@ -499,6 +508,13 @@ namespace AscNet.Common.Database
                 if (character.LiberateLv <= 0)
                 {
                     character.LiberateLv = 1;
+                    changed = true;
+                }
+
+                int claimedLiberateLv = GetLiberateLevel(character.Id, gatherRewards);
+                if (claimedLiberateLv > character.LiberateLv)
+                {
+                    character.LiberateLv = claimedLiberateLv;
                     changed = true;
                 }
 
