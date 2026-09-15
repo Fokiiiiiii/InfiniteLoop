@@ -2,6 +2,7 @@ using AscNet.Common.Util;
 using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.share.robot;
 using Newtonsoft.Json.Linq;
+using System.Reflection;
 
 namespace AscNet.GameServer.Handlers;
 
@@ -322,11 +323,28 @@ internal static class CurrentClientStudyTables
         {
             T row = token.ToObject<T>()
                 ?? throw new InvalidDataException($"{ResourcePath}: invalid {section} row.");
+            MaterializeOmittedArrays(row);
             int key = keySelector(row);
             if (key <= 0 || !result.TryAdd(key, row))
                 throw new InvalidDataException($"{ResourcePath}: invalid or duplicate {section} key {key}.");
         }
         return result;
+    }
+
+    /// Client table JSON omits empty arrays, while the runtime TSV reader materializes them and the
+    /// generated rows declare them non-nullable. Frozen rows adopt the reader-built invariant so
+    /// Stage and Robot fields are never null.
+    private static void MaterializeOmittedArrays<T>(T row)
+    {
+        foreach (PropertyInfo property in typeof(T).GetProperties())
+        {
+            if (property.PropertyType.IsGenericType
+                && property.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
+                && property.GetValue(row) is null)
+            {
+                property.SetValue(row, Activator.CreateInstance(property.PropertyType));
+            }
+        }
     }
 
     private static void NormalizeBooleanScalars(JObject row)
