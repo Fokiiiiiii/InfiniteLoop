@@ -824,7 +824,7 @@ namespace AscNet.GameServer.Handlers
             IEnumerable<int> skills = characterSkill?.SkillGroupId.SelectMany(x => TableReaderV2.Parse<CharacterSkillGroupTable>().Find(y => y.Id == x)?.SkillId ?? new List<int>()) ?? new List<int>();
             HashSet<int> removedSkillIds = robot.RemoveSkillId?.ToHashSet() ?? [];
             CharacterTable? character = TableReaderV2.Parse<CharacterTable>().Find(row => row.Id == robot.CharacterId);
-            uint fashionId = (uint)(character?.DefaultNpcFashtionId > 0 ? character.DefaultNpcFashtionId : robot.FashionId);
+            uint fashionId = (uint)(robot.FashionId > 0 ? robot.FashionId : character?.DefaultNpcFashtionId ?? 0);
             List<EquipData> equips =
             [
                 new()
