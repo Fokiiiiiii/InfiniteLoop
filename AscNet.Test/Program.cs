@@ -24100,6 +24100,8 @@ namespace AscNet.Test
             AssertEqual(467, CompatibilityRows(compatibility, "Stages").Count, "Study compatibility Stage row count");
             AssertEqual(141, CompatibilityRows(compatibility, "StageLevelControls").Count, "Study compatibility StageLevelControl row count");
             AssertEqual(170, CompatibilityRows(compatibility, "Robots").Count, "Study compatibility Robot row count");
+            AssertEqual(82, CompatibilityRows(compatibility, "EnhanceSkills").Count, "Study compatibility EnhanceSkill row count");
+            AssertEqual(92, CompatibilityRows(compatibility, "EnhanceSkillGroups").Count, "Study compatibility EnhanceSkillGroup row count");
 
             JArray studyRobotRows = CompatibilityRows(compatibility, "Robots");
             JObject StudyRobotRow(int robotId) =>
@@ -24223,8 +24225,9 @@ namespace AscNet.Test
                 expectedRobotId: 2_273,
                 luciaLotusCharacterId,
                 "Study level-1 Pyroath effect practice stage 30100081");
-            AssertRobotDeployedEnhanceSkills(basePyroathFight, 2_273,
-                [(102_628, 1), (102_629, 1), (102_630, 1)],
+            // 4.6 authors no enhance groups for Pyroath, so the version-frozen robot grants none and
+            // its authored removal list is already satisfied.
+            AssertRobotDeployedEnhanceSkills(basePyroathFight, 2_273, [],
                 "Study level-1 Pyroath effect practice stage 30100081");
         }
 
