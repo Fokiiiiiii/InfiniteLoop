@@ -420,6 +420,12 @@ namespace AscNet.Test
                     ValidatePreFightPositionCompatibility();
                     return;
                 }
+
+                if (args.Contains("--robot-deployment-fashion-compat-only"))
+                {
+                    ValidateRobotDeploymentFashionCompatibility();
+                    return;
+                }
                 if (args.Contains("--segment-check-fight-compat-only"))
                 {
                     ValidateSegmentCheckFightCompatibility();
@@ -951,6 +957,7 @@ namespace AscNet.Test
                 ValidateCharacterSendGiftCompatibility();
                 ValidateTeamPrefabCompatibility();
                 ValidatePreFightPositionCompatibility();
+                ValidateRobotDeploymentFashionCompatibility();
                 ValidateSegmentCheckFightCompatibility();
                 ValidateFightRestartCompatibility();
                 ValidateCharacterProgressionPersistenceCompatibility();
