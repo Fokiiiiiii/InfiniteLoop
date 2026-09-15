@@ -777,7 +777,8 @@ namespace AscNet.GameServer.Handlers
                 FubenData = new()
                 {
                     StageData = BuildLoginStageData(session),
-                    FubenBaseData = new()
+                    FubenBaseData = new(),
+                    UnlockHideStages = FightModule.BuildUnlockedHideStages(session.stage)
                 },
                 IsSetFightCgEnable = true,
                 FubenMainLineData = session.player.FubenMainLineData,

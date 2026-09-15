@@ -68,6 +68,7 @@ This branch adds or fixes current-client server behavior for:
 - Mainline 2 exhibition chapter compatibility.
 - Mainline treasure rewards using current `Treasure.tsv` and `Chapter.tsv` contracts.
 - Story course rewards.
+- Lucia: Lotus's hidden interlude uses table-derived replay flags and persisted objective events, with an immediate hidden-stage notification and relog recovery. Old clear records do not prove objective completion; replay episode 6 after updating. Clearing the episode without its hidden objective does not unlock episode 7.
 - Boss single login payload shape.
 - Guide table compatibility for current guide TSVs.
 - Player cost-time upload.
@@ -397,6 +398,7 @@ Available focused switches:
 --fashion-suit-reward-compat-only
 --exp-level-compat-only
 --story-course-reward-compat-only
+--hidden-stage-compat-only
 --pr2-quality-compat-only
 --current-client-notice-endpoints-only
 --theatre-compat-only

@@ -344,6 +344,10 @@ namespace AscNet.GameServer.Handlers
                     .Where(stageId => stageId > 0)
                     .Select(stageId => (StageId: (uint)stageId, chapter.ChapterId)))
                 .ToDictionary(entry => entry.StageId, entry => entry.ChapterId));
+        private static readonly Lazy<IReadOnlyList<StageTable>> HiddenStageUnlockTargets = new(() =>
+            TableReaderV2.Parse<StageTable>()
+                .Where(stage => stage.StageId > 0 && stage.UnlockEventId.Any(eventId => eventId > 0))
+                .ToArray());
 
 
         private static readonly Lazy<IReadOnlyDictionary<string, int>> TeamConfigValues = new(() =>
@@ -541,9 +545,22 @@ namespace AscNet.GameServer.Handlers
                     RebootId = stageTable?.RebootId ?? 0,
                     PassTimeLimit = stageTable?.PassTimeLimit ?? 0,
                     StarsMark = 0,
-                    MonsterLevel = levelControl?.MonsterLevel ?? new()
+                    MonsterLevel = levelControl?.MonsterLevel ?? new(),
+                    NormalEventIds = stageTable?.NormalEventId
+                        .Where(eventId => eventId > 0)
+                        .Distinct()
+                        .Select(eventId => (dynamic)eventId)
+                        .ToList() ?? []
                 }
             };
+            int normalReplayEventId = stageTable?.NormalEventIdOnPassed ?? 0;
+            if (stageTable is not null
+                && normalReplayEventId > 0
+                && session.stage?.Stages.GetValueOrDefault(req.PreFightData.StageId)?.Passed == true
+                && !stageTable.NormalEventId.Contains(normalReplayEventId))
+            {
+                rsp.FightData.NormalEventIds.Add(normalReplayEventId);
+            }
 
             // Central table-derived ordinary event-stage availability gate: a stage that maps
             // to an activity TimeId via the fuben/miniactivity tables must be inside its
@@ -2587,6 +2604,9 @@ namespace AscNet.GameServer.Handlers
             uint responseStageId = ResolveFightSettleStageId(session, req);
             ExploreModule.TrySettle(session, req.Result);
             StageDatum? previousStageData = session.stage?.Stages.TryGetValue(responseStageId, out StageDatum? existingStageData) == true ? existingStageData : null;
+            StageDatum? previousSourceStageData = responseStageId == req.Result.StageId
+                ? previousStageData
+                : session.stage?.Stages.GetValueOrDefault(req.Result.StageId);
             bool isQuickClear = responseStageId != req.Result.StageId;
             bool isFirstClear = ArenaModule.IsArenaStage(req.Result.StageId)
                 ? !session.player.SimulatedBattlefield.ArenaStageMaxPoints.ContainsKey(req.Result.StageId)
@@ -2865,6 +2885,30 @@ namespace AscNet.GameServer.Handlers
             session.player.Save();
             session.inventory.Save();
             session.character.Save();
+            List<int>? addedUnlockEvents = null;
+            List<object>? unlockStagesBefore = null;
+            if (!isTowerStage
+                && stageTable is not null
+                && req.Result.EventSet is { Length: > 0 })
+            {
+                foreach (object? rawEventId in req.Result.EventSet)
+                {
+                    if (!TryReadProtocolInteger(rawEventId, out int eventId)
+                        || eventId <= 0
+                        || !stageTable.PreEventId.Contains(eventId))
+                    {
+                        continue;
+                    }
+
+                    session.stage.UnlockEvents ??= new();
+                    if (session.stage.UnlockEvents.Contains(eventId))
+                        continue;
+
+                    unlockStagesBefore ??= BuildUnlockedHideStages(session.stage);
+                    session.stage.UnlockEvents.Add(eventId);
+                    (addedUnlockEvents ??= new()).Add(eventId);
+                }
+            }
             // Arcade Anima progress is read back by the mode claim ledger and replayed from Stage.Stages on
             // relog, so a mode win must not be answered before that write is acknowledged. A failed write
             // restores the pre-settle datum, so no retry can see a first-clear/pass count the database never
@@ -2885,10 +2929,37 @@ namespace AscNet.GameServer.Handlers
                     throw;
                 }
             }
+            else if (addedUnlockEvents is not null)
+            {
+                try
+                {
+                    session.stage.SaveChecked();
+                }
+                catch
+                {
+                    foreach (int eventId in addedUnlockEvents)
+                        session.stage.UnlockEvents.Remove(eventId);
+                    if (previousStageData is null)
+                        session.stage.Stages.Remove(stageData.StageId);
+                    else
+                        session.stage.AddStage(previousStageData);
+                    if (responseStageId != req.Result.StageId)
+                    {
+                        if (previousSourceStageData is null)
+                            session.stage.Stages.Remove(req.Result.StageId);
+                        else
+                            session.stage.AddStage(previousSourceStageData);
+                    }
+                    throw;
+                }
+            }
             else
             {
                 session.stage.Save();
             }
+            List<object>? unlockStagesAfter = addedUnlockEvents is null
+                ? null
+                : BuildUnlockedHideStages(session.stage);
             BossModule.PushActivityProgress(session, stageData.StageId);
             CourseModule.RecordBattleResult(session, req.Result);
             foreach (RewardApplicationResult application in deferredRewardApplications)
@@ -2930,6 +3001,15 @@ namespace AscNet.GameServer.Handlers
             }
             session.fight = null;
             session.SendPush(new NotifyStageData() { StageList = new() { stageData } });
+            if (unlockStagesBefore is not null && unlockStagesAfter is not null)
+            {
+                foreach (object hiddenStageId in unlockStagesAfter)
+                {
+                    if (hiddenStageId is not int targetStageId || unlockStagesBefore.Contains(hiddenStageId))
+                        continue;
+                    session.SendPush(new NotifyUnlockHideStage { UnlockHideStage = targetStageId });
+                }
+            }
             if (simulateTrainArchiveRecord is not null)
                 session.SendPush(simulateTrainArchiveRecord);
             StudyProgressModule.SendTeachingStageUpdate(session, stageData);
@@ -2962,6 +3042,30 @@ namespace AscNet.GameServer.Handlers
             return controls
                 .OrderBy(control => Math.Abs(playerLevel - control.MaxLevel))
                 .FirstOrDefault();
+        }
+        internal static List<object> BuildUnlockedHideStages(Stage? stage)
+        {
+            List<object> unlockedStages = new();
+            if (stage?.UnlockEvents is not { Count: > 0 } events)
+                return unlockedStages;
+
+            // Hidden-event grants and ordinary stage prerequisites are separate client gates.
+            foreach (StageTable target in HiddenStageUnlockTargets.Value)
+            {
+                bool eventUnlocked = true;
+                foreach (int eventId in target.UnlockEventId)
+                {
+                    if (eventId > 0 && !events.Contains(eventId))
+                    {
+                        eventUnlocked = false;
+                        break;
+                    }
+                }
+                if (eventUnlocked)
+                    unlockedStages.Add(target.StageId);
+            }
+
+            return unlockedStages;
         }
 
         private static RobotTable? ResolveRobotTable(int robotId, bool isCurrentStudyStage)
@@ -3075,6 +3179,39 @@ namespace AscNet.GameServer.Handlers
             }
 
             return stageExp;
+        }
+        private static bool TryReadProtocolInteger(object? value, out int result)
+        {
+            switch (value)
+            {
+                case sbyte typed:
+                    result = typed;
+                    return true;
+                case byte typed:
+                    result = typed;
+                    return true;
+                case short typed:
+                    result = typed;
+                    return true;
+                case ushort typed:
+                    result = typed;
+                    return true;
+                case int typed:
+                    result = typed;
+                    return true;
+                case uint typed when typed <= int.MaxValue:
+                    result = (int)typed;
+                    return true;
+                case long typed when typed is >= int.MinValue and <= int.MaxValue:
+                    result = (int)typed;
+                    return true;
+                case ulong typed when typed <= int.MaxValue:
+                    result = (int)typed;
+                    return true;
+                default:
+                    result = 0;
+                    return false;
+            }
         }
     }
 }

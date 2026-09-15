@@ -665,6 +665,12 @@ namespace AscNet.Test
                     return;
                 }
 
+                if (args.Contains("--hidden-stage-compat-only"))
+                {
+                    ValidateHiddenStageCompatibility();
+                    return;
+                }
+
                 if (args.Contains("--prequel-reward-compat-only"))
                 {
                     ValidatePrequelRewardCompatibility();
@@ -966,6 +972,7 @@ namespace AscNet.Test
                 ValidateExpLevelCompatibility();
                 ValidateStoryCourseRewardCompatibility();
                 ValidatePrequelRewardCompatibility();
+                ValidateHiddenStageCompatibility();
                 ValidateStoryDeployVersionGapCompatibility();
                 ValidateStudyCharacterCompatibility();
                 ValidateStudyProgressionCompatibility();
