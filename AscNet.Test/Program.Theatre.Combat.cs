@@ -194,7 +194,7 @@ internal partial class Program
             {
                 value => value.FightId++, value => value.StageId++, value => value.RebootCount++,
                 value => value.SettleFrame = -1, value => value.PauseFrame = 1,
-                value => value.TotalDamage = -1, value => value.LeftTime = -1,
+                value => value.TotalDamage = -1, value => value.LeftTime = (long)int.MinValue - 1,
                 value => value.PlayerIds = [test.Session.player.PlayerData.Id + 1]
             })
             {

@@ -163,6 +163,36 @@ The local system-effect interpretation below follows numeric operands and refere
 
 Trigger and source identities are recorded before grants to prevent retry duplication and recursive grant cycles. Battle effects use authored native fight events and leveled events; currency changes use inventory receipts and mode capacity/energy/quantum notifications carry absolute values.
 
+### Awakening Tundra (Theatre4)
+
+Awakening Tundra persists exploration, event chains, recruitment/teams, item/talent choices, shops, tech, battle-pass progression and rewards. Generated maps, offered choices and authorized encounters survive relog; durable receipts prevent duplicate rewards.
+
+Pending endings include the finalized adventure snapshot and replay on login without regranting rewards. Starting the next adventure clears the pending ending; closing the client UI has no server acknowledgement RPC.
+
+Box grids carry authored box-row IDs; opening resolves the row's drop rather than treating a drop ID as a display ID. Login repairs legacy box identities in the active run, rollback snapshots and pending ending without granting rewards. Battle rooms can save a valid recruited team after encounter allocation, but not after `PreFight` authorizes the battle.
+
+Fight grids expose authored fight-group **row IDs** and basis-point HP (`10000 = 100%`); server encounter buckets and frozen whole-percent HP remain internal. Login repairs unambiguous legacy grid identities and HP together, once, without changing clear state or frozen battle payloads. Talent notifications replace the client's entire colour collection, so they include all three tracks; resource notifications remain per-colour deltas.
+
+Login preserves an unresolved authorized battle for reconnect. Explicit map continuation (`Theatre4EnterRequest`) instead abandons that battle through the retreat path: one HP loss, no battle rewards, and durable retry protection. A locate-only room costs no HP. If the loss ends the run, the activity snapshot clears the client's active adventure before the entry response while retaining the pending ending.
+
+Native settlement `LeftTime` is a signed countdown and may be negative on untimed stages. Theatre, Theatre3 and Theatre4 preserve that value within the response's signed 32-bit range; report identity, frame, damage, roster and authored time-limit checks still apply.
+
+**Authoritative client tables supply content, operands, conditions and rewards. Maintainer-authorized AscNet rules fill missing server generation, effect composition, economy/progression and scaling; this is not a claim of retail gameplay parity.** `AscNet.GameServer/Handlers/Theatre4Module.*.cs` documents these local rules:
+
+- **Map generation:** the authored `Block`/`BlockGrid`/`BlockGroup`/`BlockRelation`/`MapGrid` tables are absent, so the traversable floor share, content distribution, hidden-region reveal, boss placement and route/difficulty selection are `AscNet Theatre4 local policy`, deterministic from the persisted per-run RNG. Colours, route lists and gates stay authored where present.
+- **Effects:** persisted effect instances use authored numeric operands. Authored descriptions inform explicitly labelled local handler rules; production does not parse descriptions to execute effects. Numeric operands take precedence over inconsistent translated text.
+- **Economy/progression:** offer sampling, stock caps and box opening have no authored server algorithm and are local policy; in-run assets, ticket grants, battle-pass EXP/claims, permanent atlas/task/achievement predicates and tech unlock follow authored tables plus the shared counter ledger.
+- **Daily development:** each colour uses the native `round(effective multiplier × effective resources × ColorExtra)` tally, including fractional `ColorExtra`. AscNet policy credits that amount to the colour's development points, credits Military spending points for red, and adds the three amounts to cumulative area score (`Prosperity`). Earned resource multipliers remain separate from point-derived talent levels; daily-resource rates remain until an explicit debit. Temporary tally bonuses do not permanently stack on resource multipliers or replay at run end. Battle reward cards still require selection. The next day uses the corrected tally; missed historical credits are not reconstructed from current rates.
+- **Battle scaling:** encounters use authored fight/mold/monster rows. Native stage parameters include difficulty, the current chapter's authored HP factor, and an action factor from `Theatre4ActionFactor`. AscNet policy counts each successful grid exploration as one action, selects the highest authored `ActionTimes` not exceeding `max(1, ExploreCount)`, and retains the last factor beyond the curve. Missing factors are errors, not neutral fallbacks. This counter selection is local policy, not a claim of retail scaling parity.
+- **Availability:** permanent activity windows derive from authored `Theatre4Activity.TimeId` rows. Functional-open, difficulty prerequisites and costs remain enforced; permanent availability does not grant progression.
+- **Native limits/proof:** the harness drives real registered handlers over the loopback session and asserts durable BSON state and real pushes. Original EN Lua construction, shop controls, colour-cache replacement and fight-grid identity/HP consumers have been replayed with bounded handler output. Recovered installed behavior-node input gates are checked against emitted stage parameters. These checks do not prove native combat, rendering or movie playback, and do not constitute a completed original-Lua full-run replay.
+
+Run the focused server compatibility harness:
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre4-compat-only
+```
+
 ### Godfall Revelation (Theatre5)
 
 Godfall implements separate persisted PvE and PvP adventures, mode switching and login recovery. PvE includes storyline branches/backtracking, chapters, events, clues/deduction and rewards; PvP includes persisted-player build matching with explicitly labelled authored NPC fallback, ranks, normal completion and overtime. Both modes support run shops, bags/equipment/runes, boxes, EXP/relic choices, commissions, effects, DLC world `200` entry/settlement, retries and durable task/reward receipts.

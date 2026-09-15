@@ -856,6 +856,12 @@ namespace AscNet.Test
                     return;
                 }
 
+                if (args.Contains("--theatre4-compat-only"))
+                {
+                    ValidateTheatre4Compatibility();
+                    return;
+                }
+
                 if (args.Contains("--theatre5-compat-only"))
                 {
                     ValidateTheatre5Compatibility();
@@ -976,6 +982,7 @@ namespace AscNet.Test
                 ValidateFashionSuitRewardCompatibility();
                 ValidateBiancaTheatreCompatibility();
                 ValidateTheatreCompatibility();
+                ValidateTheatre4Compatibility();
                 ValidateTheatre5Compatibility();
                 ValidateCharacterTowerCompatibility();
                 ValidateShopCompatibility();

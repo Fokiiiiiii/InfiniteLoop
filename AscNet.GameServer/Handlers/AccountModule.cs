@@ -1288,6 +1288,7 @@ namespace AscNet.GameServer.Handlers
 
             TheatreModule.PrepareLogin(session);
             Theatre3Module.PrepareLogin(session);
+            Theatre4Module.PrepareLogin(session);
             Theatre5Module.PrepareLogin(session);
             NotifyLogin notifyLogin = BuildNotifyLogin(session);
 
@@ -1488,7 +1489,8 @@ namespace AscNet.GameServer.Handlers
             SendEmptyStartupPush(session, "NotifyTurntableData");
             session.SendPush(new NotifyVoteData { VoteAlarmDic = session.player.VoteAlarmData });
             SendEmptyStartupPush(session, "NotifyWheelchairManualActivity");
-            SendEmptyStartupPush(session, "NotifyTheatre4ActivityData");
+            session.SendPush(Theatre4Module.BuildLoginData(session));
+            Theatre4Module.SendRecoveredSettlement(session);
             SendEmptyStartupPush(session, "NotifyRestaurantData");
             SendEmptyStartupPush(session, "NotifyBlackRockChessData");
             SendCurrentEventTaskBatch(session, RetroArcadeTaskBatchPostSubModesA);

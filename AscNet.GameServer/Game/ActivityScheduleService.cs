@@ -4,6 +4,7 @@ using AscNet.Table.V2.share.condition;
 using AscNet.Table.V2.share.miniactivity.dyemerge;
 using AscNet.Table.V2.share.theatre;
 using AscNet.Table.V2.share.theatre3;
+using AscNet.Table.V2.share.theatre4;
 
 namespace AscNet.GameServer.Game;
 
@@ -25,6 +26,11 @@ public static class ActivityScheduleService
             .Where(row => row.TimeId > 0)
             .Select(row => new ActivityScheduleEntry(row.TimeId, 0, 0,
                 $"local-policy:Theatre3:permanent-mode:Theatre3Activity:Id={row.Id}:TimeId={row.TimeId}"))
+            // AscNet policy: Awakening Tundra remains available as a permanent roguelike.
+            .Concat(TableReaderV2.Parse<Theatre4ActivityTable>()
+                .Where(row => row.TimeId > 0)
+                .Select(row => new ActivityScheduleEntry(row.TimeId, 0, 0,
+                    $"local-policy:Theatre4:permanent-mode:Theatre4Activity:Id={row.Id}:TimeId={row.TimeId}")))
             .Concat(TheatreDecorationEntries())
             // Godfall's PvP client requires a positive end. 3000-01-01 UTC stays within the
             // Windows _localtime64 range even after a local-time-zone adjustment.

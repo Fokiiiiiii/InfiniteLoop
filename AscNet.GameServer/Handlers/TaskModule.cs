@@ -193,24 +193,35 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("FinishTaskRequest")]
         public static void FinishTaskRequestHandler(Session session, Packet.Request packet)
         {
-            if (session.player.Theatre5.PendingMutation is { } pending
-                && pending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
-                && !Theatre5Module.CanDispatchPendingRequest(session, packet))
+            if ((session.player.Theatre5.PendingMutation is { } pending
+                    && pending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
+                    && !Theatre5Module.CanDispatchPendingRequest(session, packet))
+                || (session.player.Theatre4.PendingMutation is { } tundraPending
+                    && tundraPending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
+                    && !Theatre4Module.CanDispatchPendingRequest(session, packet)))
             {
                 session.SendResponse(new FinishTaskResponse { Code = 1 }, packet.Id);
                 return;
             }
             FinishTaskRequest request = packet.Deserialize<FinishTaskRequest>();
             bool theatre5 = Theatre5Module.IsMetaTask(request.TaskId);
+            bool theatre4 = Theatre4Module.IsMetaTask(request.TaskId);
             bool theatre = TheatreModule.IsMetaTask(request.TaskId);
             bool theatre3 = Theatre3Module.IsMetaTask(request.TaskId);
             bool bianca = !theatre && !theatre3 && BiancaTheatreModule.MetaTasks().Any(task => task.Id == request.TaskId);
-            PrepareTaskRequest(session, bianca, theatre, theatre5);
+            PrepareTaskRequest(session, bianca, theatre, theatre5, theatre4);
             if (theatre5)
             {
                 Theatre5Module.Handle<FinishTaskRequest, FinishTaskResponse>(session, packet,
                     (mutation, body, result) => result.RewardGoodsList = Theatre5Module.ClaimMetaTask(mutation, body.TaskId),
                     static (result, code) => result.Code = code);
+                return;
+            }
+            if (theatre4)
+            {
+                Theatre4Module.Handle<FinishTaskRequest, FinishTaskResponse>(session, packet,
+                    (mutation, body, result) => result.RewardGoodsList = Theatre4Module.ClaimMetaTask(mutation, body.TaskId),
+                    static (result, code) => result.Code = code, afterCommit: SendTaskSync);
                 return;
             }
             if (theatre)
@@ -275,19 +286,23 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("FinishMultiTaskRequest")]
         public static void FinishMultiTaskRequestHandler(Session session, Packet.Request packet)
         {
-            if (session.player.Theatre5.PendingMutation is { } pending
-                && pending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
-                && !Theatre5Module.CanDispatchPendingRequest(session, packet))
+            if ((session.player.Theatre5.PendingMutation is { } pending
+                    && pending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
+                    && !Theatre5Module.CanDispatchPendingRequest(session, packet))
+                || (session.player.Theatre4.PendingMutation is { } tundraPending
+                    && tundraPending.ResponseName is not (nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
+                    && !Theatre4Module.CanDispatchPendingRequest(session, packet)))
             {
                 session.SendResponse(new FinishMultiTaskResponse { Code = 1 }, packet.Id);
                 return;
             }
             FinishMultiTaskRequest request = packet.Deserialize<FinishMultiTaskRequest>();
             bool theatre5 = request.TaskIds.Any(Theatre5Module.IsMetaTask);
+            bool theatre4 = request.TaskIds.Any(Theatre4Module.IsMetaTask);
             bool theatre = request.TaskIds.Any(TheatreModule.IsMetaTask);
             bool theatre3 = request.TaskIds.Any(Theatre3Module.IsMetaTask);
             bool bianca = !theatre && !theatre3 && request.TaskIds.Any(taskId => BiancaTheatreModule.MetaTasks().Any(task => task.Id == taskId));
-            PrepareTaskRequest(session, bianca, theatre, theatre5);
+            PrepareTaskRequest(session, bianca, theatre, theatre5, theatre4);
             if (theatre5)
             {
                 Theatre5Module.Handle<FinishMultiTaskRequest, FinishMultiTaskResponse>(session, packet, (mutation, body, result) =>
@@ -303,6 +318,23 @@ namespace AscNet.GameServer.Handlers
                         result.SuccessTaskIds.Add(taskId);
                     }
                 }, static (result, code) => result.Code = code);
+                return;
+            }
+            if (theatre4)
+            {
+                Theatre4Module.Handle<FinishMultiTaskRequest, FinishMultiTaskResponse>(session, packet, (mutation, body, result) =>
+                {
+                    foreach (int taskId in body.TaskIds.Distinct())
+                    {
+                        if (!Theatre4Module.CanClaimMetaTask(mutation, taskId))
+                        {
+                            result.NotDealTaskIds.Add(taskId);
+                            continue;
+                        }
+                        result.RewardGoodsList.AddRange(Theatre4Module.ClaimMetaTask(mutation, taskId));
+                        result.SuccessTaskIds.Add(taskId);
+                    }
+                }, static (result, code) => result.Code = code, afterCommit: SendTaskSync);
                 return;
             }
             if (theatre)
@@ -801,6 +833,7 @@ namespace AscNet.GameServer.Handlers
                 .Select(ToLoginTask));
             tasks.AddRange(Theatre3Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(TheatreModule.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
+            tasks.AddRange(Theatre4Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(Theatre5Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             session.TaskSnapshotProgress = tasks.Where(task => SnapshotTaskIds.Value.Contains((int)task.Id))
                 .ToDictionary(task => (int)task.Id, task => (task.Schedule[0].Value, task.State));
@@ -835,6 +868,7 @@ namespace AscNet.GameServer.Handlers
                             Schedule = task.Schedule.Select(value => new SyncTaskSchedule { Id = value.Id, Value = value.Value }).ToList()
                         }))
                         .Concat(Theatre5Module.BuildTaskUpdates(new Theatre5Module.Mutation(session, newOperation: false)))
+                        .Concat(Theatre4Module.BuildTaskUpdates(new Theatre4Module.Mutation(session, newOperation: false)))
                         .GroupBy(x => x.Id)
                         .Select(x => x.First())
                         .ToList()
@@ -1446,7 +1480,7 @@ namespace AscNet.GameServer.Handlers
             });
         }
 
-        internal static void RecordTableDrivenProgress(Session session, IEnumerable<(int ConditionType, int? Parameter, int Amount)> increments, bool sendNotification = true, TheatreModule.Mutation? theatre = null, Theatre5Module.Mutation? theatre5 = null)
+        internal static void RecordTableDrivenProgress(Session session, IEnumerable<(int ConditionType, int? Parameter, int Amount)> increments, bool sendNotification = true, TheatreModule.Mutation? theatre = null, Theatre5Module.Mutation? theatre5 = null, Theatre4Module.Mutation? theatre4 = null)
         {
             Dictionary<(int ConditionType, int? Parameter), int> amounts = increments
                 .Where(increment => increment.Amount > 0)
@@ -1473,14 +1507,14 @@ namespace AscNet.GameServer.Handlers
                 .Select(condition => (condition.Id, Amount: Amount(condition.Type, condition.Params)))
                 .Where(condition => condition.Amount > 0)
                 .ToDictionary(condition => condition.Id, condition => condition.Amount);
-            RecordConditionAmounts(session, conditionAmounts, currentAmounts, sendNotification, theatre, theatre5);
+            RecordConditionAmounts(session, conditionAmounts, currentAmounts, sendNotification, theatre, theatre5, theatre4);
         }
 
-        private static void RecordConditionAmounts(Session session, Dictionary<int, int> conditionAmounts, Dictionary<int, int> currentAmounts, bool sendNotification = true, TheatreModule.Mutation? theatre = null, Theatre5Module.Mutation? theatre5 = null)
+        private static void RecordConditionAmounts(Session session, Dictionary<int, int> conditionAmounts, Dictionary<int, int> currentAmounts, bool sendNotification = true, TheatreModule.Mutation? theatre = null, Theatre5Module.Mutation? theatre5 = null, Theatre4Module.Mutation? theatre4 = null)
         {
             if (conditionAmounts.Count == 0 && currentAmounts.Count == 0)
                 return;
-            if (theatre is null && theatre5 is null) EnsureMissionResets(session);
+            if (theatre is null && theatre5 is null && theatre4 is null) EnsureMissionResets(session);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             List<TaskTable> tasks = TableReaderV2.Parse<TaskTable>()
                 .Where(task => conditionAmounts.ContainsKey(task.Condition)
@@ -1495,11 +1529,14 @@ namespace AscNet.GameServer.Handlers
             if (tasks.Count == 0 && currentAmounts.Count == 0) return;
 
             HashSet<int> legacyConditions = tasks.Select(task => task.Condition).ToHashSet();
-            if (theatre is not null || theatre5 is not null)
+            if (theatre is not null || theatre5 is not null || theatre4 is not null)
             {
-                Action<int, int> add = theatre is not null ? theatre.AddTaskConditionProgress : theatre5!.AddTaskConditionProgress;
-                Func<int, int> get = theatre is not null ? theatre.GetTaskConditionProgress : theatre5!.GetTaskConditionProgress;
-                Action<NotifyTask> push = theatre is not null ? theatre.Push : theatre5!.Push;
+                Action<int, int> add = theatre is not null ? theatre.AddTaskConditionProgress
+                    : theatre5 is not null ? theatre5.AddTaskConditionProgress : theatre4!.AddTaskConditionProgress;
+                Func<int, int> get = theatre is not null ? theatre.GetTaskConditionProgress
+                    : theatre5 is not null ? theatre5.GetTaskConditionProgress : theatre4!.GetTaskConditionProgress;
+                Action<NotifyTask> push = theatre is not null ? theatre.Push
+                    : theatre5 is not null ? theatre5.Push : theatre4!.Push;
                 foreach (int conditionId in legacyConditions)
                     add(conditionId, conditionAmounts[conditionId]);
                 foreach ((int conditionId, int amount) in currentAmounts)
@@ -2269,7 +2306,7 @@ namespace AscNet.GameServer.Handlers
             }
         }
 
-        private static void PrepareTaskRequest(Session session, bool bianca, bool theatre, bool theatre5 = false)
+        private static void PrepareTaskRequest(Session session, bool bianca, bool theatre, bool theatre5 = false, bool theatre4 = false)
         {
             // A foreign task journal must commit before cloning this mode; the owning handler keeps its intent check.
             if (!theatre && session.player.Theatre.PendingMutation?.ResponseName is nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse) or nameof(BuyResponse))
@@ -2280,16 +2317,19 @@ namespace AscNet.GameServer.Handlers
                 Theatre3Module.ReplayPending(session);
             if (!theatre5 && session.player.Theatre5.PendingMutation is not null)
                 Theatre5Module.ReplayPending(session);
+            if (!theatre4 && session.player.Theatre4.PendingMutation?.ResponseName is nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
+                Theatre4Module.ReplayPending(session);
             if (!(bianca && session.player.BiancaTheatre.PendingMutation is not null)
                 && !(theatre && session.player.Theatre.PendingMutation is not null)
-                && !(theatre5 && session.player.Theatre5.PendingMutation is not null))
+                && !(theatre5 && session.player.Theatre5.PendingMutation is not null)
+                && !(theatre4 && session.player.Theatre4.PendingMutation is not null))
                 EnsureMissionResets(session);
         }
 
         internal static void EnsureMissionResets(Session session)
         {
             // The owner must match/recover its pending intent before shared resets can mutate it.
-            if (session.player.Theatre5.PendingMutation is not null)
+            if (session.player.Theatre5.PendingMutation is not null || session.player.Theatre4.PendingMutation is not null)
                 return;
             // Restore old-period claims before clearing them and recording new-period progress.
             if (session.player.Theatre.PendingMutation?.ResponseName is nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse) or nameof(BuyResponse))

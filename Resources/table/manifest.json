@@ -7496,6 +7496,633 @@
       "source": [
         "share/fashion/FashionSuit.json"
       ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "d849c686b054f160b6c95665974589a6972a6cec8b2e5d82862200cad3e53ec9",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4Asset.tsv",
+      "rows": 20,
+      "source": [
+        "client/theatre4/Theatre4Asset.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "023c7a82ab5f878b14cc1a7fc5e4012debb696a585b82ccf43c402959d27bb0d",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4BlockIcon.tsv",
+      "rows": 18,
+      "source": [
+        "client/theatre4/Theatre4BlockIcon.json"
+      ]
+    },
+    {
+      "columns": 8,
+      "contentSha256": "818e5b8989ed09d5e33fb9a18e54ace1b44b5170d9e68af934b868a88871ccbd",
+      "filter": "all",
+      "naturalKey": "Key",
+      "path": "client/theatre4/Theatre4ClientConfig.tsv",
+      "rows": 80,
+      "source": [
+        "client/theatre4/Theatre4ClientConfig.json"
+      ]
+    },
+    {
+      "columns": 4,
+      "contentSha256": "6d9a7ebb0059c79849aa77e9a56a219bec87068fe56cdf85f537c2092edfb8ee",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4ItemEffectCount.tsv",
+      "rows": 23,
+      "source": [
+        "client/theatre4/Theatre4ItemEffectCount.json"
+      ]
+    },
+    {
+      "columns": 13,
+      "contentSha256": "df3b47e8f8641cc6a15f61f6b7bf0f7d53445a781487476cf4a1a1edb17bcb34",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4MapClient.tsv",
+      "rows": 50,
+      "source": [
+        "client/theatre4/Theatre4MapClient.json"
+      ]
+    },
+    {
+      "columns": 2,
+      "contentSha256": "1bd63a09b1eb874bbad559c7fd77186fbf74b1bd3cbcba50a20a6eab4867a52b",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4MapIndex.tsv",
+      "rows": 20,
+      "source": [
+        "client/theatre4/Theatre4MapIndex.json"
+      ]
+    },
+    {
+      "columns": 5,
+      "contentSha256": "6956ea287577d246a57c6b34d77512be1911879c6117358dbe1ee31651cbd4c1",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "client/theatre4/Theatre4ScientificSpEffect.tsv",
+      "rows": 16,
+      "source": [
+        "client/theatre4/Theatre4ScientificSpEffect.json"
+      ]
+    },
+    {
+      "columns": 4,
+      "contentSha256": "8feea2cbdff23426889d93897bcaabdef15b56fc42db8fe485dfa8d518b126c9",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ActionFactor.tsv",
+      "rows": 240,
+      "source": [
+        "share/theatre4/Theatre4ActionFactor.json"
+      ]
+    },
+    {
+      "columns": 8,
+      "contentSha256": "96135f881da169ac9a562c1f5419b1d4eff94163e47872c8669f8927ec255e4f",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Activity.tsv",
+      "rows": 1,
+      "source": [
+        "share/theatre4/Theatre4Activity.json"
+      ]
+    },
+    {
+      "columns": 8,
+      "contentSha256": "7fdfbe212a585485683888354c25bea2353665ab88d156ba6b36e8e9aa2aec55",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Affix.tsv",
+      "rows": 7,
+      "source": [
+        "share/theatre4/Theatre4Affix.json"
+      ]
+    },
+    {
+      "columns": 4,
+      "contentSha256": "c60867c45bb9a8b83bb7adef6dc7e51e2d4243807907b87b9221d8f8731ab935",
+      "filter": "all",
+      "naturalKey": "Level",
+      "path": "share/theatre4/Theatre4BattlePass.tsv",
+      "rows": 150,
+      "source": [
+        "share/theatre4/Theatre4BattlePass.json"
+      ]
+    },
+    {
+      "columns": 11,
+      "contentSha256": "28226b0a08f10f41d00d683326d89a0e73ded1644137e2e8f205d3db5b7bf6c7",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4BoxGroup.tsv",
+      "rows": 64,
+      "source": [
+        "share/theatre4/Theatre4BoxGroup.json"
+      ]
+    },
+    {
+      "columns": 10,
+      "contentSha256": "849e3deb483bbd8cb6e0725a6f713a039e375d121f5fa27de02588477aae7182",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Building.tsv",
+      "rows": 5,
+      "source": [
+        "share/theatre4/Theatre4Building.json"
+      ]
+    },
+    {
+      "columns": 5,
+      "contentSha256": "202977150fbb00350757f237a009ee19117790add1e5854f62ed1db972066994",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Character.tsv",
+      "rows": 69,
+      "source": [
+        "share/theatre4/Theatre4Character.json"
+      ]
+    },
+    {
+      "columns": 9,
+      "contentSha256": "ae43533e1be4233778bad77e6eb28db6a8f5ba2c16c1eed455bec592295ba678",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4CharacterGroup.tsv",
+      "rows": 363,
+      "source": [
+        "share/theatre4/Theatre4CharacterGroup.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "728428be8c6de52da0ddd7ee645a99b73e15031612cdabb2ab55f44876e478dc",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4CharacterStar.tsv",
+      "rows": 6969,
+      "source": [
+        "share/theatre4/Theatre4CharacterStar.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "71a2e3f27ec31f137e8d2a32ad697d983686ac61bfc55a8136b62bbb0e1d637b",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorResource.tsv",
+      "rows": 35,
+      "source": [
+        "share/theatre4/Theatre4ColorResource.json"
+      ]
+    },
+    {
+      "columns": 21,
+      "contentSha256": "8f603f28ae2aed80105fa831fb1f7f6fa81d43dfe37f67dc1f4b6ceacc99b74c",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorTalent.tsv",
+      "rows": 139,
+      "source": [
+        "share/theatre4/Theatre4ColorTalent.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "9f30827c4e3f206c913e506ab88ba9403b245203e70b6da9a224cc775f27847c",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorTalentPool.tsv",
+      "rows": 541,
+      "source": [
+        "share/theatre4/Theatre4ColorTalentPool.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "2c8ec0109799fb3b628f61fae0f974866d89905149582b6a255af0a2d8218fba",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorTalentRelation.tsv",
+      "rows": 119,
+      "source": [
+        "share/theatre4/Theatre4ColorTalentRelation.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "995977ccf7f2b6b012dfca738973b43d52b703ab15a3c4053a3f28ba0d187de6",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorTalentSlot.tsv",
+      "rows": 77,
+      "source": [
+        "share/theatre4/Theatre4ColorTalentSlot.json"
+      ]
+    },
+    {
+      "columns": 5,
+      "contentSha256": "d84c12f284c3f271c50737e774210637643674f30437b6c6090976fddec6d3cc",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorTalentTree.tsv",
+      "rows": 3,
+      "source": [
+        "share/theatre4/Theatre4ColorTalentTree.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "ad4f4f2371464a5cc4d20bac72088601aa59965a4075de843ea454f31027c267",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ColorWeight.tsv",
+      "rows": 32,
+      "source": [
+        "share/theatre4/Theatre4ColorWeight.json"
+      ]
+    },
+    {
+      "columns": 4,
+      "contentSha256": "8756146538771407b821fc5d2d8af27cb93aa0f43779f4544a95f0481557ae12",
+      "filter": "all",
+      "naturalKey": "Key",
+      "path": "share/theatre4/Theatre4Config.tsv",
+      "rows": 15,
+      "source": [
+        "share/theatre4/Theatre4Config.json"
+      ]
+    },
+    {
+      "columns": 5,
+      "contentSha256": "e323dec5cd40bd7f0b5ae657d7700beac8024c718819b0147704e2ede4b58392",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4DifficultDistance.tsv",
+      "rows": 0,
+      "source": [
+        "share/theatre4/Theatre4DifficultDistance.json"
+      ]
+    },
+    {
+      "columns": 38,
+      "contentSha256": "7dfde0ffbdbd04df5f2365bf7f472dad88a22ee19c27b50a4b54f29515530659",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Difficulty.tsv",
+      "rows": 7,
+      "source": [
+        "share/theatre4/Theatre4Difficulty.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "195cfd0a0d3694c71839376ed5d39e08c54dcbfdf57f78b0a134b4711a4ec278",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4DifficultyStar.tsv",
+      "rows": 15,
+      "source": [
+        "share/theatre4/Theatre4DifficultyStar.json"
+      ]
+    },
+    {
+      "columns": 22,
+      "contentSha256": "19483ea16ffaff629cb41a5f0199a09630b05a22b9d283ca7fd62ec8f45d1db8",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Effect.tsv",
+      "rows": 282,
+      "source": [
+        "share/theatre4/Theatre4Effect.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "8e40b3b686b250a9c1e6adfa8e6e5d1b11508e9569f204b711ed8eea1853e0e6",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4EffectGroup.tsv",
+      "rows": 250,
+      "source": [
+        "share/theatre4/Theatre4EffectGroup.json"
+      ]
+    },
+    {
+      "columns": 18,
+      "contentSha256": "f89ca31442118d2247af97f936943b10aa6dde1bef4b53365dc1fab9ef00bb06",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Ending.tsv",
+      "rows": 13,
+      "source": [
+        "share/theatre4/Theatre4Ending.json"
+      ]
+    },
+    {
+      "columns": 25,
+      "contentSha256": "40fc1379d29fd2f69c07d51fc10374622ab8de3d1614c40a6f0f8c45a80664f9",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Event.tsv",
+      "rows": 734,
+      "source": [
+        "share/theatre4/Theatre4Event.json"
+      ]
+    },
+    {
+      "columns": 13,
+      "contentSha256": "2bc8738bee2d471631ffaa7e2b9fab666911e65050a530e0e09ec355d1a0604d",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4EventGroup.tsv",
+      "rows": 271,
+      "source": [
+        "share/theatre4/Theatre4EventGroup.json"
+      ]
+    },
+    {
+      "columns": 13,
+      "contentSha256": "f4e9509b96ad73417607d481ddecb840c676b1c9556fc6c142f0fdb96f61f5fe",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4EventOption.tsv",
+      "rows": 298,
+      "source": [
+        "share/theatre4/Theatre4EventOption.json"
+      ]
+    },
+    {
+      "columns": 9,
+      "contentSha256": "fed0de4074125379e9c789d8105b3b312ada31de4895969f6f35742c31089d75",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Fate.tsv",
+      "rows": 8,
+      "source": [
+        "share/theatre4/Theatre4Fate.json"
+      ]
+    },
+    {
+      "columns": 10,
+      "contentSha256": "cc2f827d6acce311bdee7a07bea97838f7ea6cc249c1a76c2318c448cd6f0dce",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4FateEvent.tsv",
+      "rows": 11,
+      "source": [
+        "share/theatre4/Theatre4FateEvent.json"
+      ]
+    },
+    {
+      "columns": 15,
+      "contentSha256": "6ae8da8f3442de4b521dc0babe062330f2ead96210b5c049ba930de9f44de88a",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Fight.tsv",
+      "rows": 216,
+      "source": [
+        "share/theatre4/Theatre4Fight.json"
+      ]
+    },
+    {
+      "columns": 43,
+      "contentSha256": "b6b74db509083be6e0f9f2c4bc4fbcfde7d008693b2dc7f70ffec121a53f31ec",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4FightGroup.tsv",
+      "rows": 307,
+      "source": [
+        "share/theatre4/Theatre4FightGroup.json"
+      ]
+    },
+    {
+      "columns": 18,
+      "contentSha256": "9f52ef73b96770f6a065c5b14c4129ccb935563266015dca34bcf972c5d67880",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4FightMold.tsv",
+      "rows": 170,
+      "source": [
+        "share/theatre4/Theatre4FightMold.json"
+      ]
+    },
+    {
+      "columns": 14,
+      "contentSha256": "f3c60ff25f89f4dbc9159fd566a7dfe34d2cb5b8b36c5e193df3f6c349f21f2d",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Item.tsv",
+      "rows": 46,
+      "source": [
+        "share/theatre4/Theatre4Item.json"
+      ]
+    },
+    {
+      "columns": 12,
+      "contentSha256": "f3d2193f81cbc6bf3c61fb5e7c5a04d0766451268b547d0e23c1c5874e33f8fe",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ItemBox.tsv",
+      "rows": 2,
+      "source": [
+        "share/theatre4/Theatre4ItemBox.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "edf8f03cac892d5721ac20af4723c4ac454211a34b96b21a0afbe70d154b9011",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ItemGroup.tsv",
+      "rows": 46,
+      "source": [
+        "share/theatre4/Theatre4ItemGroup.json"
+      ]
+    },
+    {
+      "columns": 8,
+      "contentSha256": "cc46def9714b2c373cb8eaf1114c552d2db450c5b664e8b4d5d8dd8c5dc367a2",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Monster.tsv",
+      "rows": 194,
+      "source": [
+        "share/theatre4/Theatre4Monster.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "dbbe3bd40c2664dac3eafd15f7f394bede5ca7d5cb663c9b1d6905f253ef742c",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4MonsterGroup.tsv",
+      "rows": 151,
+      "source": [
+        "share/theatre4/Theatre4MonsterGroup.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "89c9e97866f2e36f7fd5c4c4aba16c5feae25d7deed7bf5f3e152b90260412fa",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Reboot.tsv",
+      "rows": 2,
+      "source": [
+        "share/theatre4/Theatre4Reboot.json"
+      ]
+    },
+    {
+      "columns": 9,
+      "contentSha256": "8ab207a3e41fffba0d33c3dbada78aca190d0d26ed12cd60dfe752a28ba81a33",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4RecruitTicket.tsv",
+      "rows": 10,
+      "source": [
+        "share/theatre4/Theatre4RecruitTicket.json"
+      ]
+    },
+    {
+      "columns": 10,
+      "contentSha256": "f5b683d54b1411cce4e5e325d7db6620eb07a2369d2e5f254b0ec3cac0076db4",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Reward.tsv",
+      "rows": 194,
+      "source": [
+        "share/theatre4/Theatre4Reward.json"
+      ]
+    },
+    {
+      "columns": 9,
+      "contentSha256": "31e2583adc96e32c82da8345ae906bbfe99ef658ff1a51c0fb499007721a3318",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4RewardDrop.tsv",
+      "rows": 40,
+      "source": [
+        "share/theatre4/Theatre4RewardDrop.json"
+      ]
+    },
+    {
+      "columns": 19,
+      "contentSha256": "2388c5e3350faa05c11a98e48cdc794ef877226140398949df5956178ba96c33",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Shop.tsv",
+      "rows": 34,
+      "source": [
+        "share/theatre4/Theatre4Shop.json"
+      ]
+    },
+    {
+      "columns": 11,
+      "contentSha256": "87b28c9b74b0eefa653c6852280cac0a9986ba39e28a9f8010351ec077fb0578",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ShopGoods.tsv",
+      "rows": 119,
+      "source": [
+        "share/theatre4/Theatre4ShopGoods.json"
+      ]
+    },
+    {
+      "columns": 7,
+      "contentSha256": "b6c3d7fc1fa689ea53f6b3820891e4fab25e251ac9db0e5426c66855df322402",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4ShopGroup.tsv",
+      "rows": 38,
+      "source": [
+        "share/theatre4/Theatre4ShopGroup.json"
+      ]
+    },
+    {
+      "columns": 11,
+      "contentSha256": "8debe37078ee0df930309f5d546ed53b11e01a187a9e36fb8258f352e0d9e71a",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Task.tsv",
+      "rows": 3,
+      "source": [
+        "share/theatre4/Theatre4Task.json"
+      ]
+    },
+    {
+      "columns": 10,
+      "contentSha256": "0785638106e58c8eac12178c87aac401d814251882806b0c4d526df0f0d5d23a",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Tech.tsv",
+      "rows": 20,
+      "source": [
+        "share/theatre4/Theatre4Tech.json"
+      ]
+    },
+    {
+      "columns": 6,
+      "contentSha256": "2530e522e610816336b75b8d7e420ba8f6deca43c0e757eda6cf249ab9a9bcb3",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/Theatre4Traceback.tsv",
+      "rows": 7,
+      "source": [
+        "share/theatre4/Theatre4Traceback.json"
+      ]
+    },
+    {
+      "columns": 9,
+      "contentSha256": "27a5cc27b5b3456784e7cb1676dd6bf64d72fa137b455d127850073685829961",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/theatre4map/Theatre4Map.tsv",
+      "rows": 50,
+      "source": [
+        "share/theatre4/theatre4map/Theatre4Map.json"
+      ]
+    },
+    {
+      "columns": 13,
+      "contentSha256": "51ed20eb6d9c43939ea8d82308d9407bea382dbda59b332d65d1e06a47253ffa",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/theatre4map/Theatre4MapBlueprint.tsv",
+      "rows": 5,
+      "source": [
+        "share/theatre4/theatre4map/Theatre4MapBlueprint.json"
+      ]
+    },
+    {
+      "columns": 8,
+      "contentSha256": "8920a5db77bf7296c12c9a968f0115a1442c5e0227e629ec09ea52be7d473480",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/theatre4map/Theatre4MapGroup.tsv",
+      "rows": 53,
+      "source": [
+        "share/theatre4/theatre4map/Theatre4MapGroup.json"
+      ]
+    },
+    {
+      "columns": 4,
+      "contentSha256": "10d8fb8406c8f8a6f675f3e8243a875e2a3a4eed305fad17204687096ffb6446",
+      "filter": "all",
+      "naturalKey": "Id",
+      "path": "share/theatre4/theatre4map/Theatre4MapHiddenGrid.tsv",
+      "rows": 10,
+      "source": [
+        "share/theatre4/theatre4map/Theatre4MapHiddenGrid.json"
+      ]
     }
   ],
   "validationNotes": [
@@ -8063,5 +8690,84 @@
       "13019614",
       "13019669"
     ]
+  },
+  "theatre4Import": {
+    "sourceRoot": "PGR_DATA/en/bytes",
+    "schemaRoot": "PGR_DATA/en/lua/matrix/xcommon/XTable.lua (XTableTheatre4*)",
+    "capturesUsed": false,
+    "tables": 57,
+    "rows": 12662,
+    "columnConvention": "XTable-declared fields in XTable order; XTable Type1 arrays expanded to the observed row width, padded to >=2 columns so TableGeneratorV2 emits List<T> (same convention that reproduces Resources/table/share/theatre5/*.tsv byte-for-byte); JSON booleans rendered true/false; XTable fields with no shipped values omitted because an all-empty generated column infers no type.",
+    "naturalKeyOverrides": {
+      "share/theatre4/Theatre4Config.tsv": "Key",
+      "client/theatre4/Theatre4ClientConfig.tsv": "Key",
+      "share/theatre4/Theatre4BattlePass.tsv": "Level"
+    },
+    "jsonOnlyFields": {
+      "share/theatre4/Theatre4Reboot.tsv": [
+        "MagicIds (List<int>, authoritative bytes value; absent from XTable.lua, appended last pending consumer evidence)"
+      ]
+    },
+    "authorityGaps": [
+      {
+        "source": "XTable.lua declares XTableTheatre4Block, XTableTheatre4BlockGrid, XTableTheatre4BlockGroup, XTableTheatre4BlockRelation, XTableTheatre4MapGrid",
+        "reason": "No data file for Theatre4Block, Theatre4BlockGrid, Theatre4BlockGroup, Theatre4BlockRelation or Theatre4MapGrid exists in PGR_Data/en/bytes or PGR_Data/cn/bytes (both language extractions have identical file sets), and no Lua file outside xcommon/XTable.lua references them: XTheatre4ConfigModel loads only the Theatre4TableKey and Theatre4MapTableKey registries, neither of which contains them. Same XTable-without-data pattern as Theatre3BaseGroup, Theatre6AttrPackPool and Theatre6SkillPool. No rows were fabricated; installed-bundle row presence was not independently verified and is not asserted here.",
+        "references": [
+          "share/theatre4/theatre4map/Theatre4Map.json:1.BaseBlockGroupId",
+          "share/theatre4/theatre4map/Theatre4MapGroup.json:1.SpEffectGroup",
+          "en/lua/matrix/xmodule/xtheatre4/XTheatre4ConfigModel.lua:11-72",
+          "en/lua/matrix/xmodule/xtheatre4/XTheatre4Agency.lua (server-pushed grid data path)"
+        ]
+      },
+      {
+        "source": "share/theatre4/Theatre4DifficultDistance.json",
+        "reason": "Empty source ([]) in both EN and CN; header-only TSV ships with 0 rows, so no properties are generated.",
+        "references": [
+          "share/theatre4/Theatre4Difficulty.json:DistanceGroup"
+        ]
+      },
+      {
+        "source": "XTable array fields with no shipped values",
+        "reason": "Declared Type1 but absent from bytes, so no column/property can be generated.",
+        "fields": [
+          "Theatre4Affix.TeamLogo",
+          "Theatre4Affix.TeamLogoCondition",
+          "Theatre4ColorTalent.Param",
+          "Theatre4ColorTalentPool.AddWeightCondition",
+          "Theatre4ColorTalentPool.AddWeight",
+          "Theatre4ColorTalentTree.Param",
+          "Theatre4Difficulty.StarGroupIds",
+          "Theatre4Ending.StoryCondition",
+          "Theatre4Fight.NextFightCondition",
+          "Theatre4ScientificSpEffect.MapImageFrom",
+          "Theatre4ScientificSpEffect.MapImageTo",
+          "Theatre4Shop.ConditionId"
+        ]
+      }
+    ],
+    "xTableFieldsWithoutShippedValues": "XTable-declared scalar fields absent from the bytes JSON (for example Theatre4Shop.NodeBg/EndDesc/NodeEffectUrl, Theatre4Traceback effect fields, Theatre4Activity.TalentRefreshFreeNum, Theatre4Difficulty.DistanceGroup/HpActionPoint) are omitted: TableGeneratorV2 infers no type for an all-empty column, so they would generate no property regardless, and emitting default 0 values would be authored data.",
+    "signedInt32Corrections": {
+      "reason": "The client table binary encodes every non-float scalar as signed int32, but tools/decode_binary_table.py read_int decodes varints unsigned (read_uint), so negative int32 values in PGR_DATA/en/bytes JSON appear as 2**32+n. XTable.lua declares no unsigned type (only int/float/string/bool/fix), so any value in [2**31,2**32) is the two's-complement view of the signed value.",
+      "impactIfNotCorrected": "TableGeneratorV2 int.TryParse overflows on 4294967196, so the column would silently generate as string.",
+      "occurrences": [
+        {
+          "path": "share/theatre4/theatre4map/Theatre4MapGroup.tsv",
+          "column": "AddWeight",
+          "rows": [
+            "42001",
+            "43001",
+            "45001",
+            "52001",
+            "53001",
+            "55001"
+          ],
+          "raw": 4294967196,
+          "corrected": -100,
+          "othersUnchanged": "remaining 47 rows keep 100/9999/1/999999"
+        }
+      ],
+      "scopeVerified": "Grepped every PGR_DATA/en theatre4 JSON for integers >= 2**31: exactly these 6 occurrences; theatre5/theatre6 have none."
+    },
+    "closureScope": "Claims in this section are grounded in PGR_Data/en and PGR_Data/cn extracted tables, the shipped Lua/XTable schema and the repository table convention. Installed-bundle/binary decode evidence is out of scope here and deliberately not asserted."
   }
 }

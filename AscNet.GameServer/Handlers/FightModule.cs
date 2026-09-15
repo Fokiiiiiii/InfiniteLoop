@@ -438,7 +438,8 @@ namespace AscNet.GameServer.Handlers
         {
             if (TheatreModule.TryLeaveFight(session, out LeaveFightResponse theatreResponse, packet.Id)
                 || Theatre3Module.TryLeaveFight(session, out theatreResponse)
-                || BiancaTheatreModule.TryLeaveFight(session, out theatreResponse))
+                || BiancaTheatreModule.TryLeaveFight(session, out theatreResponse)
+                || Theatre4Module.TryLeaveFight(session, out theatreResponse, packet.Id))
             {
                 session.SendResponse(theatreResponse, packet.Id);
                 return;
@@ -465,7 +466,8 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             if (Theatre3Module.TryPreFight(session, req, out PreFightResponse theatreResponse)
-                || BiancaTheatreModule.TryPreFight(session, req, out theatreResponse))
+                || BiancaTheatreModule.TryPreFight(session, req, out theatreResponse)
+                || Theatre4Module.TryPreFight(session, req, out theatreResponse, packet.Id))
             {
                 session.SendResponse(theatreResponse, packet.Id);
                 return;
@@ -1085,7 +1087,8 @@ namespace AscNet.GameServer.Handlers
             FightRebootRequest req = packet.Deserialize<FightRebootRequest>();
             if (TheatreModule.TryReboot(session, req, out FightRebootResponse theatreResponse)
                 || Theatre3Module.TryReboot(session, req, out theatreResponse)
-                || BiancaTheatreModule.TryReboot(session, req, out theatreResponse))
+                || BiancaTheatreModule.TryReboot(session, req, out theatreResponse)
+                || Theatre4Module.TryReboot(session, req, out theatreResponse, packet.Id))
             {
                 session.SendResponse(theatreResponse, packet.Id);
                 return;
@@ -1103,7 +1106,8 @@ namespace AscNet.GameServer.Handlers
             FightRestartRequest req = packet.Deserialize<FightRestartRequest>();
             if (TheatreModule.TryRestart(session, req, out FightRestartResponse theatreResponse, packet.Id)
                 || Theatre3Module.TryRestart(session, req, out theatreResponse, packet.Id)
-                || BiancaTheatreModule.TryRestart(session, req, out theatreResponse))
+                || BiancaTheatreModule.TryRestart(session, req, out theatreResponse)
+                || Theatre4Module.TryRestart(session, req, out theatreResponse, packet.Id))
             {
                 session.SendResponse(theatreResponse, packet.Id);
                 return;
@@ -2414,6 +2418,8 @@ namespace AscNet.GameServer.Handlers
                 if (!TheatreModule.IsCombatStage(result.StageId)
                     && !TheatreModule.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0)
                     && !Theatre3Module.IsCombatStage(result.StageId)
+                    && !Theatre4Module.IsCombatStage(result.StageId)
+                    && !Theatre4Module.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0)
                     && !BiancaTheatreModule.IsCombatStage(result.StageId) && !IsAuthorizedFightSettle(session, result))
                     return false;
 
@@ -2428,7 +2434,8 @@ namespace AscNet.GameServer.Handlers
 
         private static void ClearFailedFightSettle(Session session)
         {
-            if (TheatreModule.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0))
+            if (TheatreModule.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0)
+                || Theatre4Module.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0))
                 return;
             BossModule.CancelFight(session);
             session.PendingBossInshotFight = null;
@@ -2447,7 +2454,8 @@ namespace AscNet.GameServer.Handlers
             {
                 if (TryRecoverFailedFightSettle(session, packet, out req))
                 {
-                    if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreFailedResponse, packet.Id))
+                    if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreFailedResponse, packet.Id)
+                        || Theatre4Module.TrySettleFight(session, req.Result, out originalTheatreFailedResponse, packet.Id))
                     {
                         session.SendResponse(originalTheatreFailedResponse, packet.Id);
                         return;
@@ -2482,7 +2490,8 @@ namespace AscNet.GameServer.Handlers
                 session.SendResponse(new FightSettleResponse { Code = FightAuthorizationError }, packet.Id);
                 return;
             }
-            if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreResponse, packet.Id))
+            if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreResponse, packet.Id)
+                || Theatre4Module.TrySettleFight(session, req.Result, out originalTheatreResponse, packet.Id))
             {
                 session.SendResponse(originalTheatreResponse, packet.Id);
                 return;
