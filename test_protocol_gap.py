@@ -90,6 +90,46 @@ end)
             protocol_gap.feature_rows([gap("FirstRequest", 2), gap("SecondRequest", 3)]),
         )
 
+    def test_probe_events_preserve_region_status_and_classification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "protocol-gap-jp.jsonl"
+            path.write_text(
+                "\n".join([
+                    '{"region":"jp","direction":"request","name":"JpOnlyRequest","packet_type_name":"Request","status":"missing_handler","payload_len":12}',
+                    '{"region":"jp","direction":"request","name":"FooRequest","packet_type_name":"Request","status":"field_mismatch","payload_len":8}',
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            observed, fields, shapes, statuses, regions, events = protocol_gap.parse_observed_details([path])
+
+        self.assertEqual(1, observed["Request", "JpOnlyRequest"])
+        self.assertEqual({"missing_handler"}, statuses["Request", "JpOnlyRequest"])
+        self.assertEqual({"jp"}, regions["Request", "FooRequest"])
+        self.assertNotIn("JpOnlyRequest", shapes)
+        self.assertEqual(2, len(events))
+        self.assertEqual(
+            "JP-only",
+            protocol_gap.classify_observation(
+                "JpOnlyRequest",
+                region="jp",
+                observed=1,
+                handled=False,
+                known_baseline=False,
+                statuses=statuses["Request", "JpOnlyRequest"],
+            ),
+        )
+        self.assertEqual(
+            "field-mismatch",
+            protocol_gap.classify_observation(
+                "FooRequest",
+                region="jp",
+                observed=1,
+                handled=True,
+                known_baseline=True,
+                statuses={"field_mismatch"},
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

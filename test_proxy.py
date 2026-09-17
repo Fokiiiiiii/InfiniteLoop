@@ -176,6 +176,45 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertIn("Channel\tint\t5\n", text)
         self.assertIn("PrimaryCdns\tstring\thttp://prod-twcdn-ak.pgr-game.com/prod\n", text)
 
+    def test_jp_config_passes_through_without_guessed_metadata(self):
+        flow = self.flow(
+            "/prod/client/config/discovered-package/unknown-version/standalone/config.tab",
+            "observed-jp-config.example",
+        )
+
+        with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+            self.assertTrue(proxy.is_authoritative_config_request(flow))
+            self.assertEqual("observed-jp-config.example", flow.request.host)
+            self.assertEqual(80, flow.request.port)
+            self.assertNotIn("X-Forwarded-Host", flow.request.headers)
+
+    def test_jp_config_response_rewrites_login_endpoints_only(self):
+        flow = self.flow(
+            "/prod/client/config/discovered-package/unknown-version/standalone/config.tab",
+            "observed-jp-config.example",
+        )
+        flow.response = SimpleNamespace(
+            status_code=200,
+            content=(
+                "Key\tType\tValue\n"
+                "DocumentVersion\tstring\tunknown\n"
+                "Channel\tint\tunknown\n"
+                "PrimaryCdns\tstring\thttps://observed-jp-cdn.example/prod\n"
+                "ServerListStr\tstring\tJapan#https://official-login.example/api/Login/Login\n"
+                "ChannelServerListStr\tstring\tdefault#Japan#https://official-login.example/api/Login/Login\n"
+            ).encode("utf-8"),
+        )
+
+        with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:8080"}, clear=False):
+            proxy.response(flow)
+
+        text = flow.response.content.decode("utf-8")
+        self.assertIn("ServerListStr\tstring\tJapan#http://127.0.0.1:8080/api/Login/Login\n", text)
+        self.assertIn("ChannelServerListStr\tstring\tdefault#Japan#http://127.0.0.1:8080/api/Login/Login\n", text)
+        self.assertIn("DocumentVersion\tstring\tunknown\n", text)
+        self.assertIn("PrimaryCdns\tstring\thttps://observed-jp-cdn.example/prod\n", text)
+
     def test_tw_feedback_with_query_is_sunk(self):
         flow = self.flow("/feedback?event=login", "prod.twzspnslog.kurogame.com")
 
@@ -184,6 +223,15 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertEqual(200, flow.response.status_code)
         self.assertEqual(b"OK", flow.response.content)
         self.assertEqual("prod.twzspnslog.kurogame.com", flow.request.host)
+
+    def test_sdk_feedback_is_not_sunk_by_region_profile(self):
+        flow = self.flow("/feedback", "sdkapi.kurogame-service.com")
+
+        with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+
+        self.assertEqual("127.0.0.1", flow.request.host)
+        self.assertEqual(9, flow.request.port)
 
 
 if __name__ == "__main__":

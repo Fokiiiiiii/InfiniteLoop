@@ -4,6 +4,14 @@ from mitmproxy import http
 from mitmproxy import ctx
 from mitmproxy.proxy import layer
 
+from region_profile import (
+    ConfigMode,
+    RegionProfile,
+    TW_PROFILE,
+    authoritative_config_matches,
+    get_region_profile,
+)
+
 def load(loader):
     # ctx.options.web_open_browser = False
     # We change the connection strategy to lazy so that next_layer happens before we actually connect upstream.
@@ -63,28 +71,38 @@ def _log_flow(prefix, flow):
 
 
 def _is_ascnet_host(host):
-    return host and (
-        host in {"sdkapi.kurogame-service.com", "sdkapi.kurogame-service.xyz"}
-        or (host.startswith(("prod-encdn-", "prod-twcdn-")) and host.endswith(".kurogame.net"))
-    )
-def _is_pgr_game_popup_notice_request(flow):
+    return get_region_profile("global").matches_route_host(host)
+
+
+def detect_region(flow=None) -> RegionProfile:
+    """Resolve the configured region, retaining legacy TW auto-detection."""
+    profile = get_region_profile(os.environ.get("ASCNET_REGION", "global"))
+    if profile.name == "global" and flow is not None:
+        request = flow.request
+        if authoritative_config_matches(TW_PROFILE, request.pretty_host, request.path):
+            return TW_PROFILE
+    return profile
+
+
+def _is_pgr_game_popup_notice_request(flow, profile: RegionProfile | None = None):
+    profile = profile or detect_region(flow)
     host = flow.request.pretty_host
     path = flow.request.path.split("?", 1)[0]
     return (
-        host
-        and host.startswith(("prod-encdn-", "prod-twcdn-"))
-        and host.endswith(".pgr-game.com")
+        profile.matches_notice_host(host)
         and path.startswith("/prod/client/notice/config/")
         and path.endswith("/PopUpPicNotice.json")
     )
 
 
 
-def _is_upstream_notice_html_request(flow):
+def _is_upstream_notice_html_request(flow, profile: RegionProfile | None = None):
+    profile = profile or detect_region(flow)
     path = flow.request.path.split("?", 1)[0]
     return (
-        _is_ascnet_host(flow.request.pretty_host)
-        and path.startswith("/prod/client/notice/html/")
+        path.startswith("/prod/client/notice/html/")
+        and (profile.matches_route_host(flow.request.pretty_host)
+             or (profile.config_mode is ConfigMode.AUTHORITATIVE and not profile.notice_hosts))
     )
 
 
@@ -92,8 +110,9 @@ def _is_ascnet_gate_request(flow):
     return flow.request.path.split("?", 1)[0] == "/api/Login/Login"
 
 
-def _is_feedback_request(flow):
-    return flow.request.pretty_host in {"prod.enzspnslog.kurogame.com", "prod.twzspnslog.kurogame.com"} and flow.request.path.split("?", 1)[0] == "/feedback"
+def _is_feedback_request(flow, profile: RegionProfile | None = None):
+    profile = profile or detect_region(flow)
+    return profile.matches_host(flow.request.pretty_host, profile.feedback_hosts) and flow.request.path.split("?", 1)[0] == "/feedback"
 
 def _is_wildcard_connect_request(flow):
     return flow.request.method == "CONNECT" and _is_local_wildcard_host(flow.request.pretty_host)
@@ -104,15 +123,45 @@ def _is_wildcard_ascnet_request(flow):
     return _is_local_wildcard_host(flow.request.pretty_host) and path.startswith(("/api/", "/prod/", "/sdkcom/"))
 
 
-def _is_tw_config_request(flow):
-    host = flow.request.pretty_host
-    path = flow.request.path.split("?", 1)[0]
-    return (
-        host.startswith("prod-twcdn-")
-        and host.endswith(".kurogame.net")
-        and path.startswith("/prod/client/config/")
-        and path.endswith("/standalone/config.tab")
+def is_authoritative_config_request(flow, profile: RegionProfile | None = None) -> bool:
+    return authoritative_config_matches(
+        profile or detect_region(flow),
+        flow.request.pretty_host,
+        flow.request.path,
     )
+
+
+# Compatibility alias for integrations that imported the old helper. New
+# routing uses the profile-independent predicate above.
+def _is_tw_config_request(flow):
+    return authoritative_config_matches(TW_PROFILE, flow.request.pretty_host, flow.request.path)
+
+
+def rewrite_game_server_routes(flow, profile: RegionProfile | None = None) -> bool:
+    """Rewrite only endpoints that belong to the selected local server."""
+    profile = profile or detect_region(flow)
+    if is_authoritative_config_request(flow, profile) or _is_upstream_notice_html_request(flow, profile):
+        return False
+
+    if not (
+        profile.matches_route_host(flow.request.pretty_host)
+        or _is_pgr_game_popup_notice_request(flow, profile)
+        or _is_ascnet_gate_request(flow)
+        or _is_wildcard_ascnet_request(flow)
+    ):
+        return False
+
+    scheme, host, port = _ascnet_target()
+    original_host = flow.request.host
+    original_scheme = flow.request.scheme
+
+    flow.request.scheme = scheme
+    flow.request.host = host
+    flow.request.port = port
+    flow.request.headers["Host"] = host if port in (80, 443) else f"{host}:{port}"
+    flow.request.headers["X-Forwarded-Host"] = original_host
+    flow.request.headers["X-Forwarded-Proto"] = original_scheme
+    return True
 
 
 def _ascnet_origin():
@@ -134,7 +183,7 @@ def _rewrite_login_url(value, target_origin):
     return head + sep + target_origin + suffix
 
 
-def _rewrite_tw_config_body(body, target_origin):
+def _rewrite_authoritative_config_body(body, target_origin):
     lines = body.split("\n")
     out = []
     for line in lines:
@@ -143,6 +192,11 @@ def _rewrite_tw_config_body(body, target_origin):
             cols[2] = _rewrite_login_url(cols[2], target_origin)
         out.append("\t".join(cols))
     return "\n".join(out)
+
+
+# Kept as a small compatibility alias for callers of the pre-profile helper.
+def _rewrite_tw_config_body(body, target_origin):
+    return _rewrite_authoritative_config_body(body, target_origin)
 
 
 def next_layer(nextlayer: layer.NextLayer):
@@ -169,49 +223,36 @@ def http_connect(flow: http.HTTPFlow) -> None:
 
 def request(flow: http.HTTPFlow) -> None:
     _log_flow("REQ", flow)
+    profile = detect_region(flow)
 
-    if _is_feedback_request(flow):
+    if _is_feedback_request(flow, profile):
         flow.response = http.Response.make(200, b"OK", {"Content-Type": "text/plain"})
         _log_flow("SINK", flow)
         return
 
     # Notice metadata points at version-specific CDN HTML files. Keep those
     # requests on the original CDN so new notices work without local fixtures.
-    if _is_upstream_notice_html_request(flow):
+    if _is_upstream_notice_html_request(flow, profile):
         _log_flow("PASS", flow)
         return
 
-    # TW config carries authoritative upstream metadata (doc/launch version,
-    # channel, CDN list) that local AscNet does not reproduce. Let it pass
-    # through to the real CDN unchanged; response() rewrites only the login
-    # endpoints to the local target.
-    if _is_tw_config_request(flow):
+    # Authoritative regional config carries upstream metadata (document/launch
+    # version, channel, CDN list) that local AscNet does not reproduce. Let it
+    # pass through unchanged; response() rewrites only login endpoints.
+    if is_authoritative_config_request(flow, profile):
         _log_flow("PASS", flow)
         return
 
-    if not (_is_ascnet_host(flow.request.pretty_host) or _is_pgr_game_popup_notice_request(flow)
-            or _is_ascnet_gate_request(flow) or _is_wildcard_ascnet_request(flow)):
-        return
-
-    scheme, host, port = _ascnet_target()
-    original_host = flow.request.host
-    original_scheme = flow.request.scheme
-
-    flow.request.scheme = scheme
-    flow.request.host = host
-    flow.request.port = port
-    flow.request.headers["Host"] = host if port in (80, 443) else f"{host}:{port}"
-    flow.request.headers["X-Forwarded-Host"] = original_host
-    flow.request.headers["X-Forwarded-Proto"] = original_scheme
+    rewrite_game_server_routes(flow, profile)
 
 
 def response(flow: http.HTTPFlow) -> None:
     _log_flow("RSP", flow)
 
-    # TW config was passed through upstream unchanged. Rewrite only the login
-    # endpoint URLs to the local target so the client reaches local AscNet,
-    # keeping all authoritative metadata (version, channel, CDNs, labels).
-    if not _is_tw_config_request(flow) or flow.response is None:
+    # Authoritative regional config was passed through upstream unchanged.
+    # Rewrite only login endpoint URLs so the client reaches local AscNet,
+    # keeping metadata (version, channel, CDNs, labels) from the source.
+    if not is_authoritative_config_request(flow) or flow.response is None:
         return
 
     body = flow.response.content
@@ -219,7 +260,7 @@ def response(flow: http.HTTPFlow) -> None:
         return
 
     text = body.decode("utf-8", errors="replace")
-    rewritten = _rewrite_tw_config_body(text, _ascnet_origin())
+    rewritten = _rewrite_authoritative_config_body(text, _ascnet_origin())
     if rewritten != text:
         flow.response.content = rewritten.encode("utf-8")
         _log_flow("TW-CONFIG-REWRITE", flow)

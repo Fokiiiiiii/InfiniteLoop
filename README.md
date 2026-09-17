@@ -337,6 +337,9 @@ Common options:
 
 | Option | Purpose |
 | --- | --- |
+| `--region global` | Use the existing local Global/EN config and routing behavior (default). |
+| `--region tw` | Pass the known TW standalone config through upstream and rewrite only its login destinations to local AscNet. |
+| `--region jp` | Enable JP authoritative-config discovery mode. It fails before smoke unless JP package/host/channel/version metadata has been observed. Use `--no-smoke` only for an explicitly instrumented discovery run. |
 | `--sdk-url http://127.0.0.1:8080` | Local SDK/config URL exposed by AscNet. |
 | `--proxy-host 127.0.0.1` | mitmproxy bind host. |
 | `--proxy-port 8081` | mitmproxy bind port. |
@@ -350,6 +353,7 @@ Common options:
 | `--no-proxy` | Run only AscNet; skip mitmproxy. |
 | `--no-smoke` | Skip config smoke checks before launching. |
 | `--proxy-log <path>` | Write redacted request/response diagnostics. |
+| `--protocol-gap-log <path>` | Write protocol compatibility metadata as JSONL; JP defaults to `.runtime/protocol-gap-jp.jsonl`. |
 | `--launch-cmd ...` | Command to start after AscNet/proxy are ready. |
 
 On native Windows, pass the client's actual `%APPDATA%\KR_G143\A1855` directory with `--krsdk-cache-dir` when using KRSDK cache repair or `--seed-krsdk-cache`; the default path targets the macOS/CrossOver launch example.
@@ -361,6 +365,18 @@ The runner sets:
 - proxy variables for the launch command
 - `ASCNET_PROXY_TARGET`
 - `ASCNET_PROXY_LOG`
+- `ASCNET_REGION`
+- `ASCNET_PROTOCOL_GAP_LOG` when protocol probing is enabled
+
+Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP treat upstream config metadata as authoritative and do not manufacture local document versions, channels, or CDN values. The JP profile currently reports `UNKNOWN / discovery required` for package, config host, channel, and version because none has been registered from an observed client/config request.
+
+When `ASCNET_PROTOCOL_GAP_LOG` is set, the game session writes metadata-only JSONL events for unknown requests/pushes, MessagePack DTO decoding failures, request field mismatches, client exception responses, and disconnect points. It records the last successful request but never stores packet payloads. Analyze the result against the EN/Lua/handler baseline with:
+
+```bash
+python3 Scripts/protocol_gap.py --region jp --summary .runtime/protocol-gap-jp.jsonl --output .runtime/protocol-gap-jp.tsv
+```
+
+The TSV keeps the historical columns and appends `observed_regions`, `observed_statuses`, and `classification` (`same`, `observed-compatible`, `missing-handler`, `field-mismatch`, `JP-only`, or `unknown`).
 
 ## Local account flow
 
@@ -443,6 +459,7 @@ Local runtime state should stay out of commits:
 - `.runtime/`
 - `.runtime/mongo`
 - `.runtime/proxy-flows.log`
+- `.runtime/protocol-gap-*.jsonl` and `.runtime/protocol-gap-*.tsv`
 - build outputs under `bin/` and `obj/`
 - packet captures (`.pcap`, `.pcapng`, `.cap`), `proxylog`, and `.DS_Store`
 

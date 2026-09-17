@@ -265,13 +265,41 @@ def parse_handlers(root: Path) -> tuple[set[str], set[str]]:
 def parse_observed(
     paths: Iterable[Path],
 ) -> tuple[Counter[tuple[str, str]], dict[str, set[str]], dict[str, set[str]]]:
+    observed, request_fields, request_shapes, _, _, _ = parse_observed_details(paths)
+    return observed, request_fields, request_shapes
+
+
+def parse_observed_details(
+    paths: Iterable[Path],
+) -> tuple[
+    Counter[tuple[str, str]],
+    dict[str, set[str]],
+    dict[str, set[str]],
+    dict[tuple[str, str], set[str]],
+    dict[tuple[str, str], set[str]],
+    list[dict[str, object]],
+]:
+    """Read packet summaries and optional compatibility-probe events.
+
+    The first three return values intentionally match the historical
+    ``parse_observed`` API. The additional maps preserve region and status
+    evidence without requiring packet payloads or captures in production.
+    """
     observed: Counter[tuple[str, str]] = Counter()
     request_fields: dict[str, set[str]] = defaultdict(set)
     request_shapes: dict[str, set[str]] = defaultdict(set)
+    statuses: dict[tuple[str, str], set[str]] = defaultdict(set)
+    regions: dict[tuple[str, str], set[str]] = defaultdict(set)
+    events: list[dict[str, object]] = []
+    candidate_groups = []
+    for path in paths:
+        if path.is_dir():
+            candidate_groups.extend(path.rglob("*summary*.jsonl"))
+            candidate_groups.extend(path.rglob("*protocol-gap*.jsonl"))
+        else:
+            candidate_groups.append(path)
     files = sorted({
-        candidate
-        for path in paths
-        for candidate in (path.rglob("*summary*.jsonl") if path.is_dir() else [path])
+        candidate for candidate in candidate_groups
     })
     for path in files:
         with path.open(encoding="utf-8") as handle:
@@ -280,9 +308,19 @@ def parse_observed(
                     row = json.loads(line)
                 except json.JSONDecodeError as exc:
                     raise ValueError(f"{path}:{line_number}: invalid JSON: {exc.msg}") from exc
-                if isinstance(row.get("name"), str) and isinstance(row.get("packet_type_name"), str):
-                    observed[row["packet_type_name"], row["name"]] += 1
-                    if row["packet_type_name"] != "Request":
+                packet_type = row.get("packet_type_name")
+                name = row.get("name")
+                if isinstance(name, str) and isinstance(packet_type, str):
+                    key = packet_type, name
+                    observed[key] += 1
+                    status = row.get("status")
+                    statuses[key].add(status if isinstance(status, str) else "observed")
+                    region = row.get("region")
+                    if isinstance(region, str) and region:
+                        regions[key].add(region)
+                    if "status" in row or "direction" in row or "region" in row:
+                        events.append(row)
+                    if packet_type != "Request":
                         continue
                     summary = row.get("payload_summary")
                     if isinstance(summary, dict):
@@ -294,9 +332,37 @@ def parse_observed(
                         keys = summary.get("keys")
                         if isinstance(keys, list):
                             request_fields[row["name"]].update(key for key in keys if isinstance(key, str))
-                    elif "payload_len" in row:
+                    elif "payload_len" in row and "status" not in row:
                         request_shapes[row["name"]].add("nil" if summary is None else type(summary).__name__)
-    return observed, request_fields, request_shapes
+    return observed, request_fields, request_shapes, statuses, regions, events
+
+
+def classify_observation(
+    name: str,
+    *,
+    region: str | None,
+    observed: int,
+    handled: bool,
+    known_baseline: bool,
+    statuses: Iterable[str] = (),
+) -> str:
+    """Classify one observed request/push against the EN/AscNet baseline."""
+    normalised_statuses = {status.replace("_", "-") for status in statuses}
+    if normalised_statuses & {
+        "field-mismatch",
+        "dto-decode-failure",
+        "response-consumer-mismatch",
+    }:
+        return "field-mismatch"
+    if observed and (region or "").lower() == "jp" and not known_baseline:
+        return "JP-only"
+    if observed and not handled:
+        return "missing-handler"
+    if observed and handled:
+        return "observed-compatible"
+    if handled and known_baseline:
+        return "same"
+    return "unknown"
 
 
 def priority(name: str, status: str, count: int, has_lua: bool) -> str:
@@ -322,7 +388,12 @@ def rows(
     observed: Counter[tuple[str, str]],
     observed_fields: dict[str, set[str]],
     observed_shapes: dict[str, set[str]],
+    observed_statuses: dict[tuple[str, str], set[str]] | None = None,
+    observed_regions: dict[tuple[str, str], set[str]] | None = None,
+    region: str | None = None,
 ) -> list[list[object]]:
+    observed_statuses = observed_statuses or {}
+    observed_regions = observed_regions or {}
     output: list[list[object]] = []
     requests = set(calls) | handlers | {name for name in schemas if name.endswith("Request")} | {
         name for kind, name in observed if kind == "Request"
@@ -340,6 +411,16 @@ def rows(
             ",".join(sorted(observed_shapes.get(name, set()))), ",".join(schemas.get(name, [])),
             ",".join(sorted(inferred_fields)), field_sources, ",".join(sorted(responses.get(name, set()))),
             ";".join(sorted(calls.get(name, set()))), status, count, response_name if response_name in schemas else "",
+            ",".join(sorted(observed_regions.get(("Request", name), set()))),
+            ",".join(sorted(observed_statuses.get(("Request", name), set()))),
+            classify_observation(
+                name,
+                region=region or next(iter(observed_regions.get(("Request", name), set())), None),
+                observed=count,
+                handled=name in handlers,
+                known_baseline=name in schemas or name in calls or name in handlers,
+                statuses=observed_statuses.get(("Request", name), set()),
+            ),
         ])
 
     pushes = set(consumers) | {name for name in schemas if name.startswith("Notify")} | {
@@ -352,6 +433,16 @@ def rows(
             "5-observed-push" if count else "6-unobserved-push",
             "push", name, feature_name(set()), "", ",".join(schemas.get(name, [])), "", "",
             ",".join(sorted(consumers.get(name, set()))), "", status, count, "",
+            ",".join(sorted(observed_regions.get(("Push", name), set()))),
+            ",".join(sorted(observed_statuses.get(("Push", name), set()))),
+            classify_observation(
+                name,
+                region=region or next(iter(observed_regions.get(("Push", name), set())), None),
+                observed=count,
+                handled=name in consumers or name in emitted_pushes,
+                known_baseline=name in schemas or name in consumers or name in emitted_pushes,
+                statuses=observed_statuses.get(("Push", name), set()),
+            ),
         ])
     return sorted(output, key=lambda row: (str(row[0]), str(row[1]), str(row[2])))
 
@@ -359,6 +450,7 @@ def rows(
 REPORT_HEADER = [
     "priority", "kind", "name", "feature", "request_shapes", "schema_fields", "request_fields",
     "request_field_sources", "consumed_fields", "lua_callsites", "ascnet_status", "observed", "response",
+    "observed_regions", "observed_statuses", "classification",
 ]
 
 
@@ -420,6 +512,7 @@ def main() -> int:
     parser.add_argument("--lua-root", type=Path, default=DEFAULT_LUA)
     parser.add_argument("--handlers", type=Path, default=REPO / "AscNet.GameServer")
     parser.add_argument("--summary", type=Path, action="append", default=[], help="Decoded JSONL summary or directory; repeatable")
+    parser.add_argument("--region", choices=("global", "tw", "jp"), help="Region label for compatibility classification")
     parser.add_argument("--output", type=Path, help="TSV output; defaults to stdout")
     parser.add_argument("--clusters-output", type=Path, help="Observed missing requests grouped by Lua feature")
     parser.add_argument("--features-output", type=Path, help="All request coverage grouped by Lua feature")
@@ -431,10 +524,11 @@ def main() -> int:
 
     calls, lua_fields, responses, consumers = parse_lua(args.lua_root)
     handlers, emitted_pushes = parse_handlers(args.handlers)
-    observed, observed_fields, observed_shapes = parse_observed(args.summary)
+    observed, observed_fields, observed_shapes, observed_statuses, observed_regions, _ = parse_observed_details(args.summary)
     report = rows(
         parse_metadata(args.metadata), calls, lua_fields, responses, consumers,
         handlers, emitted_pushes, observed, observed_fields, observed_shapes,
+        observed_statuses, observed_regions, args.region,
     )
     write_tsv(args.output, REPORT_HEADER, report)
     if args.clusters_output:

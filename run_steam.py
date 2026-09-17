@@ -24,20 +24,14 @@ else:
     import fcntl
 from typing import BinaryIO, Iterable
 
+from region_profile import ConfigMode, get_region_profile, region_names
+
 ROOT = Path(__file__).resolve().parent
 DEFAULT_KRSDK_CACHE_DIR = Path.home() / "Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix/drive_c/users/Sikarugir/AppData/Roaming/KR_G143/A1855"
 LOCAL_KRSDK_OAUTH_CODE = "ascnet-local-oauth-code"
 CONFIG_SMOKE_TARGETS = [
-    (
-        "global-client",
-        "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.punishing.grayraven.en/4.6.0/standalone/config.tab",
-        "Channel\tint\t5",
-    ),
-    (
-        "steam-pc-package",
-        "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.pc.punishing.grayraven.en/4.6.0/standalone/config.tab",
-        "Channel\tint\t205",
-    ),
+    (target.label, target.path, target.channel_assertion)
+    for target in get_region_profile("global").config_smoke_targets
 ]
 CURRENT_DOCUMENT_VERSION = "4.6.7"
 LOCAL_SDK_HTTP = None
@@ -53,6 +47,12 @@ def local_sdk_open(request: str | urllib.request.Request, timeout: float):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run AscNet on an unprivileged local SDK port and bridge Steam/Kuro HTTP(S) traffic through mitmproxy.",
+    )
+    parser.add_argument(
+        "--region",
+        choices=region_names(),
+        default="global",
+        help="Region profile for routing and diagnostics. Default: %(default)s",
     )
     parser.add_argument("--sdk-url", default="http://127.0.0.1:8080", help="AscNet SDK server URL. Default: %(default)s")
     parser.add_argument("--proxy-host", default="127.0.0.1", help="mitmproxy listen host. Default: %(default)s")
@@ -92,6 +92,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-smoke", action="store_true", help="Skip the Steam config smoke check before starting mitmproxy/launch command.")
     parser.add_argument("--smoke-timeout", type=float, default=30.0, help="Seconds to wait for AscNet config smoke. Default: %(default)s")
     parser.add_argument("--proxy-log", default=".runtime/proxy-flows.log", help="Write redacted HTTP flow diagnostics here. Empty disables. Default: %(default)s")
+    parser.add_argument(
+        "--protocol-gap-log",
+        default=os.environ.get("ASCNET_PROTOCOL_GAP_LOG"),
+        help="JSONL protocol compatibility probe path. JP defaults to .runtime/protocol-gap-jp.jsonl; empty disables.",
+    )
     parser.add_argument("--proxy-https", action="store_true", help="Also set HTTPS_PROXY for diagnostics. May break pinned KRSDK HTTPS hosts.")
     parser.add_argument("--stop-when-launch-exits", action="store_true", help="Stop AscNet/proxy when --launch-cmd exits. Default keeps the bridge alive for launchers that spawn and detach.")
     parser.add_argument(
@@ -239,8 +244,19 @@ def popen(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.Po
     return subprocess.Popen(cmd, cwd=ROOT, env=env)
 
 
-def smoke_check(sdk_url: str, timeout: float) -> None:
-    for label, path, channel_assertion in CONFIG_SMOKE_TARGETS:
+def smoke_check(sdk_url: str, timeout: float, profile=None) -> None:
+    profile = profile or get_region_profile("global")
+    if profile.requires_discovery:
+        raise SystemExit(profile.discovery_error())
+    if profile.config_mode is ConfigMode.AUTHORITATIVE and not profile.config_smoke_targets:
+        print(
+            f"Smoke DEFERRED [{profile.name}]: authoritative upstream config is passed through; "
+            "no local metadata assertion is available.",
+            flush=True,
+        )
+        return
+    for target in profile.config_smoke_targets:
+        label, path, channel_assertion = target.label, target.path, target.channel_assertion
         smoke_config_target(sdk_url, timeout, label, path, channel_assertion)
 
 
@@ -457,10 +473,25 @@ def seed_krsdk_login_cache(cache_dir: Path, account: dict[str, object]) -> None:
     print(f"KRSDK local login cache seeded: {cache_dir}", flush=True)
 
 
-def proxy_env(base: dict[str, str], proxy_host: str, proxy_port: int, sdk_url: str, proxy_log: str, proxy_https: bool) -> dict[str, str]:
+def proxy_env(
+    base: dict[str, str],
+    proxy_host: str,
+    proxy_port: int,
+    sdk_url: str,
+    proxy_log: str,
+    proxy_https: bool,
+    region: str = "global",
+    protocol_gap_log: str | None = None,
+) -> dict[str, str]:
+    profile = get_region_profile(region)
     env = dict(base)
     proxy_url = f"http://{proxy_host}:{proxy_port}"
     env["ASCNET_PROXY_TARGET"] = sdk_url
+    env["ASCNET_REGION"] = profile.name
+    env["ASCNET_REGION_CONFIG_MODE"] = profile.config_mode.value
+    env["ASCNET_REGION_PACKAGES"] = ",".join(profile.package_names) or "UNKNOWN"
+    expected_channels = profile.expected_channels
+    env["ASCNET_EXPECTED_CHANNEL"] = ",".join(str(channel) for channel in expected_channels) or "UNKNOWN"
     env["http_proxy"] = proxy_url
     env["HTTP_PROXY"] = proxy_url
     for inherited_proxy_name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
@@ -473,6 +504,12 @@ def proxy_env(base: dict[str, str], proxy_host: str, proxy_port: int, sdk_url: s
         env["ASCNET_PROXY_LOG"] = str(log_path)
     else:
         env.pop("ASCNET_PROXY_LOG", None)
+    if protocol_gap_log:
+        probe_path = (ROOT / protocol_gap_log).resolve()
+        probe_path.parent.mkdir(parents=True, exist_ok=True)
+        env["ASCNET_PROTOCOL_GAP_LOG"] = str(probe_path)
+    else:
+        env.pop("ASCNET_PROTOCOL_GAP_LOG", None)
     if proxy_https:
         env["https_proxy"] = proxy_url
         env["HTTPS_PROXY"] = proxy_url
@@ -511,6 +548,9 @@ def terminate(processes: Iterable[subprocess.Popen[bytes]]) -> None:
 
 def main() -> int:
     args = parse_args()
+    profile = get_region_profile(args.region)
+    if profile.requires_discovery and not args.no_smoke:
+        raise SystemExit(profile.discovery_error())
     args.sdk_url = normalise_local_sdk_url(args.sdk_url)
     dotnet = resolve_dotnet(args.dotnet)
     mitm = None if args.no_proxy else resolve_mitm(args.mitm)
@@ -523,7 +563,38 @@ def main() -> int:
         env["ASCNET_GATE_FALLBACK_USERNAME"] = gate_fallback
     else:
         env.pop("ASCNET_GATE_FALLBACK_USERNAME", None)
-    child_env = proxy_env(env, args.proxy_host, args.proxy_port, args.sdk_url, args.proxy_log, args.proxy_https)
+    protocol_gap_log = args.protocol_gap_log
+    if protocol_gap_log is None and profile.name == "jp":
+        protocol_gap_log = ".runtime/protocol-gap-jp.jsonl"
+    child_env = proxy_env(
+        env,
+        args.proxy_host,
+        args.proxy_port,
+        args.sdk_url,
+        args.proxy_log,
+        args.proxy_https,
+        profile.name,
+        protocol_gap_log,
+    )
+    for diagnostic_name in (
+        "ASCNET_REGION",
+        "ASCNET_REGION_CONFIG_MODE",
+        "ASCNET_REGION_PACKAGES",
+        "ASCNET_EXPECTED_CHANNEL",
+        "ASCNET_PROTOCOL_GAP_LOG",
+    ):
+        if diagnostic_name in child_env:
+            env[diagnostic_name] = child_env[diagnostic_name]
+        else:
+            env.pop(diagnostic_name, None)
+    print(
+        f"Region profile: {profile.name}; config={profile.config_mode.value}; "
+        f"packages={','.join(profile.package_names) or 'UNKNOWN'}; "
+        f"expected-channel={','.join(str(channel) for channel in profile.expected_channels) or 'UNKNOWN'}",
+        flush=True,
+    )
+    if profile.requires_discovery:
+        print(f"Region profile warning: {profile.discovery_error()}", flush=True)
     print(f"AscNet SDK URL: {args.sdk_url}", flush=True)
     processes: list[subprocess.Popen[bytes]] = []
     ignored_exit_processes: set[int] = set()
@@ -572,7 +643,7 @@ def main() -> int:
         processes.append(ascnet)
 
         if not args.no_smoke:
-            smoke_check(args.sdk_url, args.smoke_timeout)
+            smoke_check(args.sdk_url, args.smoke_timeout, profile)
 
         account = None
         if not args.no_ensure_account:

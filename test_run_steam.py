@@ -68,6 +68,37 @@ class PasswordHelpTests(unittest.TestCase):
             self.assertEqual(password, run_steam.parse_args().ascnet_password)
 
 
+class RegionProfileRunnerTests(unittest.TestCase):
+    def test_region_defaults_to_global(self):
+        with patch.object(sys, "argv", ["run_steam.py"]):
+            self.assertEqual("global", run_steam.parse_args().region)
+
+    def test_region_jp_selects_discovery_profile(self):
+        with patch.object(sys, "argv", ["run_steam.py", "--region", "jp"]):
+            args = run_steam.parse_args()
+        profile = run_steam.get_region_profile(args.region)
+        self.assertEqual("jp", profile.name)
+        self.assertTrue(profile.requires_discovery)
+        self.assertIsNone(profile.expected_channel)
+
+    def test_jp_smoke_fails_clearly_without_metadata(self):
+        with self.assertRaisesRegex(SystemExit, r"UNKNOWN / discovery required"):
+            run_steam.smoke_check("http://127.0.0.1:9", 0.01, run_steam.get_region_profile("jp"))
+
+    def test_tw_authoritative_smoke_is_not_faked_locally(self):
+        with patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            run_steam.smoke_check("http://127.0.0.1:9", 0.01, run_steam.get_region_profile("tw"))
+        self.assertIn("Smoke DEFERRED [tw]", stdout.getvalue())
+
+    def test_proxy_environment_carries_selected_region_without_metadata(self):
+        with tempfile.TemporaryDirectory() as root, patch.object(run_steam, "ROOT", Path(root)):
+            env = run_steam.proxy_env({}, "127.0.0.1", 8081, "http://127.0.0.1:8080", "", False, "jp", "")
+        self.assertEqual("jp", env["ASCNET_REGION"])
+        self.assertEqual("authoritative", env["ASCNET_REGION_CONFIG_MODE"])
+        self.assertEqual("UNKNOWN", env["ASCNET_REGION_PACKAGES"])
+        self.assertEqual("UNKNOWN", env["ASCNET_EXPECTED_CHANNEL"])
+
+
 class GateFallbackUsernameTests(unittest.TestCase):
     def args(self, fallback, *, no_ensure_account):
         return SimpleNamespace(

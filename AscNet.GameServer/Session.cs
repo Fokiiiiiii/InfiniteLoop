@@ -38,6 +38,8 @@ namespace AscNet.GameServer
         private int startState;
         private int packetNo = 0;
         private int disconnectState;
+        private string? lastSuccessfulRequest;
+        private string lastProtocolPoint = "connected";
         private const int InitialReceiveBufferLength = 1 << 16;
         private const int MaxReceivePacketLength = PacketCodec.MaxFrameLength;
         private static readonly object BigWorldPacketDumpLock = new();
@@ -248,6 +250,15 @@ namespace AscNet.GameServer
                             catch (Exception ex)
                             {
                                 log.Error($"Failed to deserialize packet: packetBytes={packetLen}, bufferedBytes={prevBuf}, error={ex.GetType().Name}");
+                                ProtocolGapProbe.Record(
+                                    id,
+                                    "inbound",
+                                    "<unknown>",
+                                    "Packet",
+                                    "dto_decode_failure",
+                                    packetLen,
+                                    error: ex.GetType().Name,
+                                    point: "packet-envelope");
                             }
                         }
 
@@ -271,43 +282,171 @@ namespace AscNet.GameServer
                         {
                             try
                             {
+                                lastProtocolPoint = $"packet:{packet.Type}";
                                 switch (packet.Type)
                                 {
                                     case Packet.ContentType.Request:
-                                        Packet.Request request = MessagePackSerializer.Deserialize<Packet.Request>(packet.Content, Packet.InboundOptions);
-                                        RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(request.Name);
+                                        Packet.Request request;
+                                        try
+                                        {
+                                            request = MessagePackSerializer.Deserialize<Packet.Request>(packet.Content, Packet.InboundOptions);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            lastProtocolPoint = "request-envelope-decode";
+                                            ProtocolGapProbe.Record(
+                                                id,
+                                                "request",
+                                                "<unknown>",
+                                                "Request",
+                                                "dto_decode_failure",
+                                                packet.Content?.Length,
+                                                error: ex.GetType().Name,
+                                                point: lastProtocolPoint);
+                                            throw;
+                                        }
+                                        string requestName = request.Name ?? "<unknown>";
+                                        lastProtocolPoint = $"request:{requestName}";
+                                        RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(requestName);
                                         if (requestPacketHandler is not null)
                                         {
                                             // TODO: with new logger this will be unnecessary
                                             if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
-                                            InvokeRequestHandler(requestPacketHandler, request);
+                                            try
+                                            {
+                                                InvokeRequestHandler(requestPacketHandler, request);
+                                                lastSuccessfulRequest = requestName;
+                                                ProtocolGapProbe.Record(
+                                                    id,
+                                                    "request",
+                                                    requestName,
+                                                    "Request",
+                                                    "handled",
+                                                    request.Content?.Length,
+                                                    request.Id,
+                                                    point: $"request:{requestName}");
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                ProtocolGapProbe.Record(
+                                                    id,
+                                                    "request",
+                                                    requestName,
+                                                    "Request",
+                                                    ProtocolGapProbe.RequestFailureStatus(ex),
+                                                    request.Content?.Length,
+                                                    request.Id,
+                                                    error: ex.GetType().Name,
+                                                    point: $"request:{requestName}",
+                                                    lastSuccessfulRequest: lastSuccessfulRequest);
+                                                throw;
+                                            }
                                         }
                                         else
                                         {
                                             if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
                                                 log.Warn($"Request handler not found: name={System.Text.Json.JsonSerializer.Serialize(request.Name is { Length: > 128 } ? request.Name[..128] : request.Name)}, nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
+                                            ProtocolGapProbe.Record(
+                                                id,
+                                                "request",
+                                                requestName,
+                                                "Request",
+                                                "missing_handler",
+                                                request.Content?.Length,
+                                                request.Id,
+                                                point: lastProtocolPoint,
+                                                lastSuccessfulRequest: lastSuccessfulRequest);
                                         }
                                         break;
 
                                     case Packet.ContentType.Push:
-                                        Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content, Packet.InboundOptions);
+                                        Packet.Push push;
+                                        try
+                                        {
+                                            push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content, Packet.InboundOptions);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            lastProtocolPoint = "push-envelope-decode";
+                                            ProtocolGapProbe.Record(
+                                                id,
+                                                "push",
+                                                "<unknown>",
+                                                "Push",
+                                                "dto_decode_failure",
+                                                packet.Content?.Length,
+                                                error: ex.GetType().Name,
+                                                point: lastProtocolPoint);
+                                            throw;
+                                        }
+                                        string pushName = push.Name ?? "<unknown>";
+                                        lastProtocolPoint = $"push:{pushName}";
+                                        bool knownPush = IsKnownClientPush(pushName);
                                         if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
                                         {
-                                            if (IsKnownClientPush(push.Name))
+                                            if (knownPush)
                                                 log.Info($"Known client push received: nameLength={push.Name?.Length ?? 0}, contentBytes={push.Content?.Length ?? 0}");
                                             else
                                                 log.Warn($"Client push ignored: nameLength={push.Name?.Length ?? 0}, contentBytes={push.Content?.Length ?? 0}");
                                         }
+                                        ProtocolGapProbe.Record(
+                                            id,
+                                            "push",
+                                            pushName,
+                                            "Push",
+                                            knownPush ? "known" : "unknown_push",
+                                            push.Content?.Length,
+                                            point: lastProtocolPoint,
+                                            lastSuccessfulRequest: lastSuccessfulRequest);
                                         break;
 
                                     case Packet.ContentType.Exception:
-                                        Packet.Exception exception = MessagePackSerializer.Deserialize<Packet.Exception>(packet.Content, Packet.InboundOptions);
+                                        Packet.Exception exception;
+                                        try
+                                        {
+                                            exception = MessagePackSerializer.Deserialize<Packet.Exception>(packet.Content, Packet.InboundOptions);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            lastProtocolPoint = "exception-envelope-decode";
+                                            ProtocolGapProbe.Record(
+                                                id,
+                                                "response",
+                                                "<unknown>",
+                                                "Exception",
+                                                "dto_decode_failure",
+                                                packet.Content?.Length,
+                                                error: ex.GetType().Name,
+                                                point: lastProtocolPoint,
+                                                lastSuccessfulRequest: lastSuccessfulRequest);
+                                            throw;
+                                        }
                                         log.Error($"Exception packet received: code={exception.Code}, id={exception.Id}");
+                                        ProtocolGapProbe.Record(
+                                            id,
+                                            "response",
+                                            "<client-exception>",
+                                            "Exception",
+                                            "response_consumer_mismatch",
+                                            packet.Content?.Length,
+                                            exception.Id,
+                                            error: $"code={exception.Code}",
+                                            point: "client-exception",
+                                            lastSuccessfulRequest: lastSuccessfulRequest);
                                         break;
 
                                     default:
                                         log.Error($"Unknown packet received: type={(int)packet.Type}, contentBytes={packet.Content?.Length ?? 0}");
+                                        ProtocolGapProbe.Record(
+                                            id,
+                                            "inbound",
+                                            "<unknown>",
+                                            packet.Type.ToString(),
+                                            "unknown_packet",
+                                            packet.Content?.Length,
+                                            point: lastProtocolPoint,
+                                            lastSuccessfulRequest: lastSuccessfulRequest);
                                         break;
                                 }
                             }
@@ -379,6 +518,7 @@ namespace AscNet.GameServer
                 Name = typeof(T).Name,
                 Content = MessagePackSerializer.Serialize(push)
             };
+            lastProtocolPoint = $"outbound-push:{packet.Name}";
             lock (outboundLock)
             {
                 ProbeBigWorldPacket("push", packet.Name, packet.Content, null, packetNo + 1);
@@ -401,6 +541,7 @@ namespace AscNet.GameServer
                 Name = name,
                 Content = push
             };
+            lastProtocolPoint = $"outbound-push:{packet.Name}";
             lock (outboundLock)
             {
                 ProbeBigWorldPacket("push", packet.Name, packet.Content, null, packetNo + 1);
@@ -562,6 +703,7 @@ namespace AscNet.GameServer
                 Name = typeof(T).Name,
                 Content = MessagePackSerializer.Serialize(response)
             };
+            lastProtocolPoint = $"outbound-response:{packet.Name}";
             ProbeBigWorldPacket("response", packet.Name, packet.Content, packet.Id, 0);
             Send(new Packet()
             {
@@ -581,6 +723,7 @@ namespace AscNet.GameServer
                 Name = name,
                 Content = responseContent
             };
+            lastProtocolPoint = $"outbound-response:{packet.Name}";
             ProbeBigWorldPacket("response", packet.Name, packet.Content, packet.Id, 0);
             Send(new Packet()
             {
@@ -639,6 +782,15 @@ namespace AscNet.GameServer
             {
                 return;
             }
+
+            ProtocolGapProbe.Record(
+                id,
+                "connection",
+                "<disconnect>",
+                "Connection",
+                "disconnect",
+                point: lastProtocolPoint,
+                lastSuccessfulRequest: lastSuccessfulRequest);
 
             using IDisposable metrics = MongoCommandMetrics.Begin("Disconnect");
             try
