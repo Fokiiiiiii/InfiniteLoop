@@ -24100,6 +24100,8 @@ namespace AscNet.Test
             AssertEqual(467, CompatibilityRows(compatibility, "Stages").Count, "Study compatibility Stage row count");
             AssertEqual(141, CompatibilityRows(compatibility, "StageLevelControls").Count, "Study compatibility StageLevelControl row count");
             AssertEqual(170, CompatibilityRows(compatibility, "Robots").Count, "Study compatibility Robot row count");
+            AssertEqual(82, CompatibilityRows(compatibility, "EnhanceSkills").Count, "Study compatibility EnhanceSkill row count");
+            AssertEqual(92, CompatibilityRows(compatibility, "EnhanceSkillGroups").Count, "Study compatibility EnhanceSkillGroup row count");
 
             JArray studyRobotRows = CompatibilityRows(compatibility, "Robots");
             JObject StudyRobotRow(int robotId) =>
@@ -24192,6 +24194,41 @@ namespace AscNet.Test
             // Weapon-only sparse shape: authored weapon, no core wafer arrays at all.
             AssertStudyRobotEquipPayload(weaponOnlyFight, 1_142, StudyRobotRow(1_142),
                 "Study weapon-only robot stage 30100883");
+
+            PreFightResponse baseWeaveFight = AssertStudyStageRobotDeployment(
+                stageId: 30_100_971,
+                cardIds: [],
+                robotIds: [],
+                expectedCharacterId: 1_021_005,
+                expectedRobotId: 9_161,
+                luciaLotusCharacterId,
+                "Study base-form Crimson Weave stage 30100971");
+            AssertRobotDeployedEnhanceSkills(baseWeaveFight, 9_161, [],
+                "Study base-form Crimson Weave stage 30100971");
+            PreFightResponse leapWeaveFight = AssertStudyStageRobotDeployment(
+                stageId: 30_100_099,
+                cardIds: [],
+                robotIds: [],
+                expectedCharacterId: 1_021_005,
+                expectedRobotId: 9_239,
+                luciaLotusCharacterId,
+                "Study Crimson Weave leap trial stage 30100099");
+            AssertRobotDeployedEnhanceSkills(leapWeaveFight, 9_239,
+                [(102_531, 18), (102_529, 18), (102_530, 18)],
+                "Study Crimson Weave leap trial stage 30100099");
+
+            PreFightResponse basePyroathFight = AssertStudyStageRobotDeployment(
+                stageId: 30_100_081,
+                cardIds: [],
+                robotIds: [],
+                expectedCharacterId: 1_021_006,
+                expectedRobotId: 2_273,
+                luciaLotusCharacterId,
+                "Study level-1 Pyroath effect practice stage 30100081");
+            // 4.6 authors no enhance groups for Pyroath, so the version-frozen robot grants none and
+            // its authored removal list is already satisfied.
+            AssertRobotDeployedEnhanceSkills(basePyroathFight, 2_273, [],
+                "Study level-1 Pyroath effect practice stage 30100081");
         }
 
         private static PreFightResponse AssertStudyStageRobotDeployment(
@@ -24367,6 +24404,37 @@ namespace AscNet.Test
             AssertEqual(expectedCharacterId, RequiredDynamicInteger(character, "Id", $"{name}.Character"), $"{name}.Character.Id");
             AssertEqual(true, RequiredDynamicBoolean(npcData, "IsRobot", name), $"{name}.IsRobot");
             AssertEqual(expectedRobotId, RequiredDynamicInteger(npcData, "RobotId", name), $"{name}.RobotId");
+        }
+
+        private static void AssertRobotDeployedEnhanceSkills(
+            PreFightResponse preFightResponse,
+            int robotId,
+            IReadOnlyList<(int SkillId, int Level)> expected,
+            string name)
+        {
+            if (preFightResponse.FightData is null)
+                throw new InvalidDataException($"{name}: expected FightData.");
+            System.Collections.IDictionary npc = preFightResponse.FightData.RoleData
+                .SelectMany(role => role.NpcData.Values)
+                .Select(value => RequiredDynamicMap(value, $"{name} NpcData"))
+                .Single(candidate => RequiredDynamicInteger(candidate, "RobotId", $"{name} NpcData") == robotId);
+            System.Collections.IDictionary character = RequiredDynamicMap(
+                RequiredDynamicValue(npc, "Character", name),
+                $"{name}.Character");
+            List<(int SkillId, int Level)> actual = RequiredDynamicObjectList(character, "EnhanceSkillList", $"{name}.Character.EnhanceSkillList")
+                .Select(value => RequiredDynamicMap(value, $"{name} enhance skill"))
+                .Select(skill => (
+                    SkillId: RequiredDynamicInteger(skill, "Id", $"{name} enhance skill"),
+                    Level: RequiredDynamicInteger(skill, "Level", $"{name} enhance skill")))
+                .OrderBy(skill => skill.SkillId)
+                .ToList();
+            List<(int SkillId, int Level)> orderedExpected = expected.OrderBy(skill => skill.SkillId).ToList();
+            AssertEqual(orderedExpected.Count, actual.Count, $"{name} EnhanceSkillList count");
+            for (int i = 0; i < orderedExpected.Count; i++)
+            {
+                AssertEqual(orderedExpected[i].SkillId, actual[i].SkillId, $"{name} EnhanceSkillList[{i}].Id");
+                AssertEqual(orderedExpected[i].Level, actual[i].Level, $"{name} EnhanceSkillList[{i}].Level");
+            }
         }
 
         private static void AssertPreFightDoesNotDeployCharacter(
