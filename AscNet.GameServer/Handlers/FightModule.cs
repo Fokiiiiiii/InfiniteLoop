@@ -544,6 +544,11 @@ namespace AscNet.GameServer.Handlers
                     StageId = req.PreFightData.StageId,
                     RebootId = stageTable?.RebootId ?? 0,
                     PassTimeLimit = stageTable?.PassTimeLimit ?? 0,
+                    // Table-derived default. The mode hooks below replace it when the mode owns a
+                    // different authority: Arcade towers force it on for blank-authored rows.
+                    // The generic restart handler checks fight identity only, so do not re-gate
+                    // this flag against the table.
+                    Restartable = Convert.ToInt32(stageTable?.Restartable) != 0,
                     StarsMark = 0,
                     MonsterLevel = levelControl?.MonsterLevel ?? new(),
                     NormalEventIds = stageTable?.NormalEventId
