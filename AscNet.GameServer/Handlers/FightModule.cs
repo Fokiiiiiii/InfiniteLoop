@@ -8,6 +8,7 @@ using AscNet.Table.V2.share.equip;
 using AscNet.Table.V2.share.partner;
 using AscNet.Table.V2.share.team;
 using AscNet.Table.V2.share.character;
+using AscNet.Table.V2.share.character.enhanceskill;
 using AscNet.Table.V2.share.character.skill;
 using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.share.fashion;
@@ -299,6 +300,21 @@ namespace AscNet.GameServer.Handlers
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     #endregion
 
+    /// One client version's enhance-skill inputs: the authored groups of a character and the
+    /// authored skills of a group. Premade deployments resolve both from the robot row's version.
+    internal sealed class EnhanceSkillSource(Func<int, IReadOnlyList<int>> groupIds, Func<int, IReadOnlyList<int>> skillIds)
+    {
+        // Live tables shipped with the server, used by every deployment from the live Robot table.
+        internal static EnhanceSkillSource Live { get; } = new(
+            characterId => TableReaderV2.Parse<EnhanceSkillTable>()
+                .Find(row => row.CharacterId == characterId)?.SkillGroupId ?? [],
+            groupId => TableReaderV2.Parse<EnhanceSkillGroupTable>()
+                .Find(row => row.Id == groupId)?.SkillId ?? []);
+
+        internal IReadOnlyList<int> GroupIds(int characterId) => groupIds(characterId);
+        internal IReadOnlyList<int> SkillIds(int groupId) => skillIds(groupId);
+    }
+
     internal class FightModule
     {
         private const int TeamManagerSetTeamParaError = 20004003;
@@ -544,6 +560,11 @@ namespace AscNet.GameServer.Handlers
                     StageId = req.PreFightData.StageId,
                     RebootId = stageTable?.RebootId ?? 0,
                     PassTimeLimit = stageTable?.PassTimeLimit ?? 0,
+                    // Table-derived default. The mode hooks below replace it when the mode owns a
+                    // different authority: Arcade towers force it on for blank-authored rows.
+                    // The generic restart handler checks fight identity only, so do not re-gate
+                    // this flag against the table.
+                    Restartable = Convert.ToInt32(stageTable?.Restartable) != 0,
                     StarsMark = 0,
                     MonsterLevel = levelControl?.MonsterLevel ?? new(),
                     NormalEventIds = stageTable?.NormalEventId
@@ -768,7 +789,11 @@ namespace AscNet.GameServer.Handlers
                     while (playerNpcData.ContainsKey(npcKey))
                         npcKey++;
 
-                    (CharacterData robotCharacterData, List<EquipData> equips) = BuildRobotDeployment(robot);
+                    // Legacy Study stages deploy version-frozen 4.6 premise rows, so their enhance
+                    // inputs come from the same frozen version instead of the live tables.
+                    (CharacterData robotCharacterData, List<EquipData> equips) = isCurrentStudyStage
+                        ? BuildRobotDeployment(robot, CurrentClientStudyTables.EnhanceSkills)
+                        : BuildRobotDeployment(robot);
                     deployedCharacters.Add(robotCharacterData);
                     playerNpcData.Add(npcKey, new
                     {
@@ -838,6 +863,13 @@ namespace AscNet.GameServer.Handlers
         }
 
         internal static (CharacterData Character, List<EquipData> Equips) BuildRobotDeployment(RobotTable robot)
+            => BuildRobotDeployment(robot, EnhanceSkillSource.Live);
+
+        /// <param name="enhanceSkills">
+        /// Enhance-skill inputs of the robot row's own client version. Premade rows served from a
+        /// version-frozen catalog must be deployed with that version's inputs, never the live ones.
+        /// </param>
+        internal static (CharacterData Character, List<EquipData> Equips) BuildRobotDeployment(RobotTable robot, EnhanceSkillSource enhanceSkills)
         {
             CharacterSkillTable? characterSkill = TableReaderV2.Parse<CharacterSkillTable>().Find(x => x.CharacterId == robot.CharacterId);
             IEnumerable<int> skills = characterSkill?.SkillGroupId.SelectMany(x => TableReaderV2.Parse<CharacterSkillGroupTable>().Find(y => y.Id == x)?.SkillId ?? new List<int>()) ?? new List<int>();
@@ -889,6 +921,7 @@ namespace AscNet.GameServer.Handlers
                         Level = Math.Min(Convert.ToInt32(robot.SkillLevel), TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
                             .Where(row => row.SkillId == id).Select(row => row.Level).DefaultIfEmpty(1).Max())
                     }).ToList(),
+                EnhanceSkillList = BuildRobotEnhanceSkills(robot, enhanceSkills),
                 FashionId = fashionId,
                 TrustLv = 1,
                 Ability = robot.ShowAbility ?? 0,
@@ -896,6 +929,31 @@ namespace AscNet.GameServer.Handlers
                 CharacterHeadInfo = new() { HeadFashionId = fashionId }
             };
             return (data, equips);
+        }
+
+        /// <summary>One active skill per owned enhance group; a removed skill or an absent level yields none.</summary>
+        internal static List<CharacterSkill> BuildRobotEnhanceSkills(RobotTable robot, EnhanceSkillSource enhanceSkills)
+        {
+            List<CharacterSkill> enhanceSkillList = [];
+            if (robot.EnhanceSkillLevel <= 0)
+                return enhanceSkillList;
+
+            HashSet<int> removedSkillIds = robot.RemoveSkillId?.ToHashSet() ?? [];
+            foreach (int groupId in enhanceSkills.GroupIds(robot.CharacterId).Where(id => id > 0).Distinct())
+            {
+                // The client's XEnhanceSkillGroup activates the group's first configured skill.
+                int skillId = enhanceSkills.SkillIds(groupId).FirstOrDefault(id => id > 0);
+                if (skillId <= 0 || removedSkillIds.Contains(skillId))
+                    continue;
+
+                int maxLevel = Character.EnhanceSkillMaxLevel(skillId);
+                enhanceSkillList.Add(new CharacterSkill
+                {
+                    Id = (uint)skillId,
+                    Level = Math.Clamp(robot.EnhanceSkillLevel, 1, Math.Max(1, maxLevel))
+                });
+            }
+            return enhanceSkillList;
         }
 
         private static List<ResonanceInfo> BuildRobotResonance(string? templates, string? types, int characterId)
