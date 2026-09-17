@@ -18,9 +18,21 @@ PINNED_HOST_PATTERNS = (
     r".*mp-gb-sdklog\.kurogames\.net.*",
     r".*events\.appsflyer\.com.*",
     r".*anticheatexpert\.com:443",
+    # PGR performs a client-side external-IP check and rejects the local
+    # MITM certificate. Keep this diagnostic HTTPS request as a raw tunnel.
+    r"ipv4\.icanhazip\.com:443",
     r"sdkapi\.kurogame-service\.(com|xyz):443",
     r"pgr\.kurogame\.net:443",
 )
+
+# Observed JP Steam game-server endpoint. The SDK gate is already rewritten
+# to local AscNet, but this endpoint can still be selected from a cached or
+# native client route. Redirect only this exact game TCP destination; leave
+# all other TCP and pinned HTTPS traffic untouched.
+OBSERVED_GAME_TCP_ENDPOINTS = {
+    ("8.209.200.222", 2333),
+}
+LOCAL_GAME_TCP_ENDPOINT = ("127.0.0.1", 2335)
 
 def load(loader):
     # ctx.options.web_open_browser = False
@@ -198,11 +210,34 @@ def _rewrite_login_url(value, target_origin):
 def _rewrite_authoritative_config_body(body, target_origin):
     lines = body.split("\n")
     out = []
+    application_version = None
+    server_list = None
+    channel_server_list = None
     for line in lines:
         cols = line.split("\t")
-        if len(cols) >= 3 and cols[0] in {"ServerListStr", "ChannelServerListStr"}:
-            cols[2] = _rewrite_login_url(cols[2], target_origin)
+        if len(cols) >= 3:
+            if cols[0] == "ApplicationVersion":
+                application_version = cols[2]
+            elif cols[0] == "ServerListStr":
+                cols[2] = _rewrite_login_url(cols[2], target_origin)
+                server_list = cols[2]
+            elif cols[0] == "ChannelServerListStr":
+                cols[2] = _rewrite_login_url(cols[2], target_origin)
+                channel_server_list = cols[2]
         out.append("\t".join(cols))
+
+    # The JP 4.7.0 client looks up version-qualified keys. Upstream config
+    # does not provide them, so mirror the rewritten routes without changing
+    # any other upstream metadata.
+    if application_version:
+        if server_list is not None and not any(
+            line.startswith(f"ServerListStr_{application_version}\t") for line in out
+        ):
+            out.append(f"ServerListStr_{application_version}\tstring\t{server_list}")
+        if channel_server_list is not None and not any(
+            line.startswith(f"ChannelServerListStr_{application_version}\t") for line in out
+        ):
+            out.append(f"ChannelServerListStr_{application_version}\tstring\t{channel_server_list}")
     return "\n".join(out)
 
 
@@ -217,6 +252,17 @@ def next_layer(nextlayer: layer.NextLayer):
     sni = nextlayer.context.client.sni
     if _is_ascnet_host(sni):
         ctx.log.info("ascnet candidate sni:" + sni)
+
+
+def tcp_start(flow) -> None:
+    """Route the observed JP game TCP endpoint into the local game server."""
+    address = flow.server_conn.address
+    if address in OBSERVED_GAME_TCP_ENDPOINTS:
+        flow.server_conn.address = LOCAL_GAME_TCP_ENDPOINT
+        ctx.log.info(
+            "game tcp redirect %s:%s -> %s:%s",
+            address[0], address[1], LOCAL_GAME_TCP_ENDPOINT[0], LOCAL_GAME_TCP_ENDPOINT[1],
+        )
 
 
 def http_connect(flow: http.HTTPFlow) -> None:

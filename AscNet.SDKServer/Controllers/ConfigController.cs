@@ -337,6 +337,10 @@ namespace AscNet.SDKServer.Controllers
             remoteConfigs.AddConfig("MemoryLimit", 2048);
             remoteConfigs.AddConfig("CloseMsgEncrypt", false);
             remoteConfigs.AddConfig("ServerListStr", CurrentServerListStr(publicHttpOrigin));
+            // JP Steam 4.7.0 reads the version-qualified route keys first.
+            // Keep both forms so the client cannot fall back to its embedded
+            // production game-server endpoint.
+            remoteConfigs.AddConfig($"ServerListStr_{version}", CurrentServerListStr(publicHttpOrigin));
             remoteConfigs.AddConfig("IndexMd5", versionConfig.IndexMd5);
             remoteConfigs.AddConfig("AndroidReturnEnabled", false);
             remoteConfigs.AddConfig("AndroidPayCallbackList", $"{publicHttpOrigin}/api/XPay/HeroHgAndroidPayResult");
@@ -360,6 +364,7 @@ namespace AscNet.SDKServer.Controllers
             remoteConfigs.AddConfig("WatermarkType", 0);
             remoteConfigs.AddConfig("IsPCPayEnable", true);
             remoteConfigs.AddConfig("ChannelServerListStr", CurrentChannelServerListStr(publicHttpOrigin));
+            remoteConfigs.AddConfig($"ChannelServerListStr_{version}", CurrentChannelServerListStr(publicHttpOrigin));
             remoteConfigs.AddConfig("IsHeXie", false);
             remoteConfigs.AddConfig("IsHideFunc", false);
             remoteConfigs.AddConfig("IsHideFuncAndroid", false);

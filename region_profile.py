@@ -217,4 +217,11 @@ def authoritative_config_matches(profile: RegionProfile, host: str | None, path:
     # An empty host set is intentional for JP discovery mode. It means the
     # explicitly selected region may observe and pass through its config path,
     # while the missing host remains visible as UNKNOWN metadata.
-    return not profile.config_hosts or profile.matches_config_host(host)
+    if not profile.config_hosts or profile.matches_config_host(host):
+        return True
+
+    # Process-scoped redirectors can expose the CDN as a resolved IP instead
+    # of its configured hostname. The package segment is still authoritative
+    # and is a safer discriminator than rewriting every config-looking path.
+    package = package_from_config_path(path)
+    return package in profile.package_names
