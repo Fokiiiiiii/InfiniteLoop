@@ -11,7 +11,7 @@ namespace AscNet.Common.Database
     #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     public class Stage
     {
-        public static readonly IMongoCollection<Stage> collection = Common.db.GetCollection<Stage>("stages");
+        public static IMongoCollection<Stage> collection = Common.db.GetCollection<Stage>("stages");
         
         public static Stage FromUid(long uid)
         {

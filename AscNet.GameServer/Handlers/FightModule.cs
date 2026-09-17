@@ -547,7 +547,7 @@ namespace AscNet.GameServer.Handlers
                     StarsMark = 0,
                     MonsterLevel = levelControl?.MonsterLevel ?? new(),
                     NormalEventIds = stageTable?.NormalEventId
-                        .Where(eventId => eventId > 0)
+                        ?.Where(eventId => eventId > 0)
                         .Distinct()
                         .Select(eventId => (dynamic)eventId)
                         .ToList() ?? []
@@ -557,7 +557,7 @@ namespace AscNet.GameServer.Handlers
             if (stageTable is not null
                 && normalReplayEventId > 0
                 && session.stage?.Stages.GetValueOrDefault(req.PreFightData.StageId)?.Passed == true
-                && !stageTable.NormalEventId.Contains(normalReplayEventId))
+                && stageTable.NormalEventId?.Contains(normalReplayEventId) != true)
             {
                 rsp.FightData.NormalEventIds.Add(normalReplayEventId);
             }

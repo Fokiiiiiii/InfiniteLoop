@@ -217,6 +217,26 @@ Run the focused server compatibility harness:
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre5-compat-only
 ```
 
+### Shrouded Requiem (Theatre6)
+
+Shrouded Requiem implements persisted story and gameplay runs, task/choice rooms, shops, skill placement/merging/overflow, relics, effects, archives and progression. Phantom Clash uses saved archive lineups, player defences and authored robots, with seasonal ranks and rewards. Theatre6 owns DLC worlds `201` and `202`; Godfall retains its separate routing.
+
+**Authoritative client tables supply content, operands, conditions and rewards. User-approved AscNet policies fill missing server-only data and algorithms; these are not recovered retail server rules or a claim of retail balance parity. Captures are evidence, never runtime payload sources.**
+
+- **Rooms/offers:** follow authored floor/room order and choice lines. Local selection combines authored weights with reward-type bias; task draws reduce weights for repeated material demands, and refreshes choose among eligible replacements. Persisted run RNG freezes offers, rewards, shops and encounters. Optional extra floors remain unentered until acceptance; replay eligibility follows the cleared base difficulty even when the replay selects an alternate stage.
+- **Skill/relic pools:** `Theatre6SkillPool.tsv` and `Theatre6AttrPackPool.tsv` are explicitly AscNet policy, not retail imports. Candidates come from compatible authored catalog entries; skills start at level 1, and relics at their acquisition cap are excluded. Named skill pools use their advertised quality; mixed pools use per-candidate quality weights `50:30:15:4:1`, multiplied by configured level/tag weights. The battle pool advertised as “Universal Stat Relic” is restricted to authored universal stat-only relics (qualities 1–3, weights `50:30:15`); effect relics remain available through other eligible pools.
+- **Effects/scoring:** local trigger, duration and aggregation rules fill the missing retail resolver. Effects change persisted run state or project authored native magic IDs; combat is not simulated server-side. Build score includes equipped skills, base skills in empty active slots, relics and attributes. Settlement composes authored score gates, score-per-unit operands, caps and additive rewards; earned growth currency also advances permanent talent progression.
+- **Phantom Clash:** matchmaking freezes offers from complete saved defences and authored robots within an expanded score window. Robot/human and below/above weights compose locally. Interpreting `Theatre6PvpRankFight.MinScore` as a ladder-score tier is explicitly local policy. Rating uses a 400-point Elo expectation with authored attack/defence coefficients, bonuses, rounding and rank-band clamps. Promotion attempts are free. Two opening losses end a match; two opening wins still require round three. Abandonment and expiry count as losses.
+- **Persistence/retries:** durable mutation intents precede rewards and successful responses. Session/epoch receipts replay committed answers; retired transport attempts reject instead of executing again. Frozen battle attempts prevent retry rerolls. Human defence results use a committed attacker outbox and per-attacker defender watermark; late old-season results are acknowledged without changing the new season's rating. Settled runs remain until archive save/discard acknowledgement.
+- **Availability/tasks/shops:** base PvE is permanent behind its authored level gate; Phantom Clash remains seasonal with its separate progression gate. Missing timed mission calendars derive from authored reward-token lifetimes. Local reward shops pair shop/mission tabs by priority, sell authored preview bundles once per account without resets, and price each at an equal integer share of the group's currency budget (minimum one). Claims and purchases use Theatre6's durable mutation path.
+- **Native boundary:** settlement checks frozen attempt identity, producer-copied actor/world fields, nonnegative simulation time, nonfuture authorization timestamps and combat-record invariants. Native `FinishTime` advances with `TimeScale`, not wall-clock time; no upper duration bound is enforced because the report carries no speed history and no authoritative Theatre6 speed maximum has been recovered. Synthetic battle reports, encrypted TCP/Mongo checks and headless replay of original Lua do not establish native combat, rendered UI or movie-playback correctness. Installed client assets remain unchanged.
+
+Run the focused server compatibility harness:
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre6-compat-only
+```
+
 ### Gender setup fix
 
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
@@ -402,6 +422,8 @@ Available focused switches:
 --pr2-quality-compat-only
 --current-client-notice-endpoints-only
 --theatre-compat-only
+--theatre6-compat-only
+--theatre6-visibility-only
 ```
 
 Build the main projects:
