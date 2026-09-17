@@ -20,6 +20,12 @@ The current compatibility target in this tree is:
 
 `Resources/Configs/version_config.json` carries the current `4.5.0 -> 4.5.12` version/hash tuple used by the current-client config endpoint.
 
+The observed JP PC client profile is also registered for the local bridge:
+`com.kurogame.punishing.grayraven.jp`, application `4.7.0`, document/launch
+version `4.7.11`, channel `205`, CDN key `BYf6VZR7DluwhM64`, and the observed
+`prod-encdn` CDN origins. These values are routing metadata and do not replace
+the Global/EN default target.
+
 ## What changed in this branch
 
 ### Current-client config and SDK routing
@@ -339,10 +345,12 @@ Common options:
 | --- | --- |
 | `--region global` | Use the existing local Global/EN config and routing behavior (default). |
 | `--region tw` | Pass the known TW standalone config through upstream and rewrite only its login destinations to local AscNet. |
-| `--region jp` | Enable JP authoritative-config discovery mode. It fails before smoke unless JP package/host/channel/version metadata has been observed. Use `--no-smoke` only for an explicitly instrumented discovery run. |
+| `--region jp` | Use the observed JP PC profile (`com.kurogame.punishing.grayraven.jp`, channel `205`, version `4.7.0`/`4.7.11`). |
 | `--sdk-url http://127.0.0.1:8080` | Local SDK/config URL exposed by AscNet. |
 | `--proxy-host 127.0.0.1` | mitmproxy bind host. |
 | `--proxy-port 8081` | mitmproxy bind port. |
+| `--proxy-local` | Use mitmproxy's process-scoped OS redirector without modifying the game directory. HTTP is rewritten by the bridge; pinned HTTPS is tunneled; the game TCP destination comes from the rewritten ServerList. |
+| `--proxy-local-process PGR.exe,KRSDKExternal.exe` | Override the comma-separated process names/PIDs captured by `--proxy-local`. |
 | `--with-mongo` | Start local MongoDB if it is not already reachable. |
 | `--ascnet-username test` | Local AscNet account used for Steam login handoff. |
 | `--ascnet-password test` | Password used when creating that local account. |
@@ -368,7 +376,7 @@ The runner sets:
 - `ASCNET_REGION`
 - `ASCNET_PROTOCOL_GAP_LOG` when protocol probing is enabled
 
-Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP treat upstream config metadata as authoritative and do not manufacture local document versions, channels, or CDN values. The JP profile currently reports `UNKNOWN / discovery required` for package, config host, channel, and version because none has been registered from an observed client/config request.
+Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP keep observed upstream config metadata authoritative and rewrite only login destinations to local AscNet. JP uses only the package, config hosts, channel, version, and CDN key observed in the local PGR client log; it does not copy Global/EN package metadata into the JP profile.
 
 When `ASCNET_PROTOCOL_GAP_LOG` is set, the game session writes metadata-only JSONL events for unknown requests/pushes, MessagePack DTO decoding failures, request field mismatches, client exception responses, and disconnect points. It records the last successful request but never stores packet payloads. Analyze the result against the EN/Lua/handler baseline with:
 

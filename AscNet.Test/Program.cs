@@ -32749,6 +32749,19 @@ namespace AscNet.Test
             AssertEqual("http://127.0.0.1:8080/api/XPay/KuroPayResult", ConfigValue(remoteConfigs, "PcPayCallbackUrl"), "PcPayCallbackUrl");
             AssertEqual("0", ConfigValue(remoteConfigs, "IsHideFunc"), "IsHideFunc config");
             AssertEqual("0", ConfigValue(remoteConfigs, "IsHideFuncAndroid"), "IsHideFuncAndroid config");
+
+            MethodInfo getVersion = configController.GetMethod("GetVersionConfig", BindingFlags.NonPublic | BindingFlags.Static)!;
+            object jpPackageConfig = getPackageConfig.Invoke(null, ["com.kurogame.punishing.grayraven.jp", true])!;
+            AssertEqual("http://prod-encdn-ak.pgr-game.com/prod", jpPackageConfig.GetType().GetField("Item1")!.GetValue(jpPackageConfig), "JP PrimaryCdns");
+            AssertEqual("http://prod-encdn-aliyun.kurogame.net/prod", jpPackageConfig.GetType().GetField("Item2")!.GetValue(jpPackageConfig), "JP SecondaryCdns");
+            AssertEqual(205, jpPackageConfig.GetType().GetField("Item3")!.GetValue(jpPackageConfig), "JP Channel");
+
+            ServerVersionConfig jpVersion = (ServerVersionConfig)getVersion.Invoke(null, ["4.7.0"])!;
+            List<RemoteConfig> jpConfigs = new();
+            addCurrentClientConfig.Invoke(null, [jpConfigs, "com.kurogame.punishing.grayraven.jp", "4.7.0", jpVersion, "http://127.0.0.1:8080"]);
+            AssertEqual("205", ConfigValue(jpConfigs, "Channel"), "JP Channel config");
+            AssertEqual("4.7.11", ConfigValue(jpConfigs, "DocumentVersion"), "JP DocumentVersion config");
+            AssertEqual("4.7.11", ConfigValue(jpConfigs, "LaunchModuleVersion"), "JP LaunchModuleVersion config");
         }
 
         private const string KuroSdkDummyEmail = "krsdk-test@ascnet.local";

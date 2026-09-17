@@ -72,6 +72,24 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertIn(f"RSP GET http://{flow.request.host}{path} -> 204", logged)
         self.assertEqual(original, vars(flow.request))
 
+    def test_load_passes_anticheat_tls_through(self):
+        mitmproxy.ctx.options = SimpleNamespace()
+
+        proxy.load(None)
+
+        self.assertIn(r".*anticheatexpert\.com:443", mitmproxy.ctx.options.ignore_hosts)
+
+    def test_local_capture_preserves_pinned_https_passthrough(self):
+        mitmproxy.ctx.options = SimpleNamespace()
+
+        with patch.dict(os.environ, {"ASCNET_LOCAL_CAPTURE": "1"}, clear=False):
+            proxy.load(None)
+
+        self.assertIn(r".*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz).*", mitmproxy.ctx.options.ignore_hosts)
+        self.assertIn(r".*anticheatexpert\.com:443", mitmproxy.ctx.options.ignore_hosts)
+        self.assertIn(r"sdkapi\.kurogame-service\.(com|xyz):443", mitmproxy.ctx.options.ignore_hosts)
+        self.assertTrue(mitmproxy.ctx.options.rawtcp)
+
 
     def test_notice_html_stays_on_upstream_cdn(self):
         flow = self.flow("/prod/client/notice/html/current-notice.html?cache=1")
@@ -176,23 +194,23 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertIn("Channel\tint\t5\n", text)
         self.assertIn("PrimaryCdns\tstring\thttp://prod-twcdn-ak.pgr-game.com/prod\n", text)
 
-    def test_jp_config_passes_through_without_guessed_metadata(self):
+    def test_jp_observed_config_stays_upstream_for_metadata(self):
         flow = self.flow(
-            "/prod/client/config/discovered-package/unknown-version/standalone/config.tab",
-            "observed-jp-config.example",
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "prod-encdn-ak.pgr-game.com",
         )
 
         with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
             proxy.request(flow)
             self.assertTrue(proxy.is_authoritative_config_request(flow))
-            self.assertEqual("observed-jp-config.example", flow.request.host)
+            self.assertEqual("prod-encdn-ak.pgr-game.com", flow.request.host)
             self.assertEqual(80, flow.request.port)
             self.assertNotIn("X-Forwarded-Host", flow.request.headers)
 
-    def test_jp_config_response_rewrites_login_endpoints_only(self):
+    def test_jp_observed_config_response_rewrites_login_endpoints_only(self):
         flow = self.flow(
-            "/prod/client/config/discovered-package/unknown-version/standalone/config.tab",
-            "observed-jp-config.example",
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "prod-encdn-ak.pgr-game.com",
         )
         flow.response = SimpleNamespace(
             status_code=200,

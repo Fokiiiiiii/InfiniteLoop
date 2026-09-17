@@ -397,6 +397,10 @@ namespace AscNet.SDKServer.Controllers
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",
                     205),
+                "com.kurogame.punishing.grayraven.jp" when currentClient => (
+                    "http://prod-encdn-ak.pgr-game.com/prod",
+                    "http://prod-encdn-aliyun.kurogame.net/prod",
+                    205),
                 _ => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",

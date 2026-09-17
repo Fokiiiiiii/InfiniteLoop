@@ -57,6 +57,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sdk-url", default="http://127.0.0.1:8080", help="AscNet SDK server URL. Default: %(default)s")
     parser.add_argument("--proxy-host", default="127.0.0.1", help="mitmproxy listen host. Default: %(default)s")
     parser.add_argument("--proxy-port", type=int, default=8081, help="mitmproxy listen port. Default: %(default)s")
+    parser.add_argument(
+        "--proxy-local",
+        action="store_true",
+        help="Use mitmproxy's process-scoped OS redirector; HTTP routing uses the bridge, pinned HTTPS is tunneled, and game TCP follows the rewritten ServerList.",
+    )
+    parser.add_argument(
+        "--proxy-local-process",
+        default=os.environ.get("ASCNET_PROXY_LOCAL_PROCESS", "PGR.exe,KRSDKExternal.exe"),
+        help="Comma-separated process names or PIDs captured by --proxy-local. Default: %(default)s",
+    )
     parser.add_argument("--dotnet", default=os.environ.get("DOTNET"), help="dotnet executable. Defaults to DOTNET, PATH, then /Users/reiserfs/.dotnet/dotnet")
     parser.add_argument("--mitm", default=os.environ.get("MITMPROXY"), help="mitmproxy/mitmdump executable. Defaults to MITMPROXY, mitmdump, then mitmproxy")
     parser.add_argument("--with-mongo", action="store_true", help="Start a local mongod for AscNet login/player data if MongoDB is not already reachable.")
@@ -256,11 +266,26 @@ def smoke_check(sdk_url: str, timeout: float, profile=None) -> None:
         )
         return
     for target in profile.config_smoke_targets:
-        label, path, channel_assertion = target.label, target.path, target.channel_assertion
-        smoke_config_target(sdk_url, timeout, label, path, channel_assertion)
+        smoke_config_target(
+            sdk_url,
+            timeout,
+            target.label,
+            target.path,
+            target.channel_assertion,
+            application_version=target.application_version,
+            document_version=target.document_version,
+        )
 
 
-def smoke_config_target(sdk_url: str, timeout: float, label: str, path: str, channel_assertion: str) -> None:
+def smoke_config_target(
+    sdk_url: str,
+    timeout: float,
+    label: str,
+    path: str,
+    channel_assertion: str,
+    application_version: str = "4.6.0",
+    document_version: str | None = None,
+) -> None:
     url = sdk_url.rstrip("/") + path
     deadline = time.monotonic() + timeout
     last_error: Exception | None = None
@@ -269,10 +294,11 @@ def smoke_config_target(sdk_url: str, timeout: float, label: str, path: str, cha
         try:
             with local_sdk_open(url, timeout=2.0) as response:
                 body = response.read().decode("utf-8", errors="replace")
+            expected_document_version = document_version or CURRENT_DOCUMENT_VERSION
             required = [
-                "ApplicationVersion\tstring\t4.6.0",
-                f"DocumentVersion\tstring\t{CURRENT_DOCUMENT_VERSION}",
-                f"LaunchModuleVersion\tstring\t{CURRENT_DOCUMENT_VERSION}",
+                f"ApplicationVersion\tstring\t{application_version}",
+                f"DocumentVersion\tstring\t{expected_document_version}",
+                f"LaunchModuleVersion\tstring\t{expected_document_version}",
                 channel_assertion,
                 "KuroPayCallbackUrl\tstring\t",
                 "PcPayCallbackUrl\tstring\t",
@@ -482,6 +508,7 @@ def proxy_env(
     proxy_https: bool,
     region: str = "global",
     protocol_gap_log: str | None = None,
+    local_capture: bool = False,
 ) -> dict[str, str]:
     profile = get_region_profile(region)
     env = dict(base)
@@ -492,10 +519,16 @@ def proxy_env(
     env["ASCNET_REGION_PACKAGES"] = ",".join(profile.package_names) or "UNKNOWN"
     expected_channels = profile.expected_channels
     env["ASCNET_EXPECTED_CHANNEL"] = ",".join(str(channel) for channel in expected_channels) or "UNKNOWN"
-    env["http_proxy"] = proxy_url
-    env["HTTP_PROXY"] = proxy_url
-    for inherited_proxy_name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
-        env.pop(inherited_proxy_name, None)
+    if local_capture:
+        env["ASCNET_LOCAL_CAPTURE"] = "1"
+        for inherited_proxy_name in ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
+            env.pop(inherited_proxy_name, None)
+    else:
+        env.pop("ASCNET_LOCAL_CAPTURE", None)
+        env["http_proxy"] = proxy_url
+        env["HTTP_PROXY"] = proxy_url
+        for inherited_proxy_name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
+            env.pop(inherited_proxy_name, None)
 
     if proxy_log:
         log_path = (ROOT / proxy_log).resolve()
@@ -575,6 +608,7 @@ def main() -> int:
         args.proxy_https,
         profile.name,
         protocol_gap_log,
+        args.proxy_local,
     )
     for diagnostic_name in (
         "ASCNET_REGION",
@@ -656,9 +690,16 @@ def main() -> int:
                 seed_krsdk_login_cache(cache_dir, account)
 
         if mitm:
-            proxy = popen([mitm, "--listen-host", args.proxy_host, "--listen-port", str(args.proxy_port), "-s", "proxy.py"], env=child_env)
+            if args.proxy_local:
+                proxy_command = [mitm, "--mode", f"local:{args.proxy_local_process}", "-s", "proxy.py"]
+            else:
+                proxy_command = [mitm, "--listen-host", args.proxy_host, "--listen-port", str(args.proxy_port), "-s", "proxy.py"]
+            proxy = popen(proxy_command, env=child_env)
             processes.append(proxy)
-            print(f"Proxy env: http_proxy=http://{args.proxy_host}:{args.proxy_port}; ASCNET_PROXY_TARGET={child_env['ASCNET_PROXY_TARGET']}; flow log={args.proxy_log or '<disabled>'}", flush=True)
+            if args.proxy_local:
+                print(f"Local process redirect: {args.proxy_local_process}; HTTP route rewrite enabled; pinned HTTPS tunneled; game TCP follows ServerList to local AscNet; flow log={args.proxy_log or '<disabled>'}", flush=True)
+            else:
+                print(f"Proxy env: http_proxy=http://{args.proxy_host}:{args.proxy_port}; ASCNET_PROXY_TARGET={child_env['ASCNET_PROXY_TARGET']}; flow log={args.proxy_log or '<disabled>'}", flush=True)
 
         if launch_cmd:
             launcher = popen(launch_cmd, env=child_env)

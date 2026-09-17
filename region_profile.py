@@ -1,9 +1,8 @@
 """Region profiles shared by the Steam runner and mitmproxy bridge.
 
-Only values already present in the bridge or its tests are recorded as known.
-The JP profile deliberately contains no guessed package, host, channel, or
-version metadata; it is a discovery profile until an observed client request
-supplies those values.
+Only values already present in the bridge, its tests, or an observed client
+request are recorded as known. The JP profile is populated from the observed
+4.7.0 PC client log; no package, host, channel, or version values are guessed.
 """
 
 from __future__ import annotations
@@ -26,6 +25,8 @@ class ConfigSmokeTarget:
     label: str
     path: str
     channel_assertion: str
+    application_version: str = "4.6.0"
+    document_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,17 +140,33 @@ TW_PROFILE = RegionProfile(
 
 JP_PROFILE = RegionProfile(
     name="jp",
-    package_names=(),
-    config_hosts=(),
-    notice_hosts=(),
-    sdk_hosts=(),
-    feedback_hosts=(),
-    route_hosts=(),
+    package_names=("com.kurogame.punishing.grayraven.jp",),
+    config_hosts=("prod-encdn-*.pgr-game.com", "prod-encdn-*.kurogame.net"),
+    notice_hosts=("prod-encdn-*.pgr-game.com", "prod-encdn-*.kurogame.net"),
+    sdk_hosts=(
+        "sdkapi.kurogame-service.com",
+        "sdkapi.kurogame-service.xyz",
+    ),
+    feedback_hosts=("prod.jpzspnslog.kurogame.com",),
+    route_hosts=(
+        "sdkapi.kurogame-service.com",
+        "sdkapi.kurogame-service.xyz",
+        "prod-encdn-*.pgr-game.com",
+        "prod-encdn-*.kurogame.net",
+    ),
     config_mode=ConfigMode.AUTHORITATIVE,
-    expected_channel=None,
-    expected_channels=(),
-    metadata_status="unknown",
-    discovery_required=("package", "config host", "channel", "version"),
+    expected_channel=205,
+    expected_channels=(205,),
+    config_smoke_targets=(
+        ConfigSmokeTarget(
+            "jp-client",
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "Channel\tint\t205",
+            application_version="4.7.0",
+            document_version="4.7.11",
+        ),
+    ),
+    metadata_status="observed",
 )
 
 

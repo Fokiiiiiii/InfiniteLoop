@@ -12,19 +12,31 @@ from region_profile import (
     get_region_profile,
 )
 
+PINNED_HOST_PATTERNS = (
+    r".*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz).*",
+    r".*qcloud-sg-datareceiver\.kurogame\.xyz.*",
+    r".*mp-gb-sdklog\.kurogames\.net.*",
+    r".*events\.appsflyer\.com.*",
+    r".*anticheatexpert\.com:443",
+    r"sdkapi\.kurogame-service\.(com|xyz):443",
+    r"pgr\.kurogame\.net:443",
+)
+
 def load(loader):
     # ctx.options.web_open_browser = False
     # We change the connection strategy to lazy so that next_layer happens before we actually connect upstream.
     ctx.options.connection_strategy = "lazy"
     ctx.options.upstream_cert = False
     ctx.options.ssl_insecure = True
-    ctx.options.ignore_hosts = [
-        r".*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz).*",
-        r".*qcloud-sg-datareceiver\.kurogame\.xyz.*",
-        r".*mp-gb-sdklog\.kurogames\.net.*",
-        r".*events\.appsflyer\.com.*",
-        r"pgr\.kurogame\.net:443",
-    ]
+    ctx.options.ignore_hosts = list(PINNED_HOST_PATTERNS)
+    if _local_capture_enabled():
+        # Keep the regular pass-through list. Pinned KRSDK/service HTTPS
+        # traffic must remain a raw tunnel instead of being MITM'd locally.
+        ctx.options.rawtcp = True
+
+
+def _local_capture_enabled():
+    return os.environ.get("ASCNET_LOCAL_CAPTURE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _normalise_connect_host(host):
