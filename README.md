@@ -22,9 +22,10 @@ The current compatibility target in this tree is:
 
 The observed JP PC client profile is also registered for the local bridge:
 `com.kurogame.punishing.grayraven.jp`, application `4.7.0`, document/launch
-version `4.7.11`, channel `205`, CDN key `BYf6VZR7DluwhM64`, and the observed
-`prod-encdn` CDN origins. These values are routing metadata and do not replace
-the Global/EN default target.
+version `4.7.15`, channel `5`, CDN key `BYf6VZR7DluwhM64`, and the observed
+`prod-jpcdn` CDN origins. The JP config is fetched from that official CDN and
+only its login destinations are rewritten to local AscNet; these values are
+routing metadata and do not replace the Global/EN default target.
 
 ## What changed in this branch
 
@@ -52,6 +53,7 @@ the Global/EN default target.
   - `sdkapi.kurogame-service.com`
   - `sdkapi.kurogame-service.xyz`
   - `prod-encdn-*.kurogame.net`
+  - `prod-jpcdn-*.kurogame.net` and `prod-jpcdn-*.pgr-game.com` for the JP profile
   - local wildcard `/api/`, `/prod/`, and `/sdkcom/` requests
 - Added redacted proxy flow logging to `.runtime/proxy-flows.log`.
 - Added KRSDK cache repair/seeding helpers for local Steam bridge experiments.
@@ -345,7 +347,7 @@ Common options:
 | --- | --- |
 | `--region global` | Use the existing local Global/EN config and routing behavior (default). |
 | `--region tw` | Pass the known TW standalone config through upstream and rewrite only its login destinations to local AscNet. |
-| `--region jp` | Use the observed JP PC profile (`com.kurogame.punishing.grayraven.jp`, channel `205`, version `4.7.0`/`4.7.11`). |
+| `--region jp` | Use the observed JP PC profile (`com.kurogame.punishing.grayraven.jp`, channel `5`, version `4.7.0`/`4.7.15`) and smoke-check the official config before bridging it. |
 | `--sdk-url http://127.0.0.1:8080` | Local SDK/config URL exposed by AscNet. |
 | `--proxy-host 127.0.0.1` | mitmproxy bind host. |
 | `--proxy-port 8081` | mitmproxy bind port. |
@@ -376,7 +378,7 @@ The runner sets:
 - `ASCNET_REGION`
 - `ASCNET_PROTOCOL_GAP_LOG` when protocol probing is enabled
 
-Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP keep observed upstream config metadata authoritative and rewrite only login destinations to local AscNet. JP uses only the package, config hosts, channel, version, and CDN key observed in the local PGR client log; it does not copy Global/EN package metadata into the JP profile.
+Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP keep observed upstream config metadata authoritative and rewrite only login destinations to local AscNet. JP uses only the package, `prod-jpcdn-*` hosts, channel `5`, version `4.7.0`/`4.7.15`, and CDN key observed in the official/client config; it does not copy Global/EN package metadata into the JP profile. A direct local JP config request returns `421 Misdirected Request` so a bridge mistake cannot silently serve the Global/EN fallback.
 
 When `ASCNET_PROTOCOL_GAP_LOG` is set, the game session writes metadata-only JSONL events for unknown requests/pushes, MessagePack DTO decoding failures, request field mismatches, client exception responses, and disconnect points. It records the last successful request but never stores packet payloads. Analyze the result against the EN/Lua/handler baseline with:
 

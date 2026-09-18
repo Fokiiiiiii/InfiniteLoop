@@ -7,10 +7,14 @@
     "originalExportJump": [233, 174, 101, 44, 1]
   },
   "originals": {
-    "PGR.exe": ["56c02821711675403ffbd8a40c3bad0f4217b5adc30eb33c652379a8fda66f76"],
+    "PGR.exe": [
+      "56c02821711675403ffbd8a40c3bad0f4217b5adc30eb33c652379a8fda66f76",
+      "23c55fe8af5cb1ddef16c5d092ee190b91e2005327c2532f97465a38de92c4f4"
+    ],
     "GameAssembly.dll": [
       "036b2f823e89465cd0542c7736e9d763ef880d9a791c19d412dfe1f4d8fd5ed0",
-      "7dbdbc91ea9952b3e1d37b65817152326287c36e1cf82f6a83ad33d37c5d5eab"
+      "7dbdbc91ea9952b3e1d37b65817152326287c36e1cf82f6a83ad33d37c5d5eab",
+      "7433fadbe21fdd6b47f8af2df67b365ef810aa23f6972bc39456730808ff362b"
     ],
     "PGR_Data/Plugins/KRSDK.dll": [
       "2a1d8f5def0e3a0ccb712a471d7f0b2097d6444d701e399524663c87c1d34c88",

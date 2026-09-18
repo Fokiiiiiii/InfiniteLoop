@@ -24,7 +24,7 @@ else:
     import fcntl
 from typing import BinaryIO, Iterable
 
-from region_profile import ConfigMode, get_region_profile, region_names
+from region_profile import ConfigMode, ConfigSmokeTarget, get_region_profile, region_names
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_KRSDK_CACHE_DIR = Path.home() / "Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix/drive_c/users/Sikarugir/AppData/Roaming/KR_G143/A1855"
@@ -266,15 +266,57 @@ def smoke_check(sdk_url: str, timeout: float, profile=None) -> None:
         )
         return
     for target in profile.config_smoke_targets:
-        smoke_config_target(
-            sdk_url,
-            timeout,
-            target.label,
-            target.path,
-            target.channel_assertion,
-            application_version=target.application_version,
-            document_version=target.document_version,
-        )
+        if target.base_url:
+            smoke_authoritative_config_target(target.base_url, timeout, target)
+        else:
+            smoke_config_target(
+                sdk_url,
+                timeout,
+                target.label,
+                target.path,
+                target.channel_assertion,
+                application_version=target.application_version,
+                document_version=target.document_version,
+            )
+
+
+def smoke_authoritative_config_target(base_url: str, timeout: float, target: ConfigSmokeTarget) -> None:
+    """Check observed regional metadata without asking AscNet to recreate it."""
+    url = base_url.rstrip("/") + target.path
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            with local_sdk_open(url, timeout=2.0) as response:
+                body = response.read().decode("utf-8", errors="replace")
+            expected_document_version = target.document_version or CURRENT_DOCUMENT_VERSION
+            required = [
+                f"ApplicationVersion\tstring\t{target.application_version}",
+                f"DocumentVersion\tstring\t{expected_document_version}",
+                f"LaunchModuleVersion\tstring\t{expected_document_version}",
+                target.channel_assertion,
+            ]
+            missing = [needle for needle in required if needle not in body]
+            values = {}
+            for line in body.splitlines():
+                columns = line.split("\t", 2)
+                if len(columns) == 3:
+                    values[columns[0]] = columns[2]
+            missing_values = [
+                key for key in ("ServerListStr", "ChannelServerListStr")
+                if not values.get(key)
+            ]
+            if missing or missing_values:
+                detail = missing + [f"{key} value" for key in missing_values]
+                raise RuntimeError(f"{target.label} upstream smoke response is missing: " + ", ".join(detail))
+            print(f"Smoke OK [{target.label}] upstream: {url}", flush=True)
+            return
+        except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+            last_error = exc
+            time.sleep(0.5)
+
+    raise SystemExit(f"Upstream config did not pass {target.label} smoke within {timeout:g}s: {last_error}")
 
 
 def smoke_config_target(

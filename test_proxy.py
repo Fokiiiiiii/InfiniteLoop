@@ -197,30 +197,72 @@ class ProxyRoutingTests(unittest.TestCase):
     def test_jp_observed_config_stays_upstream_for_metadata(self):
         flow = self.flow(
             "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
-            "prod-encdn-ak.pgr-game.com",
+            "prod-jpcdn-tx.kurogame.net",
         )
 
         with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
             proxy.request(flow)
             self.assertTrue(proxy.is_authoritative_config_request(flow))
-            self.assertEqual("prod-encdn-ak.pgr-game.com", flow.request.host)
+            self.assertEqual("prod-jpcdn-tx.kurogame.net", flow.request.host)
             self.assertEqual(80, flow.request.port)
             self.assertNotIn("X-Forwarded-Host", flow.request.headers)
+
+    def test_jp_notice_metadata_stays_on_authoritative_cdn(self):
+        flow = self.flow(
+            "/prod/client/notice/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/PopUpPicNotice.json",
+            "prod-jpcdn-ak.pgr-game.com",
+        )
+
+        with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+
+        self.assertEqual("prod-jpcdn-ak.pgr-game.com", flow.request.host)
+        self.assertEqual(80, flow.request.port)
+        self.assertNotIn("X-Forwarded-Host", flow.request.headers)
+
+    def test_jp_config_does_not_route_unrelated_host(self):
+        flow = self.flow(
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "unrelated.example.test",
+        )
+
+        with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+
+        self.assertEqual("unrelated.example.test", flow.request.host)
+        self.assertEqual(80, flow.request.port)
+        self.assertNotIn("X-Forwarded-Host", flow.request.headers)
+
+    def test_jp_config_accepts_observed_ip_host_from_process_redirector(self):
+        flow = self.flow(
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "8.209.200.222",
+        )
+
+        with patch.dict(os.environ, {"ASCNET_REGION": "jp", "ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+            self.assertTrue(proxy.is_authoritative_config_request(flow))
+
+        self.assertEqual("8.209.200.222", flow.request.host)
+        self.assertEqual(80, flow.request.port)
+        self.assertNotIn("X-Forwarded-Host", flow.request.headers)
 
     def test_jp_observed_config_response_rewrites_login_endpoints_only(self):
         flow = self.flow(
             "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
-            "prod-encdn-ak.pgr-game.com",
+            "prod-jpcdn-tx.kurogame.net",
         )
         flow.response = SimpleNamespace(
             status_code=200,
             content=(
                 "Key\tType\tValue\n"
-                "DocumentVersion\tstring\tunknown\n"
-                "Channel\tint\tunknown\n"
-                "PrimaryCdns\tstring\thttps://observed-jp-cdn.example/prod\n"
-                "ServerListStr\tstring\tJapan#https://official-login.example/api/Login/Login\n"
-                "ChannelServerListStr\tstring\tdefault#Japan#https://official-login.example/api/Login/Login\n"
+                "ApplicationVersion\tstring\t4.7.0\n"
+                "DocumentVersion\tstring\t4.7.15\n"
+                "LaunchModuleVersion\tstring\t4.7.15\n"
+                "Channel\tint\t5\n"
+                "PrimaryCdns\tstring\thttp://prod-jpcdn-ak.pgr-game.com/prod\n"
+                "ServerListStr\tstring\t日本サーバー#http://8.209.200.222:2333/api/Login/Login\n"
+                "ChannelServerListStr\tstring\tdefault#日本サーバー#http://8.209.200.222:2333/api/Login/Login\n"
             ).encode("utf-8"),
         )
 
@@ -228,10 +270,13 @@ class ProxyRoutingTests(unittest.TestCase):
             proxy.response(flow)
 
         text = flow.response.content.decode("utf-8")
-        self.assertIn("ServerListStr\tstring\tJapan#http://127.0.0.1:8080/api/Login/Login\n", text)
-        self.assertIn("ChannelServerListStr\tstring\tdefault#Japan#http://127.0.0.1:8080/api/Login/Login\n", text)
-        self.assertIn("DocumentVersion\tstring\tunknown\n", text)
-        self.assertIn("PrimaryCdns\tstring\thttps://observed-jp-cdn.example/prod\n", text)
+        self.assertIn("ServerListStr\tstring\t日本サーバー#http://127.0.0.1:8080/api/Login/Login\n", text)
+        self.assertIn("ChannelServerListStr\tstring\tdefault#日本サーバー#http://127.0.0.1:8080/api/Login/Login\n", text)
+        self.assertIn("ServerListStr_4.7.0\tstring\t", text)
+        self.assertIn("ChannelServerListStr_4.7.0\tstring\tdefault#", text)
+        self.assertIn("#http://127.0.0.1:8080/api/Login/Login", text)
+        self.assertIn("DocumentVersion\tstring\t4.7.15\n", text)
+        self.assertIn("PrimaryCdns\tstring\thttp://prod-jpcdn-ak.pgr-game.com/prod\n", text)
 
     def test_tw_feedback_with_query_is_sunk(self):
         flow = self.flow("/feedback?event=login", "prod.twzspnslog.kurogame.com")

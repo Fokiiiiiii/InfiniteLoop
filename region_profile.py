@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from fnmatch import fnmatchcase
+from ipaddress import ip_address
 from pathlib import PurePosixPath
 from typing import Iterable
 
@@ -27,6 +28,7 @@ class ConfigSmokeTarget:
     channel_assertion: str
     application_version: str = "4.6.0"
     document_version: str | None = None
+    base_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -141,8 +143,8 @@ TW_PROFILE = RegionProfile(
 JP_PROFILE = RegionProfile(
     name="jp",
     package_names=("com.kurogame.punishing.grayraven.jp",),
-    config_hosts=("prod-encdn-*.pgr-game.com", "prod-encdn-*.kurogame.net"),
-    notice_hosts=("prod-encdn-*.pgr-game.com", "prod-encdn-*.kurogame.net"),
+    config_hosts=("prod-jpcdn-*.pgr-game.com", "prod-jpcdn-*.kurogame.net"),
+    notice_hosts=("prod-jpcdn-*.pgr-game.com", "prod-jpcdn-*.kurogame.net"),
     sdk_hosts=(
         "sdkapi.kurogame-service.com",
         "sdkapi.kurogame-service.xyz",
@@ -151,19 +153,20 @@ JP_PROFILE = RegionProfile(
     route_hosts=(
         "sdkapi.kurogame-service.com",
         "sdkapi.kurogame-service.xyz",
-        "prod-encdn-*.pgr-game.com",
-        "prod-encdn-*.kurogame.net",
+        "prod-jpcdn-*.pgr-game.com",
+        "prod-jpcdn-*.kurogame.net",
     ),
     config_mode=ConfigMode.AUTHORITATIVE,
-    expected_channel=205,
-    expected_channels=(205,),
+    expected_channel=5,
+    expected_channels=(5,),
     config_smoke_targets=(
         ConfigSmokeTarget(
             "jp-client",
             "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
-            "Channel\tint\t205",
+            "Channel\tint\t5",
+            base_url="https://prod-jpcdn-tx.kurogame.net",
             application_version="4.7.0",
-            document_version="4.7.11",
+            document_version="4.7.15",
         ),
     ),
     metadata_status="observed",
@@ -211,17 +214,27 @@ def package_from_config_path(path: str | None) -> str | None:
     return None
 
 
+def is_ip_host(host: str | None) -> bool:
+    if not host:
+        return False
+    try:
+        ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
 def authoritative_config_matches(profile: RegionProfile, host: str | None, path: str | None) -> bool:
     if profile.config_mode is not ConfigMode.AUTHORITATIVE or not is_config_path(path):
         return False
-    # An empty host set is intentional for JP discovery mode. It means the
-    # explicitly selected region may observe and pass through its config path,
-    # while the missing host remains visible as UNKNOWN metadata.
+    # An empty host set remains useful for an explicitly selected region in
+    # discovery mode. Known profiles still require an observed host or the
+    # observed package path below when a process redirector exposes an IP.
     if not profile.config_hosts or profile.matches_config_host(host):
         return True
 
     # Process-scoped redirectors can expose the CDN as a resolved IP instead
-    # of its configured hostname. The package segment is still authoritative
-    # and is a safer discriminator than rewriting every config-looking path.
+    # of its configured hostname. Allow that observed-IP case, but do not let
+    # an arbitrary unrelated hostname plus a familiar path opt into rewriting.
     package = package_from_config_path(path)
-    return package in profile.package_names
+    return is_ip_host(host) and package in profile.package_names

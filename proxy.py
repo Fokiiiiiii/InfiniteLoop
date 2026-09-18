@@ -113,7 +113,8 @@ def _is_pgr_game_popup_notice_request(flow, profile: RegionProfile | None = None
     host = flow.request.pretty_host
     path = flow.request.path.split("?", 1)[0]
     return (
-        profile.matches_notice_host(host)
+        profile.config_mode is ConfigMode.LOCAL
+        and profile.matches_notice_host(host)
         and path.startswith("/prod/client/notice/config/")
         and path.endswith("/PopUpPicNotice.json")
     )
@@ -123,10 +124,11 @@ def _is_pgr_game_popup_notice_request(flow, profile: RegionProfile | None = None
 def _is_upstream_notice_html_request(flow, profile: RegionProfile | None = None):
     profile = profile or detect_region(flow)
     path = flow.request.path.split("?", 1)[0]
+    if profile.config_mode is ConfigMode.AUTHORITATIVE:
+        return profile.matches_notice_host(flow.request.pretty_host) and path.startswith("/prod/client/notice/")
     return (
         path.startswith("/prod/client/notice/html/")
-        and (profile.matches_route_host(flow.request.pretty_host)
-             or (profile.config_mode is ConfigMode.AUTHORITATIVE and not profile.notice_hosts))
+        and profile.matches_route_host(flow.request.pretty_host)
     )
 
 
@@ -321,4 +323,4 @@ def response(flow: http.HTTPFlow) -> None:
     rewritten = _rewrite_authoritative_config_body(text, _ascnet_origin())
     if rewritten != text:
         flow.response.content = rewritten.encode("utf-8")
-        _log_flow("TW-CONFIG-REWRITE", flow)
+        _log_flow("CONFIG-REWRITE", flow)

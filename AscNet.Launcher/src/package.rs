@@ -382,6 +382,14 @@ mod tests {
             assert!(!package.manifest.accepts_original("PGR_Data/Plugins/KRSDK.dll", Some(hash)));
         }
         assert!(!package.manifest.accepts_original("GameAssembly.dll", Some(&"00".repeat(32))));
+        assert!(package.manifest.accepts_original(
+            "PGR.exe",
+            Some("23c55fe8af5cb1ddef16c5d092ee190b91e2005327c2532f97465a38de92c4f4"),
+        ));
+        assert!(package.manifest.accepts_original(
+            "GameAssembly.dll",
+            Some("7433fadbe21fdd6b47f8af2df67b365ef810aa23f6972bc39456730808ff362b"),
+        ));
         assert!(!package.manifest.accepts_original("GameAssembly.dll", None));
         let _ = fs::remove_dir_all(root);
     }

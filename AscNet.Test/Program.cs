@@ -32750,18 +32750,15 @@ namespace AscNet.Test
             AssertEqual("0", ConfigValue(remoteConfigs, "IsHideFunc"), "IsHideFunc config");
             AssertEqual("0", ConfigValue(remoteConfigs, "IsHideFuncAndroid"), "IsHideFuncAndroid config");
 
-            MethodInfo getVersion = configController.GetMethod("GetVersionConfig", BindingFlags.NonPublic | BindingFlags.Static)!;
-            object jpPackageConfig = getPackageConfig.Invoke(null, ["com.kurogame.punishing.grayraven.jp", true])!;
-            AssertEqual("http://prod-encdn-ak.pgr-game.com/prod", jpPackageConfig.GetType().GetField("Item1")!.GetValue(jpPackageConfig), "JP PrimaryCdns");
-            AssertEqual("http://prod-encdn-aliyun.kurogame.net/prod", jpPackageConfig.GetType().GetField("Item2")!.GetValue(jpPackageConfig), "JP SecondaryCdns");
-            AssertEqual(205, jpPackageConfig.GetType().GetField("Item3")!.GetValue(jpPackageConfig), "JP Channel");
-
-            ServerVersionConfig jpVersion = (ServerVersionConfig)getVersion.Invoke(null, ["4.7.0"])!;
-            List<RemoteConfig> jpConfigs = new();
-            addCurrentClientConfig.Invoke(null, [jpConfigs, "com.kurogame.punishing.grayraven.jp", "4.7.0", jpVersion, "http://127.0.0.1:8080"]);
-            AssertEqual("205", ConfigValue(jpConfigs, "Channel"), "JP Channel config");
-            AssertEqual("4.7.11", ConfigValue(jpConfigs, "DocumentVersion"), "JP DocumentVersion config");
-            AssertEqual("4.7.11", ConfigValue(jpConfigs, "LaunchModuleVersion"), "JP LaunchModuleVersion config");
+            MethodInfo handleConfig = configController.GetMethod("HandleConfigRequest", BindingFlags.NonPublic | BindingFlags.Static)!;
+            Microsoft.AspNetCore.Http.DefaultHttpContext jpContext = new();
+            jpContext.Request.Scheme = "http";
+            jpContext.Request.Host = new Microsoft.AspNetCore.Http.HostString("127.0.0.1", 8080);
+            jpContext.Request.RouteValues["package"] = "com.kurogame.punishing.grayraven.jp";
+            jpContext.Request.RouteValues["version"] = "4.7.0";
+            string jpResponse = (string)handleConfig.Invoke(null, [jpContext])!;
+            AssertEqual(Microsoft.AspNetCore.Http.StatusCodes.Status421MisdirectedRequest, jpContext.Response.StatusCode, "JP local config status");
+            AssertEqual("JP config is authoritative upstream; use the JP region bridge.", jpResponse, "JP local config response");
         }
 
         private const string KuroSdkDummyEmail = "krsdk-test@ascnet.local";

@@ -80,14 +80,46 @@ class RegionProfileRunnerTests(unittest.TestCase):
         self.assertEqual("jp", profile.name)
         self.assertFalse(profile.requires_discovery)
         self.assertEqual(("com.kurogame.punishing.grayraven.jp",), profile.package_names)
-        self.assertEqual(205, profile.expected_channel)
+        self.assertEqual(5, profile.expected_channel)
         self.assertEqual("authoritative", profile.config_mode.value)
+        self.assertTrue(profile.matches_config_host("prod-jpcdn-tx.kurogame.net"))
+        self.assertTrue(profile.matches_notice_host("prod-jpcdn-ak.pgr-game.com"))
 
     def test_jp_smoke_expects_observed_versions(self):
         target = run_steam.get_region_profile("jp").config_smoke_targets[0]
         self.assertEqual("4.7.0", target.application_version)
-        self.assertEqual("4.7.11", target.document_version)
-        self.assertEqual("Channel\tint\t205", target.channel_assertion)
+        self.assertEqual("4.7.15", target.document_version)
+        self.assertEqual("Channel\tint\t5", target.channel_assertion)
+        self.assertEqual("https://prod-jpcdn-tx.kurogame.net", target.base_url)
+
+    def test_jp_smoke_reads_authoritative_upstream_config(self):
+        target = run_steam.get_region_profile("jp").config_smoke_targets[0]
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self):
+                return (
+                    "Key\tType\tValue\r\n"
+                    "ApplicationVersion\tstring\t4.7.0\r\n"
+                    "DocumentVersion\tstring\t4.7.15\r\n"
+                    "LaunchModuleVersion\tstring\t4.7.15\r\n"
+                    "Channel\tint\t5\r\n"
+                    "ServerListStr\tstring\t日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
+                    "ChannelServerListStr\tstring\tdefault#日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
+                ).encode("utf-8")
+
+        with patch.object(run_steam, "local_sdk_open", return_value=FakeResponse()) as open_request:
+            with patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                run_steam.smoke_check("http://127.0.0.1:8080", 0.01, run_steam.get_region_profile("jp"))
+
+        requested_url = open_request.call_args.args[0]
+        self.assertEqual(target.base_url + target.path, requested_url)
+        self.assertIn("Smoke OK [jp-client] upstream:", stdout.getvalue())
 
     def test_tw_authoritative_smoke_is_not_faked_locally(self):
         with patch("sys.stdout", new_callable=io.StringIO) as stdout:
@@ -100,7 +132,7 @@ class RegionProfileRunnerTests(unittest.TestCase):
         self.assertEqual("jp", env["ASCNET_REGION"])
         self.assertEqual("authoritative", env["ASCNET_REGION_CONFIG_MODE"])
         self.assertEqual("com.kurogame.punishing.grayraven.jp", env["ASCNET_REGION_PACKAGES"])
-        self.assertEqual("205", env["ASCNET_EXPECTED_CHANNEL"])
+        self.assertEqual("5", env["ASCNET_EXPECTED_CHANNEL"])
 
     def test_local_proxy_environment_removes_application_proxy_variables(self):
         base = {"HTTP_PROXY": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9"}

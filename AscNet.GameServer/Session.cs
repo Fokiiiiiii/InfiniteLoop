@@ -315,7 +315,28 @@ namespace AscNet.GameServer
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
                                             try
                                             {
-                                                InvokeRequestHandler(requestPacketHandler, request);
+                                                // Login reconciliation can enqueue several megabytes of sync
+                                                // packets. Keep transport heartbeats responsive while that
+                                                // work is running so the client does not time out and reconnect
+                                                // in the middle of a valid login.
+                                                if (requestName is "HeartbeatRequest" or "Ping")
+                                                {
+                                                    _ = Task.Run(() =>
+                                                    {
+                                                        try
+                                                        {
+                                                            InvokeRequestHandler(requestPacketHandler, request);
+                                                        }
+                                                        catch (Exception ex)
+                                                        {
+                                                            log.Warn($"Background heartbeat handler failed: {ex.GetType().Name}");
+                                                        }
+                                                    });
+                                                }
+                                                else
+                                                {
+                                                    InvokeRequestHandler(requestPacketHandler, request);
+                                                }
                                                 lastSuccessfulRequest = requestName;
                                                 ProtocolGapProbe.Record(
                                                     id,

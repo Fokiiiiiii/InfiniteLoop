@@ -8,6 +8,7 @@ namespace AscNet.SDKServer.Controllers
 {
     internal class ConfigController : IRegisterable
     {
+        private const string AuthoritativeJpPackage = "com.kurogame.punishing.grayraven.jp";
         private static readonly Dictionary<string, ServerVersionConfig> versions = new();
 
         static ConfigController()
@@ -55,6 +56,16 @@ namespace AscNet.SDKServer.Controllers
         {
             string package = GetRouteValue(ctx, "package");
             string version = GetRouteValue(ctx, "version");
+            if (string.Equals(package, AuthoritativeJpPackage, StringComparison.OrdinalIgnoreCase))
+            {
+                // JP bootstrap/config metadata must come from the official CDN.
+                // Returning the local Global/EN fallback here would make a
+                // misconfigured bridge look successful with the wrong channel,
+                // version, and resource origins.
+                ctx.Response.StatusCode = StatusCodes.Status421MisdirectedRequest;
+                return "JP config is authoritative upstream; use the JP region bridge.";
+            }
+
             bool currentClient = IsVersionAtLeast(version, 4, 5, 0);
             string publicHttpOrigin = PublicHttpOrigin(ctx);
             ServerVersionConfig versionConfig = GetVersionConfig(version);
@@ -399,10 +410,6 @@ namespace AscNet.SDKServer.Controllers
                     "http://prod-encdn-aliyun.kurogame.net/prod",
                     5),
                 "com.kurogame.pc.punishing.grayraven.en" when currentClient => (
-                    "http://prod-encdn-ak.pgr-game.com/prod",
-                    "http://prod-encdn-aliyun.kurogame.net/prod",
-                    205),
-                "com.kurogame.punishing.grayraven.jp" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",
                     205),
