@@ -718,6 +718,11 @@ def main() -> int:
         ascnet = popen(ascnet_run_command(dotnet, args.sdk_url), env=env)
         processes.append(ascnet)
 
+        sdk_address = urllib.parse.urlparse(args.sdk_url)
+        sdk_host = sdk_address.hostname or "127.0.0.1"
+        sdk_port = sdk_address.port or (443 if sdk_address.scheme == "https" else 80)
+        wait_for_tcp(sdk_host, sdk_port, args.smoke_timeout, "AscNet SDK")
+
         if not args.no_smoke:
             smoke_check(args.sdk_url, args.smoke_timeout, profile)
 
