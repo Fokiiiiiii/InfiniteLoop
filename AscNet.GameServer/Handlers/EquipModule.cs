@@ -1720,6 +1720,8 @@ namespace AscNet.GameServer.Handlers
                 TaskModule.RecordTableDrivenProgress(session, [(11202, (int?)request.UseItemId, materialCost)]);
             if (commitsImmediately && hasMaterial)
                 TaskModule.RecordEquipmentProgress(session, 12205, [equip]);
+            if (commitsImmediately && resonance.Type == EquipResonanceType.CharacterSkill)
+                SyncCharacterAfterResonance(session, request.CharacterId ?? resonance.CharacterId);
             session.SendResponse(new EquipResonanceResponse() { ResonanceDatas = [resonance] }, packet.Id);
         }
 
@@ -1894,6 +1896,8 @@ namespace AscNet.GameServer.Handlers
             TaskModule.RecordTableDrivenProgress(session, [(11202, (int?)request.UseItemId, totalMaterialCost)]);
             TaskModule.RecordEquipmentProgress(session, 12205, equips);
             session.AppliedTeamPrefabId = null;
+            if (request.SelectType == EquipResonanceType.CharacterSkill)
+                SyncCharacterAfterResonance(session, request.CharacterId);
 
             session.SendPush(archivePush);
             session.SendPush(itemPush);
@@ -1901,6 +1905,18 @@ namespace AscNet.GameServer.Handlers
             {
                 SuccessEquipIds = request.EquipIds.ToList()
             }, packet.Id);
+        }
+
+        private static void SyncCharacterAfterResonance(Session session, int characterId)
+        {
+            if (!session.character.NormalizeCharactersForCurrentTables(session.player.GatherRewards))
+                return;
+
+            session.character.Save();
+            CharacterData? character = session.character.Characters
+                .Find(candidate => candidate.Id == (uint)characterId);
+            if (character is not null)
+                session.SendPush(new NotifyCharacterDataList { CharacterDataList = [character] });
         }
 
         private static int ResolveAttributePool(

@@ -813,6 +813,7 @@ namespace AscNet.GameServer.Handlers
                 foreach (CharacterData character in session.character.Characters.Where(c => c.SkillList.Any(s => s.Id == skillId)))
                     character.SkillList.First(s => s.Id == skillId).Level += request.Count;
             }
+            session.character.NormalizeCharactersForCurrentTables(session.player.GatherRewards);
 
             NotifyCharacterDataList notifyCharacterData = new();
             notifyCharacterData.CharacterDataList.AddRange(session.character.Characters.Where(x => upgradeResult.AffectedCharacters.Contains(x.Id)));
