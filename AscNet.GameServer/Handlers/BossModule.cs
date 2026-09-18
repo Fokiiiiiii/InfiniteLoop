@@ -226,6 +226,8 @@ namespace AscNet.GameServer.Handlers
         });
         private static readonly Lazy<Dictionary<int, BossSingleStageTable>> Stages = new(() =>
             TableReaderV2.Parse<BossSingleStageTable>().ToDictionary(row => row.StageId));
+        private static readonly Lazy<Dictionary<int, int>> StageNpcs = new(() =>
+            TableReaderV2.Parse<BossSingleStageNpcTable>().ToDictionary(row => row.StageId, row => row.NpcId));
         private static readonly Lazy<Dictionary<int, BossSingleScoreRuleTable>> ScoreRules = new(() =>
             TableReaderV2.Parse<BossSingleScoreRuleTable>().ToDictionary(row => row.Id));
         private static readonly Lazy<List<BossSingleScoreRewardTable>> ScoreRewards = new(() =>
@@ -560,6 +562,11 @@ namespace AscNet.GameServer.Handlers
             if (!TryResolveFightStage(session.player.SimulatedBattlefield, stageId, stageType, out int sectionId, out BossSingleStageTable? stage)
                 || stage is null)
                 return false;
+            if (!StageNpcs.Value.TryGetValue(stageId, out int npcId) || npcId <= 0)
+            {
+                session.log.Warn($"BossSingle stage {stageId} has no authoritative NPC mapping.");
+                return false;
+            }
 
             List<int> characters = request.CardIds?
                 .Where(id => id > 0)
@@ -590,6 +597,23 @@ namespace AscNet.GameServer.Handlers
                     return false;
             }
             ApplyChallengeFeatureEvents(request, response.FightData, session.player.SimulatedBattlefield);
+            response.FightData.NpcGroupList = new List<Dictionary<string, object>>
+            {
+                new()
+                {
+                    ["NpcList"] = new List<Dictionary<string, object>>
+                    {
+                        new()
+                        {
+                            ["NpcId"] = npcId,
+                            ["Level"] = 0,
+                            ["BufferIds"] = Array.Empty<int>(),
+                            ["MagicInfos"] = Array.Empty<object>(),
+                            ["AttrTable"] = new Dictionary<string, object>()
+                        }
+                    }
+                }
+            };
 
             session.PendingBossSingleScore = null;
             response.FightData.FightCheckType = 1;

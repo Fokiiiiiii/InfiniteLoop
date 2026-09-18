@@ -27786,11 +27786,21 @@ namespace AscNet.Test
                             BossSingleChallengeBuffGroup = buffGroup
                         }
                     });
-                return ReadResponsePayload<PreFightResponse>(
+                PreFightResponse response = ReadResponsePayload<PreFightResponse>(
                     harness,
                     packetId,
                     nameof(PreFightResponse),
                     $"Pain Cage stage {stageId} PreFightResponse");
+                if (response.Code == 0)
+                {
+                    JArray groups = JArray.FromObject(response.FightData?.NpcGroupList
+                        ?? throw new InvalidDataException($"Pain Cage stage {stageId}: successful PreFight omitted NpcGroupList."));
+                    AssertEqual(true, groups.Count > 0,
+                        $"Pain Cage stage {stageId} successful PreFight has an NPC group");
+                    AssertEqual(true, groups.All(group => (group["NpcList"]?.Count() ?? 0) > 0),
+                        $"Pain Cage stage {stageId} successful PreFight groups are nonempty");
+                }
+                return response;
             }
 
             FightSettleResponse SettleFight(
@@ -27895,10 +27905,15 @@ namespace AscNet.Test
             List<BossSingleScoreRewardTable> scoreRewards = TableReaderV2.Parse<BossSingleScoreRewardTable>();
             List<BossSingleRewardGoodsTable> rewardGoods = TableReaderV2.Parse<BossSingleRewardGoodsTable>();
             List<BossSingleTrialGradeTable> trialGrades = TableReaderV2.Parse<BossSingleTrialGradeTable>();
+            List<BossSingleStageNpcTable> stageNpcs = TableReaderV2.Parse<BossSingleStageNpcTable>();
             BossSingleConfigTable runtimeConfig = TableReaderV2.Parse<BossSingleConfigTable>().Single();
             AssertEqual(6, runtimeConfig.AutoFightCount, "Pain Cage EN-config auto-fight limit");
             AssertEqual(100, runtimeConfig.AutoFightRebate, "Pain Cage EN-config auto-fight rebate");
             AssertEqual(301, stages.Count, "Pain Cage generated stage count");
+            AssertEqual(stages.Count, stageNpcs.Count, "Pain Cage every stage has an NPC mapping");
+            AssertEqual(true, stageNpcs.All(row => row.NpcId > 0), "Pain Cage NPC mappings are positive");
+            AssertEqual(8160, stageNpcs.Single(row => row.StageId == 30000303).NpcId,
+                "Pain Cage Roland stage resolves to the master NPC");
             AssertEqual(stages.Count, scoreRules.Count, "Pain Cage one score rule per stage");
             if (groups.Count == 0 || sections.Count == 0 || scoreRewards.Count == 0 || rewardGoods.Count == 0)
                 throw new InvalidDataException("Pain Cage generated runtime tables are incomplete.");

@@ -79,6 +79,35 @@ def unique_index(rows: list[dict[str, Any]], field: str, source: Path) -> dict[i
     return result
 
 
+def model_aliases(model_id: str) -> list[str]:
+    aliases = [model_id]
+    if model_id.endswith("UI"):
+        aliases.append(model_id[:-2])
+    for alias in list(aliases):
+        if alias.endswith(tuple(f"Md01000{digit}" for digit in range(2, 10))):
+            aliases.append(alias[:-1] + "1")
+    return list(dict.fromkeys(aliases))
+
+
+def select_npc_id(model_id: str, npcs: list[dict[str, Any]], source: Path) -> int:
+    candidates = [row for row in npcs if row.get("ModelId") in model_aliases(model_id)]
+    if not candidates:
+        raise ValueError(f"{source}: no Npc.json row resolves BossSingle ModelId {model_id}")
+
+    def rank(row: dict[str, Any]) -> tuple[int, int, int, int, int, int]:
+        npc_id = integer(row, "Id", source)
+        return (
+            0 if row.get("Type") == 3 and row.get("Kind") == 0 else 1,
+            0 if 8000 <= npc_id < 9000 else 1,
+            0 if row.get("BossHp") is True else 1,
+            0 if npc_id == row.get("AttribId") else 1,
+            0 if row.get("PromotedId") == 0 else 1,
+            npc_id,
+        )
+
+    return integer(min(candidates, key=rank), "Id", source)
+
+
 def scalar(value: Any) -> str:
     text = str(value)
     if "\t" in text or "\r" in text or "\n" in text:
@@ -108,9 +137,11 @@ def generate(source: Path) -> dict[str, bytes]:
     paths = {name: boss_dir / f"{name}.json" for name in BOSS_FILES}
     data = {name: load_rows(path) for name, path in paths.items()}
     stage_path = source / "fuben" / "Stage.json"
+    npc_path = source / "fight" / "npc" / "Npc.json"
     reward_path = source / "reward" / "Reward.json"
     goods_path = source / "reward" / "RewardGoods.json"
     stages = unique_index(load_rows(stage_path), "StageId", stage_path)
+    npcs = load_rows(npc_path)
     rewards = unique_index(load_rows(reward_path), "Id", reward_path)
     goods = unique_index(load_rows(goods_path), "Id", goods_path)
     config_path = source / "config" / "Config.json"
@@ -166,6 +197,21 @@ def generate(source: Path) -> dict[str, bytes]:
             raise ValueError(f"{stage_path}: missing StageId {stage_id} referenced by BossSingleStage")
         stage_rows.append([stage_id] + [integer(row, f, paths["BossSingleStage"]) for f in stage_cols[1:6]] + [boolean01(row, "AutoFight", paths["BossSingleStage"]), integer(joined, "RebootId", stage_path, default=0), integer(joined, "PassTimeLimit", stage_path, default=0)])
     output["BossSingleStage.tsv"] = table(stage_cols, stage_rows)
+    output["BossSingleStageNpc.tsv"] = table(
+        ["StageId", "ModelId", "NpcId"],
+        (
+            [
+                integer(row, "StageId", paths["BossSingleStage"]),
+                row.get("ModelId") if isinstance(row.get("ModelId"), str) else "",
+                select_npc_id(
+                    row.get("ModelId") if isinstance(row.get("ModelId"), str) else "",
+                    npcs,
+                    npc_path,
+                ),
+            ]
+            for row in boss_stages
+        ),
+    )
 
     rules = sorted(data["BossSingleScoreRule"], key=lambda r: integer(r, "Id", paths["BossSingleScoreRule"]))
     unique_index(rules, "Id", paths["BossSingleScoreRule"])
