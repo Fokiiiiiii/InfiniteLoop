@@ -629,20 +629,21 @@ namespace AscNet.Common.Database
             if (character.SkillList is null || Equips is null)
                 return false;
 
-            Dictionary<int, int> resonanceCounts = Equips
+            int resonanceCount = Equips
                 .Where(equip => equip.CharacterId == character.Id)
                 .SelectMany(equip => equip.ResonanceInfo ?? [])
                 .Where(resonance => resonance.Type == EquipResonanceType.CharacterSkill
                     && resonance.CharacterId == character.Id
                     && resonance.TemplateId > 0)
-                .GroupBy(resonance => resonance.TemplateId)
-                .ToDictionary(group => group.Key, group => group.Count());
+                .Count();
+            if (resonanceCount <= 0)
+                return false;
+
             bool changed = false;
             foreach (CharacterSkill skill in character.SkillList)
             {
-                int resonanceCount = resonanceCounts.GetValueOrDefault((int)skill.Id);
                 int maxLevel = maxLevelBySkillId.GetValueOrDefault((int)skill.Id);
-                if (resonanceCount <= 0 || maxLevel <= 0)
+                if (maxLevel <= 0)
                     continue;
 
                 int effectiveMaxLevel = Math.Max(1, maxLevel - resonanceCount);
