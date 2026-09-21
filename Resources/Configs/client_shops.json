@@ -51665,6 +51665,277 @@
     "ConditionIds": [],
     "RefreshTips": null
   },
+  "1291": {
+    "Id": 1291,
+    "Name": "Circuit Connect Shop",
+    "RefreshTime": 0,
+    "ClosedTime": 0,
+    "ManualRefreshTimes": 0,
+    "ManualResetTimesLimit": 0,
+    "RefreshCostId": 0,
+    "RefreshCostCount": 0,
+    "TotalBuyTimes": 0,
+    "BuyTimesLimit": 0,
+    "ShowIds": [],
+    "GoodsList": [
+      {
+        "Id": 2001291007,
+        "Priority": 7,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 63,
+          "Count": 50,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 90031,
+            "Count": 6
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 8,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291001,
+        "Priority": 6,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 50005,
+          "Count": 50,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 150
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291002,
+        "Priority": 5,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 90031,
+          "Count": 6,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 100
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291003,
+        "Priority": 4,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 60001,
+          "Count": 30,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 100
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291004,
+        "Priority": 3,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 31204,
+          "Count": 40,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 50
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291005,
+        "Priority": 2,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 70002,
+          "Count": 40,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 50
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      },
+      {
+        "Id": 2001291006,
+        "Priority": 1,
+        "RewardGoods": {
+          "RewardType": 1,
+          "TemplateId": 1,
+          "Count": 10000,
+          "Level": 0,
+          "Quality": 0,
+          "Grade": 0,
+          "Breakthrough": 0,
+          "ConvertFrom": 0,
+          "IsGift": false,
+          "RewardMulti": 0,
+          "Id": 0
+        },
+        "ConsumeList": [
+          {
+            "Id": 63,
+            "Count": 50
+          }
+        ],
+        "TotalBuyTimes": 0,
+        "BuyTimesLimit": 3,
+        "OnSales": {},
+        "OnSaleTime": 0,
+        "SelloutTime": 0,
+        "RefreshTime": 0,
+        "Tags": 0,
+        "ConditionIds": [],
+        "GiftRewardId": 0,
+        "AutoResetClockId": 0,
+        "BuyPriority": 0,
+        "ActivityConsumeCount": 0,
+        "ActivityDiscount": 0
+      }
+    ],
+    "ScreenGroupList": [],
+    "ConditionIds": [],
+    "RefreshTips": null,
+    "Provenance": "AscNet local policy catalog for the Circuit Connect mode shop (no retail Shop/ShopGoods source exists). Goods 2001291001-2001291006 reward the mode's authored per-mission task reward counts (Task 90970-90990 via Reward/RewardGoods) priced in Signal Diffusers (item 63) at policy multiples x3/x2/x1 of the 50-per-mission grant unit. Goods 2001291007 is the local-policy currency exchange: the current activity's authored tasks grant item 90031 (51 total, authored per-mission max 6) but never item 63, so 6 x 90031 -> 50 x 63 with BuyTimesLimit 8 (= floor(51/6), 400 Signal Diffusers maximum) makes the catalog reachable. It pays half the 100-per-6 rate this catalog charges for item 90031, so the pair cannot be arbitraged for gain. Not captured data."
+  },
   "1421": {
     "Id": 1421,
     "Name": "Version Limited",

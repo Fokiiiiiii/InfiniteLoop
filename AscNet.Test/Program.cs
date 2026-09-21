@@ -347,6 +347,11 @@ namespace AscNet.Test
                     ValidateVersion47ConcertStartCompatibility();
                     return;
                 }
+                if (args.Contains("--same-color-game-compat-only"))
+                {
+                    ValidateSameColorGameCompatibility();
+                    return;
+                }
                 if (args.Contains("--version-46-activity-compat-only"))
                 {
                     ValidateVersion46ActivityCompatibility();
@@ -17754,6 +17759,30 @@ namespace AscNet.Test
             {
                 return databaseType.GetField("collection", BindingFlags.Static | BindingFlags.Public)
                     ?? throw new MissingFieldException(databaseType.FullName, "collection");
+            }
+
+            public static MongoCollectionOverride InstallForSameColorGameCompatibility(
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Character> characterCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Inventory> inventoryCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.SameColorGameRankEntry> rankCollection)
+            {
+                IMongoCollection<AscNet.Common.Database.Player> recordingPlayerCollection =
+                    CreateRecordingMongoCollection(out playerCollection);
+                IMongoCollection<AscNet.Common.Database.Character> recordingCharacterCollection =
+                    CreateRecordingMongoCollection(out characterCollection);
+                IMongoCollection<AscNet.Common.Database.Inventory> recordingInventoryCollection =
+                    CreateRecordingMongoCollection(out inventoryCollection);
+                IMongoCollection<AscNet.Common.Database.SameColorGameRankEntry> recordingRankCollection =
+                    CreateRecordingMongoCollection(out rankCollection);
+                return new MongoCollectionOverride(
+                [
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Player)), recordingPlayerCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Character)), recordingCharacterCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Inventory)), recordingInventoryCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Stage)), CreateNoOpMongoCollection<AscNet.Common.Database.Stage>()),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.SameColorGameRankEntry)), recordingRankCollection)
+                ]);
             }
 
             private static IMongoCollection<TDocument> CreateNoOpMongoCollection<TDocument>()

@@ -868,6 +868,7 @@ namespace AscNet.GameServer.Handlers
             tasks.AddRange(Theatre4Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(Theatre5Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(Theatre6Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
+            tasks.AddRange(BuildSameColorTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
             session.TaskSnapshotProgress = tasks.Where(task => SnapshotTaskIds.Value.Contains((int)task.Id))
                 .ToDictionary(task => (int)task.Id, task => (task.Schedule[0].Value, task.State));
             return tasks;
@@ -903,6 +904,7 @@ namespace AscNet.GameServer.Handlers
                         .Concat(Theatre5Module.BuildTaskUpdates(new Theatre5Module.Mutation(session, newOperation: false)))
                         .Concat(Theatre4Module.BuildTaskUpdates(new Theatre4Module.Mutation(session, newOperation: false)))
                         .Concat(Theatre6Module.BuildTaskUpdates(new Theatre6Module.Mutation(session, newOperation: false)))
+                        .Concat(BuildSameColorTaskProgress(session).Select(ToSyncTask))
                         .GroupBy(x => x.Id)
                         .Select(x => x.First())
                         .ToList()
@@ -1003,6 +1005,57 @@ namespace AscNet.GameServer.Handlers
                 }
             });
         }
+        // Circuit Connect (SameColorGame) tasks: authored rows 90970-90990. The mode module owns
+        // activity availability, run totals and claim keys; this only projects them onto the shared
+        // task wire. Claimed rows stay finished and are not touched by mission-period rollovers.
+        private static readonly Lazy<IReadOnlyDictionary<int, TaskTable>> TaskRowsById = new(() =>
+            TableReaderV2.Parse<TaskTable>().ToDictionary(task => task.Id));
+
+        // Authored Circuit condition 69005 stores [bossId, grade]: its target is the grade parameter
+        // and the published value is the achieved grade (the observed wire row published Value 11 for
+        // S, not a boolean). Score condition 69002 publishes the accumulated total against Task.Result.
+        private const int SameColorGradeConditionType = 69005;
+
+        private static TaskTable? SameColorTaskRow(int taskId) =>
+            SameColorGameModule.GetTaskIds().Contains(taskId)
+                && TaskRowsById.Value.TryGetValue(taskId, out TaskTable? task)
+                ? task
+                : null;
+
+        private static long SameColorTaskTarget(TaskTable task, ConditionTable? condition) =>
+            condition is { Type: int conditionType } && conditionType == SameColorGradeConditionType
+                && condition.Params.Count > 1
+                ? condition.Params[1]
+                : task.Result ?? 1;
+
+        private static ConditionTable? SameColorTaskCondition(TaskTable task) =>
+            TableReaderV2.Parse<ConditionTable>().FirstOrDefault(condition => condition.Id == task.Condition);
+
+        private static int SameColorTaskValue(Player player, ConditionTable? condition) =>
+            condition is { Type: int conditionType }
+                ? checked((int)Math.Clamp(
+                    SameColorGameModule.GetConditionProgress(player, conditionType, condition.Params),
+                    0, int.MaxValue))
+                : 0;
+
+        private static List<MissionTaskProgress> BuildSameColorTaskProgress(Session session)
+        {
+            List<MissionTaskProgress> progress = [];
+            foreach (int taskId in SameColorGameModule.GetTaskIds().OrderBy(taskId => taskId))
+            {
+                TaskTable? task = SameColorTaskRow(taskId);
+                if (task is null || !SameColorGameModule.IsTaskAvailable(session.player, taskId))
+                    continue;
+                ConditionTable? condition = SameColorTaskCondition(task);
+                int value = SameColorTaskValue(session.player, condition);
+                int state = session.player.MissionProgress.ClaimedTaskIds.Contains(taskId)
+                    ? TaskStateFinish
+                    : value >= SameColorTaskTarget(task, condition) ? TaskStateAchieved : TaskStateActive;
+                progress.Add(new MissionTaskProgress(taskId, task.Condition, value, state));
+            }
+            return progress;
+        }
+
         internal static NotifyTask? RecordTransfiniteConfirmedProgress(Session session, int stageGroupId, int stageId, int spendTime, int? timeLimit, int winStreak)
         {
             List<TaskTable> tasks = TransfiniteTasks(session);
@@ -1769,7 +1822,7 @@ namespace AscNet.GameServer.Handlers
                 });
         }
 
-        private enum TaskClaimKind { Current, Transfinite, Passport, Dorm, Story, LifeTree, GuildAchievement }
+        private enum TaskClaimKind { Current, Transfinite, Passport, Dorm, Story, LifeTree, GuildAchievement, SameColorGame }
 
         private sealed record PreparedTaskClaim(int TaskId, TaskClaimKind Kind, string ClaimKey, List<RewardGoodsTable> Goods);
 
@@ -1840,6 +1893,17 @@ namespace AscNet.GameServer.Handlers
                 key = $"story-task:{taskId}";
                 achieved = BuildStoryTaskProgress(session, storyClaimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
                 goods = RewardHandler.GetRewardGoods(story.RewardId);
+            }
+            else if (SameColorTaskRow(taskId) is { } sameColor)
+            {
+                kind = TaskClaimKind.SameColorGame;
+                key = SameColorGameModule.GetTaskClaimKey(session.player, taskId);
+                ConditionTable? sameColorCondition = SameColorTaskCondition(sameColor);
+                achieved = SameColorGameModule.IsTaskAvailable(session.player, taskId)
+                    && sameColorCondition is { Type: int sameColorConditionType }
+                    && SameColorGameModule.GetConditionProgress(session.player, sameColorConditionType, sameColorCondition.Params)
+                        >= SameColorTaskTarget(sameColor, sameColorCondition);
+                goods = RewardHandler.GetRewardGoods(sameColor.RewardId ?? 0);
             }
             else
             {

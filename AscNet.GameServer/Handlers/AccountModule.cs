@@ -1092,11 +1092,6 @@ namespace AscNet.GameServer.Handlers
                 ["FinishIds"] = Array.Empty<object>(),
                 ["ExperimentInfos"] = Array.Empty<object>()
             }),
-            ["NotifySameColorGameData"] = SerializeStartupPayload(new Dictionary<string, object?>
-            {
-                ["ActivityId"] = 0,
-                ["BossRecords"] = Array.Empty<object>()
-            }),
             ["NotifyReviewConfig"] = SerializeStartupPayload(new Dictionary<string, object?>
             {
                 ["ReviewActivityConfigList"] = Array.Empty<object>()
@@ -1481,7 +1476,7 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(LoadingModule.BuildLoginData(session.player));
             session.SendPush(RepeatChallengeModule.BuildLoginData(session.player));
             SendEmptyStartupPush(session, "NotifyPlayerReportData");
-            SendEmptyStartupPush(session, "NotifySameColorGameData");
+            session.SendPush(SameColorGameModule.BuildLoginData(session.player));
             session.SendPush(StrongholdModule.BuildLoginData(session.player));
             SendEmptyStartupPush(session, "NotifySucceedBossData");
             SendEmptyStartupPush(session, "NotifyTaikoMasterData");

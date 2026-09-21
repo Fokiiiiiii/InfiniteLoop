@@ -3,6 +3,7 @@ using AscNet.Table.V2.share.activity;
 using AscNet.Table.V2.share.condition;
 using AscNet.Table.V2.share.fuben.simulatetrain;
 using AscNet.Table.V2.share.miniactivity.dyemerge;
+using AscNet.Table.V2.share.samecolorgame;
 using AscNet.Table.V2.share.theatre;
 using AscNet.Table.V2.share.theatre3;
 using AscNet.Table.V2.share.theatre4;
@@ -33,6 +34,14 @@ public static class ActivityScheduleService
                 .Select(row => new ActivityScheduleEntry(row.TimeId, 0, 0,
                     $"local-policy:Theatre4:permanent-mode:Theatre4Activity:Id={row.Id}:TimeId={row.TimeId}")))
             .Concat(TheatreDecorationEntries())
+            // AscNet policy: Circuit Connect is a permanent mode. Its client manager opens the mode
+            // from the authored activity row's positive TimerId without a calendar bound, and no
+            // authoritative retail window exists for AscNet; the authored table is the only source.
+            .Concat(TableReaderV2.Parse<SameColorGameActivityTable>()
+                .Where(row => row.TimerId is > 0)
+                .Select(row => new ActivityScheduleEntry(row.TimerId!.Value, 0, 0,
+                    $"local-policy:SameColorGame:permanent-mode:SameColorGameActivity:Id={row.Id}:"
+                    + $"TimerId={row.TimerId}:user-approved")))
             // Godfall's PvP client requires a positive end. 3000-01-01 UTC stays within the
             // Windows _localtime64 range even after a local-time-zone adjustment.
             // https://learn.microsoft.com/cpp/c-runtime-library/reference/localtime-localtime32-localtime64

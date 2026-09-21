@@ -237,6 +237,22 @@ Run the focused server compatibility harness:
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre6-compat-only
 ```
 
+### Circuit Connect (SameColorGame)
+
+Circuit Connect implements the current `SameColorGame` match-three mode with its own persisted activity, boards, runs, records and shared tasks. The client is a renderer of server-ordered actions, so board generation, matching and cascades, props, summons, boss skills, role skills and passives, score settlement and completion are owned by the server. The eight mode requests (`SameColorGameEnterStage`, `SwapItem`, `UseItem`, `CancelUseItem`, `GiveUp`, `PauseResume`, `CountDown`, `OpenRank`) and the `NotifySameColorGameData`/`NotifySameColorGameUpdate` pushes follow the recovered client contract; login no longer sends the former empty data stub.
+
+- **Authority vs policy:** mode content comes from the authored `Resources/table/share/samecolorgame` tables (activity, attribute factor, ball, boss, boss grade, boss skill, buff, combo, passive skill, role, score, skill, skill group). Board initialization/refill randomness, effect resolution order, score accumulation and completion boundaries, and mode availability are explicitly AscNet policy where no proprietary server algorithm exists; they are not recovered retail server rules or a parity claim. Captures are behavioural oracles only.
+- **Records and login:** `NotifySameColorGameData` carries the selected activity and each boss's best score, best combo and last used role for the player. Records survive relog; no mid-board run is resumed because the client has no resume request.
+- **Tasks:** the 21 authored tasks (`90970`-`90990`, groups `404`/`405`, TimeId `907`) publish at login and in shared task syncs. Boss-grade condition `69005` reports the achieved grade (S publishes `11`, which is also its authored target) and cumulative condition `69002` reports the accumulated total score against each row's authored `Result`. Claims use `FinishTaskRequest`/`FinishMultiTaskRequest` with activity-scoped claim keys, existing reward receipts and checked claim markers, so a retry after a partial save never pays twice, claimed state survives relog, and no Circuit task is reset by the daily or weekly mission rollover.
+- **Availability:** every positive `SameColorGameActivity.TimerId` (`907` for the current row) is permanently available with start and end `0`, derived by `ActivityScheduleService` from the authored activity table. This is the same permanent-mode representation as the other local mode policies; no other schedule entry changes.
+- **Guide and shop:** Circuit claims feed the existing guide activity `10012` (source group `3002`, item `50005` target `350`) and push the guide update. Shop `1291` opens through the shared `GetShopInfoRequest`/`BuyRequest` path using an AscNet local-policy catalog in `Resources/Configs/client_shops.json` (not a retail extract): authored per-mission reward quantities priced in Signal Diffusers, plus a local-policy exchange (6 × Serum Bundle Beta (M) → 50 Signal Diffusers, limit 8) because the current activity's tasks grant the former and never the latter; the exchange pays half the catalog's own `90031` rate so the pair cannot be arbitraged. Purchase counts persist through the shared shop path, and no `shop_base_infos.json` entry is required because the mode panel reads `GetShopInfo`/`GetShopGoodsList` only.
+
+Run the focused server compatibility harness:
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-only
+```
+
 ### Gender setup fix
 
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
