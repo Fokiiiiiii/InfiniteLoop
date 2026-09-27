@@ -81,6 +81,61 @@ pub fn logged_error(message: &str) -> String {
         Err(error) => format!("{message}\n\nCould not save launcher diagnostics: {error:#}"),
     }
 }
+
+/// Logs the full error chain; returns a one-line summary for the activity log.
+pub fn summarized_error(action: &str, error: &anyhow::Error) -> String {
+    let _ = launcher_log(&format!("Launcher error: Couldn't {action}: {error:#}"));
+    summarize_error(action, error)
+}
+
+fn summarize_error(action: &str, error: &anyhow::Error) -> String {
+    let chain = format!("{error:#}").to_ascii_lowercase();
+    // ponytail: substring classifier over reqwest/io/git text; downcast if messages drift.
+    const OFFLINE: [&str; 11] = [
+        "dns error",
+        "host not found",
+        "no such host",
+        "failed to lookup",
+        "could not resolve host",
+        "tunnel error",
+        "timed out",
+        "connection refused",
+        "connection reset",
+        "(connect)",
+        "unable to access",
+    ];
+    if OFFLINE.iter().any(|marker| chain.contains(marker)) {
+        return format!("Couldn't {action} — offline or GitHub unreachable");
+    }
+    let top = error.to_string();
+    let cause = if top.contains("url (") { error.root_cause().to_string() } else { top };
+    format!("Couldn't {action}: {}", cause.lines().next().unwrap_or_default())
+}
+
+#[cfg(test)]
+mod summary_tests {
+    use super::summarize_error;
+    use anyhow::anyhow;
+
+    #[test]
+    fn network_failures_collapse_to_offline() {
+        let error = anyhow!("dns error: Host not found. (os error 11001)")
+            .context("client error (Connect): tunnel error")
+            .context("error sending request for url (https://api.github.com/x)");
+        assert_eq!(
+            summarize_error("check for launcher updates", &error),
+            "Couldn't check for launcher updates — offline or GitHub unreachable"
+        );
+    }
+
+    #[test]
+    fn other_failures_keep_first_line_without_url_chain() {
+        let error = anyhow!("HTTP status 404").context("error sending request for url (https://x/y)");
+        assert_eq!(summarize_error("do it", &error), "Couldn't do it: HTTP status 404");
+        let error = anyhow!("disk full").context("Staged update is invalid\nsecond line");
+        assert_eq!(summarize_error("do it", &error), "Couldn't do it: Staged update is invalid");
+    }
+}
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBuild {
@@ -161,12 +216,14 @@ fn prepare_logged(
     if !script.is_file() {
         bail!("local setup script is missing: {}", script.display());
     }
+    // Refuse before setup-local.ps1 installs dependencies for a client we cannot patch.
+    crate::package::check_supported_client(&script.with_file_name("supported-client.json"), game)?;
 
     progress("Starting local source setup");
     #[cfg(windows)]
     let setup_job = create_job()?;
     let mut child = OwnedChild(
-        Command::new("powershell.exe")
+        hide_console(&mut Command::new("powershell.exe"))
             .args([
                 "-NoLogo",
                 "-NoProfile",
@@ -808,8 +865,18 @@ fn terminate_child(child: &mut Child) {
     let _ = child.wait();
 }
 
+/// The launcher has no console, so console children would each open their own window.
+pub(crate) fn hide_console(command: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+    }
+    command
+}
+
 fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std::process::Output> {
-    let mut child = command
+    let mut child = hide_console(&mut command)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

@@ -247,11 +247,16 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 40192	2	UiAutoWindow	193	4.7比安卡特效打脸图		1						1050153							
 40193	2	UiAutoWindow	194	4.6跨4.7预热打脸图		1						1050153							
 40194	2	UiAutoWindow	195	4.8洁塔薇联动皮打脸		1						1050153							
-40195	2	UiAutoWindow	196	4.7跨4.8预热打脸1		1						1050153							
-40196	2	UiAutoWindow	197	4.7跨4.8预热打脸2		1						1050153							
+40195	2	UiAutoWindow	196	4.7跨4.8预热打脸狂三	0	1						1050153	0	0					
+40196	2	UiAutoWindow	197	4.7跨4.8预热打脸阿德莱德	0	1						1050153	0	0					
 40197	2	UiAutoWindow	198	4.7500卡池复刻打脸		1						1050153							
 40198	2	UiAutoWindow	199	土豆兄弟打脸图		1						1050153							
 40199	2	UiAutoWindow	200	4.7露娜涂鸦打脸图		1						1050153							
+40200	2	UiAutoWindow	201	4.8阿德莱德特效皮	0	1						1050153	0	0					
+40201	2	UiAutoWindow	202	4.8涅缇娅特效皮	0	1						1050153	0	0					
+40202	2	UiAutoWindow	203		0	1						1050153	0	0					
+40203	2	UiAutoWindow	204	4.8卡池复刻打脸图	0	1						1050153	0	0					
+40204	2	UiAutoWindow	205	v4.8可肝商店新增打脸图	0	1						1050153	0	0					
 40756	7	OnOpenRepeatChallengeActivity		Advance to Simulated Battlefield	10309	1	1						1						
 40757	7	OnOpenRepeatChallengeActivity		Advance to Simulated Battlefield	10309	1	1						1						
 40758	7	OnOpenUiArena		War Zone	10204	1							1						
@@ -397,6 +402,10 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 50121	2	UiSignBanner	113	【每次新建】v4.5周卡签到弹窗跳转		1													
 50122	2	UiSignBanner	114	4.6版本签到		1								48110					
 50123	2	UiSignBanner	115	4.7版本签到		1								49110					
+50124	2	UiSignBanner	116	4.8联动签到	0	1						0	0	50301					
+50125	2	UiSignBanner	117	4.8版本签到	0	1						0	0	50911					
+50126	2	UiSignBanner	118	4.8中秋签到	0	1						0	0	50912					
+50127	2	UiSignBanner	119	【每次新建】v4.8五日周卡签到弹窗跳转	0	1						0	0	0					
 500	1	UiMedalUnlock		Go to Unlock Medals		1													
 11	2	UiDrawGroup	1	Research System		1													
 21	4		2	Back to Main		1													
@@ -716,6 +725,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 534	7	SkipToMainLine2		New Main Story Chapter 41	10308	1	1041					1050153							
 535	7	SkipToMainLine2		New Main Story Floating Record Chapter ER16	10308	1	2016					1050153							
 536	7	SkipToMainLine2		New Main Story Chapter 42	10308	1	1042					1050153							
+537	7	SkipToMainLine2	0	New Main Story Chapter 43	10308	1	1043					1050153	0	0					
 700	3	UiNewFuben	12010102	3	10103	1													
 701	3	UiNewFuben	12010202	Go to Stronghold mode	10103	1													
 702	3	UiNewFuben	12010402	Go to Stronghold mode	10103	1													
@@ -1330,6 +1340,8 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 7141	7	SkipToPartnerTeachingChapter		To CUB Tutorial Trial - Chapter 34	1801	1	34												
 7142	7	SkipToPartnerTeachingChapter		To CUB Tutorial Trial - Chapter 35	1801	1	35					1050153							
 7143	7	SkipToPartnerTeachingChapter		前往辅助机教学试玩-第三十七章	1801	1	37					1050153							
+7144	7	SkipToPartnerTeachingChapter	0	To CUB Tutorial Trial - Chapter 36	1801	1	36					0	0	0					
+7145	7	SkipToPartnerTeachingChapter	0	To CUB Tutorial Trial - Chapter 38	1801	1	38					1050153	0	0					
 7200	1	UiNewFuben		Go to Member Tutorial Stage (original Celica)		1													
 7201	1	UiCharacterSystemV2P6		Go to Enhance Your Member	101	1	0												
 7202	1	UiCharacterSystemV2P6		Go to Upgrade Your Member	101	1	0												
@@ -1350,6 +1362,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 7217	6	UiNewDrawMain		Go to Early Summer-Limited Research	401	1	1	27											
 7218	6	UiNewDrawMain		Go to Crucible Pool	401	1	1	35											
 7219	6	UiNewDrawMain		Go to Phylotree Nexus CUB Research	401	1	1	22	7064										
+7220	6	UiNewDrawMain	0	Go to Kurumi Collab Research - Otherworld Armament	401	1	1	40	7068			0	0	0					
 7300	1	UiNewFuben		Go to Commandant Level Up (new battle screen)		1													
 7301	7	OnOpenMainlineSubtab		Go to Interlude	1701	1	2												
 7302	7	OnOpenUiArena		Go to War Zone	10204	1							1						
@@ -1441,7 +1454,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 8014	7	SkipToCharacterV2P6		Advance to Members - Crimson Weave	101	1	1021005												
 8015	1	UiCourseMain		Go to Exam Course Screen	1802	1							1						
 8016	7	OnOpenMainLineStage		Main Story Chapter 9		1	10090101												
-8017	7	SkipToEquipGuideView		To Crimson Weave Equipment Goal Setting Interface		1	1021005												
+8017	7	SkipToTeamRecommendView	0	Go to Team Upgrade Recommendations	0	1	1021005					0	0	0					
 8018	7	SkipToCharacterV2P6		Advance to Members - Crimson Weave	101	1	1021005												
 8019	8	SkipDormWork		Go to Chores	902	1													
 8020	7	OnOpenGuild		Go to Guild	1901	1							1						
@@ -1770,6 +1783,8 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 19080	7	SkipToCharacterV2P6		Go to Members	101	1	1021007												
 19081	7	SkipToCharacterV2P6		Go to Members	101	1	1401003												
 19082	7	SkipToCharacterV2P6		Go to Members	101	1	1071005												
+19083	7	SkipToCharacterV2P6	0	Go to Members	101	1	1411003					0	0	0					
+19084	7	SkipToCharacterV2P6	0	Go to Members	101	1	1421003					0	0	0					
 20000	1	UiNewFuben		Event Quest		1													
 20001	7	OnOpenUiActivityBossSingle		Gestalt		1													
 20002	7	OnOpenUiOnlineBoss		Co-op	10302	1													
@@ -1781,7 +1796,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20008	7	OnOpenMainlineSubtab		Interlude	1701	1	2												
 20009	6	UiActivityBriefBase		Frozen Darkness	10303	1	0	0	0										
 20010	6	UiNewDrawMain		Theme-limited Research	401	1	1	15											
-20011	6	UiPurchase		Purchase Skin Supply Pack	3	1	2	0	4										
+20011	6	UiPurchase	0	Purchase Skin Supply Pack	3	1	2	0	5			0	0	0					
 20012	7	OnOpenFestivalActivity		Christmas	10306	1	1	0	0										
 20013	6	UiActivityBriefBase		Echo Aria — Analysis Lab	10306	1	3	0	0									2021/2/25 5:00	
 20014	7	OnOpenMainLineStage		Main Story - Chapter xx (check Share-Fuben-Mainline-Chapter.tab, fill in the 1st stage ID of the chapter)	10308	1	10140101												
@@ -1790,7 +1805,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20017	7	OnOpenRepeatChallengeActivity		Version Multi Clear (to each version)	10309	1	1						1						
 20018	7	OnOpenRogueLikeActivity		APUS	10310	1													
 20019	7	OnOpenUiOnlineBossActivity		Co-op (Event)	10302	1													
-20020	6	UiPurchase		Coating Pack	3	1	2	0	4										
+20020	6	UiPurchase	0	Coating Pack	3	1	2	0	5			0	0	0					
 20021	7	OnOpenFestivalActivity		Moonlit Night	10306	1	8												
 20022	7	OnOpenFestivalActivity		Metropolis Preview	10306	1	6												
 20023	6	UiNewDrawMain		Uniframe Research	401	1	1	16											
@@ -1829,9 +1844,9 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20057	2	UiActivityBase	1	Complete New Year Event Mission		1	1	204											
 20058	2	UiNierTask		Abyssal Action	1305	1													
 20059	2	UiFubenNierRepeat		Reverb Archive	1305	1													
-20060	6	UiPurchase		Purchase other care package(s)	3	1	2	0	5										
+20060	6	UiPurchase	0	Purchase other care package(s)	3	1	2	0	6			0	0	0					
 20061	2	UiActivityBase	1	To Total Spending		1	1	213										2021/2/4 10:00	2021/2/18 10:00
-20062	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/2/4 10:00	2021/3/4 9:59
+20062	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/2/4 10:00	2021/3/4 9:59
 20063	6	UiFubenNierEnter		Secret exchange counter of Untold Naraka	1305	1												2021/1/7 5:00	2021/2/4 5:00
 20064	6	UiCoupletGame		Go to "Couplets Mini-game"	10328	1	1											2020/12/7 5:00	2021/2/4 5:00
 20065	2	UiActivityBase	1	Complete the event mission		1	1	103											
@@ -1880,7 +1895,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20108	7	OnOpenUiPrequel		Capriccio's Interlude	1701	1	1027	1018002											
 20109	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2021/11/12 5:00	2021/12/16 4:59
 20110	1	UiPartnerMain		CUB	5001	1													
-20111	6	UiPurchase		Purchase Coating Supply Pack (Used in the character screen of each version)	3	1	2	0	4										
+20111	6	UiPurchase	0	Purchase Coating Supply Pack (Used in the character screen of each version)	3	1	2	0	5			0	0	0					
 20112	7	SkipToNewYearLuck		New Year Lottery Ticket	10417	1	4												
 20113	6	UiHitMouseMain		Whac-a-Mole	10418	1													
 20114	2	UiActivityBase	1	Complete "New Year Lottery" Event Mission		1	1	92											
@@ -1926,7 +1941,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20155	2	UiActivityBase	1	Complete "A Covenant of Glass" Event Missions		1	1	92											
 20156	7	SkipToSummerSignInMain		Go to 2022 Summer Sign-in	10434	1								23601					
 20157	7	OnOpenFestivalActivity		Clear the story mission "White Day"	10306	1	24												
-20158	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4										
+20158	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0					
 20159	7	OpenLotto		Directed to Coating Pool		1	5												
 20160	7	SkipToSpecialShop	1228	Coating Encore Shop	1001	1													
 20161	7	OnOpenFestivalActivity		Clear the Mission "Slumberland"	10306	1	34												
@@ -2003,24 +2018,24 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20232	7	OnOpenGacha		V2.17 Pool Story [Lost in Whitebloom]	10306	1	19	1											
 20233	6	UiWelfare		Complete "Dusk's Shade" event missions	10476	1	1	104											
 20234	6	UiFubenPracticeCharacterDetail		Skip to Celica's tutorial	1800	1	1021005	30100099											
-20235	7	OnOpenCharacterFileFubenActivity		New Character Theme Trial (Edit event no. after the 33rd event)	10325	1	50												
+20235	7	OnOpenCharacterFileFubenActivity	0	New Character Theme Trial (Edit event no. after the 33rd event)	10325	1	52					0	0	0					
 20236	6	UiFubenPracticeStageListRoot		To Celica Crammer (New jump id after the 33rd event)	10325	1	33						1						
 20237	7	OpenLotto		Advance to event [Luna Pool Story].	10306	1	16	2											
 20238	6	UiWelfare		Complete "King's Gambit" event missions	1	1	1	105											
 20239	7	SkipToGachaCanLiverMainUi		[Insatiable Research] Lilith Research Event	403	1	1												
 20240	6	UiNewDrawMain		[Ishmael: Parhelion] Advance to the themed pool	401	1	1	11										2024/11/7 7:00	2024/12/19 5:00
-20241	6	UiPurchase		[Ishmael: Parhelion] Advance to the Coating Supply Pack	3	1	2	0	4									2024/11/7 7:00	2024/12/19 5:00
+20241	6	UiPurchase	0	[Ishmael: Parhelion] Advance to the Coating Supply Pack	3	1	2	0	5			0	0	0				2024/11/7 7:00	2024/12/19 5:00
 20242	6	UiFavorabilityStory		Advance to Lilith: Daemonissa Affection Story		1	1331003												
 20243	6	UiFubenPracticeStageListRoot			10325	1	34												
 20244	7	OnOpenGacha		To V3.2 Coating Pool	403	1	31												
 20245	7	OnOpenGacha		V3.2 Pool Story	10306	1	31	1											
 20246	7	SkipToGachaCanLiverMainUi		[Insatiable Research] Lilith Research Event	403	1	1											2024/12/19 7:00	2025/1/23 5:00
-20247	6	UiPurchase		[Lilith: Daemonissa] Advance to the Coating Supply Pack	3	1	2	0	4									2024/12/19 7:00	2025/1/23 5:00
+20247	6	UiPurchase	0	[Lilith: Daemonissa] Advance to the Coating Supply Pack	3	1	2	0	5			0	0	0				2024/12/19 7:00	2025/1/23 5:00
 20248	6	UiWelfare		Complete "Dawning Luminescence" event missions	1	1	1	106											
 20249	6	UiFavorabilityStory		Advance to Selena Affection Story		1	1531005												
 20250	6	UiFubenPracticeStageListRoot		To Celica Crammer (New jump id after the 33rd event)	10325	1	35						1						
 20251	6	UiFubenPracticeCharacterDetail		To Celica Tutorial (Echo Leap)	1800	1	1261003	30100135											
-20252	6	UiPurchase		[Selena: Pianissimo] Advance to Coating Supply Pack	3	1	2	0	4									2025/1/23 7:00	2025/3/6 5:00
+20252	6	UiPurchase	0	[Selena: Pianissimo] Advance to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/1/23 7:00	2025/3/6 5:00
 20253	6	UiNewDrawMain		[Selena: Pianissimo] Advance to themed pool	401	1	1	11										2025/1/23 7:00	2025/3/6 5:00
 20254	1	UiGachaFashionSelfChoiceEntrance			403	1													
 20255	7	OnOpenGacha			403	1	32												
@@ -2032,13 +2047,13 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20261	6	UiFubenPracticeStageListRoot		To Celica Crammer (New jump id after the 33rd event)	10325	1	36						1						
 20262	6	UiWelfare		Complete the "Intertwined Fate" event missions	1	1	1	107											
 20263	6	UiFubenPracticeStageListRoot		To Celica Crammer (New jump id after the 33rd event)	10325	1	36						1						
-20264	6	UiPurchase		[Jetavie: Daybreak] Advance to Coating Supply Pack	3	1	2	0	4									2025/3/6 7:00	2025/4/10 7:00
+20264	6	UiPurchase	0	[Jetavie: Daybreak] Advance to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/3/6 7:00	2025/4/10 7:00
 20265	6	UiNewDrawMain		[Jetavie: Daybreak] Advance to themed pool	401	1	1	1										2025/3/6 7:00	2025/4/10 7:00
-20266	6	UiPuzzleActivity		Jump to Phantoms in the Mirror	10324	1	10	102											
+20266	6	UiPuzzleActivity	0	Jump to Phantoms in the Mirror	10324	1	12	102				0	0	0					
 20267	6	UiFavorabilityStory		Advance to Vera Affection Story		1	1131004												
 20268	6	UiFubenPracticeStageListRoot		To Celica Crammer (New jump id after the 33rd event)	10325	1	39						1						
 20269	6	UiNewDrawMain		[Vera: Geiravor] Advance to themed pool	401	1	1	11										2025/4/10 7:00	2025/5/22 5:00
-20270	6	UiPurchase		[Vera: Geiravor] Advance to Coating Supply Pack	3	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
+20270	6	UiPurchase	0	[Vera: Geiravor] Advance to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
 20271	6	UiWelfare		Complete "Phantoms in the Mirror" event missions	1	1	1	90											
 20272	6	UiWelfare		Complete "Light in Indigo Waves" Event Mission	10476	1	1	104											
 20273	7	OnOpenCharacterFileFubenActivity		New Character Theme Trial (Edit event no. after the 33rd event)	10325	1	37												
@@ -2050,7 +2065,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20279	6	UiWelfare		Complete "Ding Dong Hammer" Event Mission	1	1	1	99											
 20280	6	UiFubenPracticeStageListRoot		To Celica Crammer (New redirection after the 33rd event)	10325	1	40						1						
 20281	6	UiNewDrawMain		[Bianca: Crepuscule] Proceed to themed pool	401	1	1	11										2025/9/19 2:00	2025/11/12 21:00
-20282	6	UiPurchase		[Bianca: Crepuscule] Proceed to Coating Supply Pack	3	1	2	0	4									2025/9/19 2:00	2025/11/12 21:00
+20282	6	UiPurchase	0	[Bianca: Crepuscule] Proceed to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/9/19 2:00	2025/11/12 21:00
 20283	6	UiWelfare		Complete "Piercing the Heavens" event missions	1	1	1	99											
 20284	6	UiFavorabilityStory		Proceed to Bianca Affection Story		1	1041005						1						
 20285	7	OnOpenGacha			403	1	36					774800							
@@ -2063,13 +2078,13 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20292	7	OnOpenGacha			1308	1	39	1											
 20293	6	UiFubenPracticeCharacterDetail		To Celica Tutorial (Watanabe Leap)	1800	1	1081004	30100166											
 20294	6	UiNewDrawMain		[Discord: Secator] Advance to themed pool	401	1	1	1										2025/9/26 7:00	2025/11/12 21:00
-20295	6	UiPurchase		[Discord: Secator] Advance to Coating Supply Pack	3	1	2	0	4									2025/9/26 7:00	2025/11/12 21:00
+20295	6	UiPurchase	0	[Discord: Secator] Advance to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/9/26 7:00	2025/11/12 21:00
 20296	6	UiFubenPracticeStageListRoot		To Discord Celica Crammer (New jump id after the 33rd event)	10325	1	41						1						
 20297	7	OpenLotto		To Departure Card Pool 3.8		1	21												
 20298	7	OpenLotto		To 4.0 Card Pool	403	1	22	1				774800							
 20299	7	OpenLotto		To 4.0 Pool Story	1308	1	22	2											
 20300	6	UiNewDrawMain		[Veronica: Aegis] Go to themed pool	401	1	1	11										2025/10/10 7:00	2025/11/12 21:00
-20301	6	UiPurchase		[Veronica: Aegis] Go to Coating Supply Pack	3	1	2	0	4									2025/10/10 7:00	2025/11/12 21:00
+20301	6	UiPurchase	0	[Veronica: Aegis] Go to Coating Supply Pack	3	1	2	0	5			0	0	0				2025/10/10 7:00	2025/11/12 21:00
 20302	6	UiFubenPracticeStageListRoot		To Veronica Celica Crammer (New jump id after the 33rd event)	10325	1	42						1						
 20303	6	UiWelfare		完成“捕梦遮网”活动任务	1	1	1	99											
 20304	6	UiWelfare		Complete "Phantom Delusion" event missions	1	1	1	342											
@@ -2079,7 +2094,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20310	6	UiFavorabilityStory		Go to Liv Affection Story		1	1031005						1						
 20311	6	UiWelfare		Complete "Arctic Amalgamation" event missions	1	1	1	106											
 20312	6	UiNewDrawMain		【布偶熊】前往主题卡池	401	1	1	11										2025/12/23 5:00	2026/2/2 5:00
-20313	6	UiPurchase		【布偶熊】前往涂装补给包	3	1	2	0	4									2025/12/23 5:00	2026/2/2 5:00
+20313	6	UiPurchase	0	【布偶熊】前往涂装补给包	3	1	2	0	5			0	0	0				2025/12/23 5:00	2026/2/2 5:00
 20314	6	UiFubenPracticeStageListRoot		布偶熊赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	44						1						
 20315	1	UiFubenExperiment	18	Coating Set Trial_The Godfall Revelation_Watanabe_Hell Sing		1	18											2025/12/23 5:00	2026/2/2 5:00
 20316	1	UiFubenExperiment	18	Coating Set Trial_The Godfall Revelation_Vera_Hollow Crown		1	18											2025/12/23 5:00	2026/2/2 5:00
@@ -2091,10 +2106,10 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20322	6	UiWelfare		Complete "Dicey Mystery" event missions	1	1	1	106											
 20323	6	UiFubenPracticeStageListRoot		罗塞塔赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	45						1						
 20324	6	UiNewDrawMain		【v4.3涅缇娅】前往主题卡池	401	1	1	35										2026/3/17 0:00	2026/4/20 23:00
-20325	6	UiPurchase		【v4.3涅缇娅】前往涂装补给包	3	1	2	0	4									2026/3/17 0:00	2026/4/20 23:00
+20325	6	UiPurchase	0	【v4.3涅缇娅】前往涂装补给包	3	1	2	0	5			0	0	0				2026/3/17 0:00	2026/4/20 23:00
 20326	6	UiFubenPracticeStageListRoot		【v4.3涅缇娅】赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	46						1						
 20327	6	UiNewDrawMain		【v4.2罗塞塔】前往主题卡池	401	1	1	11										2026/2/3 0:00	2026/3/16 23:00
-20328	6	UiPurchase		【v4.2罗塞塔】前往涂装补给包	3	1	2	0	4									2026/2/3 0:00	2026/3/16 23:00
+20328	6	UiPurchase	0	【v4.2罗塞塔】前往涂装补给包	3	1	2	0	5			0	0	0				2026/2/3 0:00	2026/3/16 23:00
 20329	7	SkipToCharacterStory		【v4.3涅缇娅】限时通关好感剧情领取角色跳转		1	1391003												
 20330	6	UiFavorabilityStory		前往罗塞塔好感度剧情		1	1141004						1						
 20331	6	UiFavorabilityStory		前往涅缇娅好感度剧情		1	1391003						1						
@@ -2102,7 +2117,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20333	6	UiFavorabilityStory		Go to Kamui Affection Story		1	1061004						1						
 20334	6	UiFubenPracticeCharacterDetail		To Celica Tutorial (Hanying Leap)	1800	1	1241003	30100213											
 20335	6	UiNewDrawMain		【v4.4神威】前往主题卡池	401	1	1	11										2026/4/21 0:00	2026/6/1 23:00
-20336	6	UiPurchase		【v4.4神威】前往涂装补给包	3	1	2	0	4									2026/4/21 0:00	2026/6/1 23:00
+20336	6	UiPurchase	0	【v4.4神威】前往涂装补给包	3	1	2	0	5			0	0	0				2026/4/21 0:00	2026/6/1 23:00
 20337	6	UiFubenPracticeStageListRoot		神威赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	47						1						
 20338	7	OnOpenGacha			403	1	41					774800							
 20339	7	OnOpenGacha			403	1	42					774800							
@@ -2132,7 +2147,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20363	7	OnOpenGacha			403	1	49					1050153							
 20364	7	OnOpenGacha			1308	1	49	1				1050153							
 20365	6	UiNewDrawMain		【v4.5冰毛】前往主题卡池	401	1	1	11	1488									2026/6/2 0:00	2026/7/16 23:00
-20366	6	UiPurchase		【v4.5冰毛】前往涂装补给包	3	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
+20366	6	UiPurchase	0	【v4.5冰毛】前往涂装补给包	3	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
 20367	6	UiFubenPracticeStageListRoot		To Lucia: Inverse Crown Celica Crammer (New jump id after the 33rd event)	10325	1	48						1						
 20368	6	UiFavorabilityStory		Go to Helentine's Affection Story		1	1401003						1						
 20369	7	SkipToMainLine2		New Main Story Chapter 37		1	1037					1050153							
@@ -2148,16 +2163,38 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 20379	7	SkipToCharacterStory				1	1401003					1050153							
 20380	6	UiFubenPracticeStageListRoot		海伦汀赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	49						1						
 20381	6	UiNewDrawMain		【v4.6海伦汀】前往主题卡池	401	1	1	35	1499									2026/7/17 0:00	2026/8/18 23:00
-20382	6	UiPurchase		【v4.6海伦汀】前往涂装补给包	3	1	2	0	4									2026/7/17 0:00	2026/8/18 23:00
-20383	6	UiWelfare		Complete the "Scarlet Arrival" event mission	1	1	1	99											
+20382	6	UiPurchase	0	【v4.6海伦汀】前往涂装补给包	3	1	2	0	5			0	0	0				2026/7/17 0:00	2026/8/18 23:00
+20383	7	SkipToUiWelfare	0	Complete the "Scarlet Arrival" event mission	1	1	9	47	418			0	0	0					
 20384	6	UiFubenPracticeCharacterDetail		跳转赛利卡教学（七实跃升）	1800	1	1051005	30100229											
 20385	6	UiFavorabilityStory		Advance to Karenina's Affection Story		1	1071005					1050153	1						
 20386	6	UiFubenPracticeStageListRoot		To Karenina: Celica's Class (New jump id after the 33rd event)	10325	1	50						1						
 20387	6	UiNewDrawMain		【v4.7卡列】前往主题卡池	401	1	1	11										2026/8/19 0:00	2026/9/23 23:00
-20388	6	UiPurchase		【v4.7卡列】前往涂装补给包	3	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
+20388	6	UiPurchase	0	【v4.7卡列】前往涂装补给包	3	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
+20389	7	SkipToUiWelfare	0	Complete "Ripples of the Past" event missions	1	1	9	47	428			0	0	0					
 20390	7	SkipToMainLine2				1	1042					1050153							
 20391	7	SkipToCharacterV2P6			101	1	1071005												
+20395	7	OnOpenCharacterFileFubenActivity	0	新角色主题试玩（狂三）	10325	1	51					0	0	0					
+20393	7	SkipToNewDrawMain	0	Research	401	1	1	37	5612			0	0	0				2026/9/29 10:00	2026/11/3 23:59
+20394	6	UiFubenPracticeStageListRoot	0	【v4.8狂三】赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	51					0	1	0					
 20392	6	UiFubenPracticeCharacterDetail		跳转赛利卡教学（火露跃升）	1800	1	1021006	30100230											
+20396	7	OnOpenGacha	0	v4.8比安卡剧情跳转·自选复刻	1308	1	50	1				0	0	0					
+20397	7	OnOpenGacha	0		1308	1	51	1				0	0	0					
+20398	7	OnOpenGacha	0		1308	1	52	1				0	0	0					
+20399	7	OnOpenGacha	0		1308	1	53	1				0	0	0					
+20400	7	SkipToSelfChoiceGacha	0	v4.8跳转到当期Gacha自选卡池	10489	1	5					0	0	0					
+20401	7	OnOpenGacha	0		403	1	50					774800	0	0					
+20402	7	OnOpenGacha	0		403	1	51					774800	0	0					
+20403	7	OnOpenGacha	0		403	1	52					774800	0	0					
+20404	7	OnOpenGacha	0		403	1	53					774800	0	0					
+20405	6	UiFavorabilityStory	0	Go to Adelyde Affection Story	0	1	1421003					1050153	1	0					
+20406	7	SkipToMainLine2	0		0	1	1043					1050153	0	0					
+20407	7	SkipToCharacterV2P6	0		101	1	1421003					0	0	0					
+20408	7	SkipToCharacterStory	0		0	1	1421003					1050153	0	0					
+20409	7	SkipToUiWelfare	0	Complete "Cosmic Wonders" event missions	1	1	9	47	430			0	0	0					
+20410	7	SkipToNewDrawMain	0	【v4.8阿德莱德】前往主题卡池	401	1	1	35	1516			0	0	0				2026/9/24 0:00	2026/11/4 23:00
+20411	6	UiPurchase	0	【v4.8阿德莱德】前往涂装补给包	3	1	2	0	5			0	0	0				2026/9/24 0:00	2026/11/4 23:00
+20412	6	UiFubenPracticeStageListRoot	0	阿德莱德赛利卡补习班跳转（33期之后，新增跳转id）	10325	1	52					0	1	0					
+20413	7	SkipToNewDrawMain	0	Research	401	1	1	40	7068			0	0	0				2026/9/29 10:00	2026/11/3 23:59
 11010101	3	UiNewFuben	11010101	困难1-1		1													
 11010102	3	UiNewFuben	11010102	困难1-2		1													
 11010103	3	UiNewFuben	11010103	困难1-3		1													
@@ -2546,106 +2583,106 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 60001	1	UiPartnerMain		Partner System	5001	1													
 70001	7	SkipToStrongholdMain		Norman Revival Plan	10205	1							1						
 70002	1	UiStrongholdPower		Norman Revival Plan Power Station	10206	1													
-80000	6	UiPurchase		Purchase coating care package	3	1	2	0	4										
+80000	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0					
 80001	6	UiShop	3	Character—Rainbow Card Shop	1001	1	1	0	502										
 80002	2	UiActivityBase	1	Total Spending Reward		1	1	213										2021/2/4 10:00	2021/2/18 10:00
 80003	6	UiNewDrawMain		Secret Pact	401	1	2	1										2021/2/4 10:00	2021/2/25 10:00
 80004	7	SkipToSpecialShop	1150	Good Old Days	1001	1												2021/2/4 10:00	2021/2/24 9:59
-80005	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/2/4 10:00	2021/2/24 9:59
-80006	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/2/26 10:00	2021/3/25 9:59
+80005	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/2/4 10:00	2021/2/24 9:59
+80006	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/2/26 10:00	2021/3/25 9:59
 80007	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/3/25 9:59	
-80008	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/3/11 10:00	2021/4/8 9:59
+80008	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/3/11 10:00	2021/4/8 9:59
 80009	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/4/8 9:59	
-80010	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/3/14 10:00	2021/4/11 9:59
+80010	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/3/14 10:00	2021/4/11 9:59
 80011	7	JumpToWhiteValentineGame		White Day Dating Event		1													
-80012	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/4/9 10:00	2021/5/6 9:59
+80012	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/4/9 10:00	2021/5/6 9:59
 80013	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/5/6 9:59	
-80014	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/5/1 10:00	2021/5/29 10:00
+80014	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/5/1 10:00	2021/5/29 10:00
 80015	7	SkipToMoeWar		Eden Festival	1310	1												2021/4/8 10:00	2021/5/6 9:59
 80016	1	UiMoeWarPreparation		Festival Preparation	1310	1												2021/4/8 10:00	2021/5/3 20:00
 80017	1	UiMoeWarVote		Festival Cheers	1310	1												2021/4/8 10:00	2021/5/6 9:59
-80018	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/5/21 10:00	2021/6/17 9:59
+80018	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/5/21 10:00	2021/6/17 9:59
 80019	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/6/17 10:00	
-80020	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/6/1 10:00	2021/6/29 10:00
-80021	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/6/10 10:00	2021/6/24 10:00
+80020	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/6/1 10:00	2021/6/29 10:00
+80021	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/6/10 10:00	2021/6/24 10:00
 80022	7	SkipToPokerGuessing		Poker Guessing Event	10333	1												2021/6/24 5:00	2021/7/8 5:00
-80023	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/8/13 10:00	2021/9/9 10:00
+80023	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/8/13 10:00	2021/9/9 10:00
 80024	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/7/29 10:00	
-80025	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/7/22 10:00	2021/8/19 10:00
+80025	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/7/22 10:00	2021/8/19 10:00
 80026	6	UiNewDrawMain		Endless Summer Blue	401	1	2	2										2021/7/15 10:00	2021/8/12 10:00
 80027	7	OnOpenGachaOrganize		Deep Blue Warzone	403	1	2											2021/7/1 5:00	2021/8/5 5:00
 80028	2	UiSignBanner	26	Summer Breeze		1												2021/7/15 10:00	2021/7/29 5:00
-80029	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/8/13 10:00	2021/9/9 9:59
+80029	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/8/13 10:00	2021/9/9 9:59
 80030	6	UiShop	3	Coating Shop	1001	1	1	0	501									2021/9/9 10:00	
 80031	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2021/8/13 5:00	2021/9/30 4:59
-80032	6	UiPurchase		Purchase coating care package	3	1	2	0	4									2021/10/29 10:00	2021/11/19 9:59
+80032	6	UiPurchase	0	Purchase coating care package	3	1	2	0	5			0	0	0				2021/10/29 10:00	2021/11/19 9:59
 80033	7	SkipToPickFlipRewardActivity		Afterglow of Fate		1	1											2021/10/1 10:00	2021/10/29 9:59
 80034	6	UiShop		Afterglow of Fate	1001	1	2	0	1192									2021/10/1 10:00	2021/10/29 9:59
 80035	7	SkipToAreaWar		Special Dispatch - Sand Table Simulation	10349	1												2021/9/30 5:00	2021/11/1 4:59
 80036	6	UiShop		Special Dispatch - Sand Table Simulation	1001	1	2	0	4010										
 80037	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2021/10/1 5:00	2021/11/11 4:59
 80038	6	UiShop	3	Coating Shop	1001	1	1	0	502									2021/12/10 10:00	
-80039	6	UiPurchase		Purchase coating care package	5	1	2	0	4									2021/11/12 10:00	2021/12/10 9:59
+80039	6	UiPurchase	0	Purchase coating care package	5	1	2	0	5			0	0	0				2021/11/12 10:00	2021/12/10 9:59
 80040	7	SkipToTheatre		Obtain from Recitativo di Fantasia - Shop									1					2021/11/11 5:00	2021/12/13 4:59
 80041	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2021/11/12 5:00	2021/12/16 4:59
 80042	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2021/12/17 5:00	2022/1/27 4:59
-80043	6	UiPurchase		Purchase coating care package	5	1	2	0	4									2021/12/17 10:00	2022/1/14 9:59
+80043	6	UiPurchase	0	Purchase coating care package	5	1	2	0	5			0	0	0				2021/12/17 10:00	2022/1/14 9:59
 80044	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/1/14 10:00	
-80045	6	UiPurchase		Purchase coating care package	5	1	2	0	4									2021/12/31 10:00	2022/1/27 9:59
-80046	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/1/28 10:00	2022/2/25 9:59
+80045	6	UiPurchase	0	Purchase coating care package	5	1	2	0	5			0	0	0				2021/12/31 10:00	2022/1/27 9:59
+80046	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/1/28 10:00	2022/2/25 9:59
 80047	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/2/25 10:00	
 80048	6	UiConsumeActivityMain		Obtained from the Fortune's Favor event		1												2022/1/27 10:00	2022/2/25 10:00
-80049	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/1/27 10:00	2022/2/25 9:59
+80049	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/1/27 10:00	2022/2/25 9:59
 80050	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/1/28 5:00	2022/3/10 4:59
-80051	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/3/11 10:00	2022/4/8 9:59
+80051	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/3/11 10:00	2022/4/8 9:59
 80052	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/4/8 10:00	
 80053	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/3/11 5:00	2022/4/21 4:59
-80054	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/4/22 10:00	2022/5/20 9:59
+80054	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/4/22 10:00	2022/5/20 9:59
 80055	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/5/20 10:00	
-80056	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/4/29 10:00	2022/5/27 9:59
+80056	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/4/29 10:00	2022/5/27 9:59
 80057	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/5/27 10:00	
 80058	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/4/21 5:00	2022/6/2 4:59
 80059	7	SkipToMoeWar		Eden Festival	1310	1												2022/4/21 10:00	2022/5/30 5:00
-80060	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/6/3 10:00	2022/7/1 9:59
+80060	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/6/3 10:00	2022/7/1 9:59
 80061	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/7/1 10:00	
 80062	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/6/3 5:00	2022/7/8 4:59
 80063	7	OpenLotto		Go to [Slumberland] Event		1	5											2022/7/14 10:00	2022/8/11 9:59
 80064	6	UiSign		Go to [Across the Ruined Sea] Sign-in		1	2	0	0									2022/7/8 10:00	2022/7/22 5:00
-80065	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/7/22 10:00	2022/8/12 9:59
+80065	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/7/22 10:00	2022/8/12 9:59
 80066	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/7/8 10:00	2022/8/18 4:59
 80067	6	UiShop	3	Rainbow Card Shop - Character	1001	1	1	0	502									2022/8/12 10:00	
-80068	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/7/22 10:00	2022/8/12 9:59
-80069	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/8/19 10:00	2022/9/16 9:59
+80068	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/7/22 10:00	2022/8/12 9:59
+80069	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/8/19 10:00	2022/9/16 9:59
 80070	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/9/16 10:00	
 80071	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/8/18 10:00	2022/9/29 4:59
-80072	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/8/19 10:00	2022/9/16 9:59
-80073	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/9/30 10:00	2022/10/28 9:59
-80074	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/9/30 10:00	2022/10/28 9:59
+80072	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/8/19 10:00	2022/9/16 9:59
+80073	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/9/30 10:00	2022/10/28 9:59
+80074	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/9/30 10:00	2022/10/28 9:59
 80075	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/10/28 10:00	
 80076	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/9/29 10:00	2022/11/17 4:59
-80077	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/11/18 10:00	2022/12/12 9:59
-80078	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/11/18 10:00	2022/12/12 9:59
+80077	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/11/18 10:00	2022/12/12 9:59
+80078	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/11/18 10:00	2022/12/12 9:59
 80079	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/11/17 10:00	2022/12/29 4:59
-80080	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/11/18 10:00	2022/12/16 9:59
+80080	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/11/18 10:00	2022/12/16 9:59
 80081	6	UiShop	3	Coating Shop	1001	1	1	0	502									2022/12/16 10:00	
 80082	6	UiWelfare		Advance to [Renaissance du Fantastique] Sign-in	7	1												2022/11/17 10:00	2022/12/19 5:00
-80083	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/12/30 10:00	2023/1/27 9:59
+80083	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/12/30 10:00	2023/1/27 9:59
 80084	6	UiShop	3	Coating Shop	1001	1	1	0	502									2023/1/27 10:00	
 80085	7	OnOpenGacha		Advance to event [Solitary Dream].			14											2023/1/6 10:00	2023/2/3 9:59
-80086	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/1/20 10:00	2023/2/9 9:59
+80086	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/1/20 10:00	2023/2/9 9:59
 80087	7	SkipToDlcHuntMain		Advance to event [Anchor Realm].	10441													2023/1/12 5:00	2023/2/9 5:00
 80088	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2022/12/29 10:00	2023/2/9 4:59
-80089	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/1/20 10:00	2023/2/9 9:59
-80090	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2022/12/30 10:00	2023/1/27 9:59
-80091	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/2/10 10:00	2023/3/10 9:59
+80089	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/1/20 10:00	2023/2/9 9:59
+80090	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2022/12/30 10:00	2023/1/27 9:59
+80091	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/2/10 10:00	2023/3/10 9:59
 80092	6	UiShop	3	Coating Shop	1001	1	1	0	502									2023/3/10 10:00	
-80093	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/2/10 10:00	2023/3/10 9:59
+80093	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/2/10 10:00	2023/3/10 9:59
 80094	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/2/9 10:00	2023/3/23 4:59
-80095	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/2/10 10:00	2023/3/10 9:59
-80096	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/3/24 10:00	2023/4/21 9:59
+80095	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/2/10 10:00	2023/3/10 9:59
+80096	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/3/24 10:00	2023/4/21 9:59
 80097	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/3/23 10:00	2023/4/27 4:59
-80098	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/3/24 10:00	2023/4/21 9:59
-80099	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/3/24 10:00	2023/4/21 9:59
+80098	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/3/24 10:00	2023/4/21 9:59
+80099	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/3/24 10:00	2023/4/21 9:59
 80100	6	UiShop	3	Coating Shop	1001	1	1	0	502									2023/4/21 10:00	
 80101	7	SkipToPlanetRunning		Advance to [Space Odyssey]	10446													2023/3/23 10:00	2023/4/24 5:00
 80102	7	OnOpenCerberusGame		Advance to event The Meandering Three	10448													2023/4/27 10:00	2023/5/29 5:00
@@ -2660,215 +2697,222 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 80111	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/6/8 4:59	2023/7/20 4:59
 80112	6	UiShop	3	Coating Shop	1001	1	1	0	504										
 80113	6	UiShop	3	Coating Shop	1001	1	1	0	502									2023/8/17 18:00	
-80114	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 17:59
-80115	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 18:00
-80116	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 18:00
+80114	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 17:59
+80115	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 18:00
+80116	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 18:00
 80117	2	UiSignBanner	59	Advance to [Cradle Parade] Sign-in		1												2023/7/20 10:00	2023/8/21 5:00
 80118	7	OpenLotto		Advance to event [Neon Dynamite]		1	9											2023/7/28 10:00	2023/8/24 9:59
-80119	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 18:00
-80120	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 18:00
-80121	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/7/20 18:00	2023/8/17 18:00
+80119	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 18:00
+80120	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 18:00
+80121	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/7/20 18:00	2023/8/17 18:00
 80122	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/7/20 10:00	2023/8/17 4:59
 80123	6	UiShop	3	Coating Shop	1001	1	1	0	504									2023/8/17 18:00	
-80124	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/8/24 18:00	2023/9/22 9:59
-80125	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/8/31 10:00	2023/9/28 4:59
-80126	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/8/24 18:00	2023/9/22 9:59
-80127	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/8/31 10:00	2023/9/28 4:59
-80128	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/8/24 18:00	2023/9/22 9:59
+80124	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/8/24 18:00	2023/9/22 9:59
+80125	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/8/31 10:00	2023/9/28 4:59
+80126	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/8/24 18:00	2023/9/22 9:59
+80127	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/8/31 10:00	2023/9/28 4:59
+80128	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/8/24 18:00	2023/9/22 9:59
 80129	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/8/24 10:00	2023/9/28 4:59
 80130	7	OnOpenGacha		Advance to event [Solitary Dream]	403	1	15											2023/8/31 10:00	2023/9/28 9:59
-80131	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/9/28 18:00	2023/10/27 9:59
+80131	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/9/28 18:00	2023/10/27 9:59
 80132	6	UiShop	3	Coating Shop	1001	1	1	0	502									2023/10/27 10:00	
 80133	7	SkipRift		Advance to event [Simulacrum Submersion: Unfathomable Shift]	10437	1												2023/9/28 10:00	2023/11/6 5:00
-80134	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/9/28 18:00	2023/10/27 9:59
+80134	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/9/28 18:00	2023/10/27 9:59
 80135	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/9/28 10:00	2023/11/9 4:59
-80136	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/11/9 18:00	2023/12/8 9:59
+80136	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/11/9 18:00	2023/12/8 9:59
 80137	6	UiShop	3	Coating Shop	1001	1	1	0	504									2023/12/8 10:00	
 80138	7	OpenLotto		Advance to event [Grandiose Glamor]		1	10	1										2023/11/16 10:00	2023/12/14 9:59
-80139	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/11/16 10:00	2023/12/14 9:59
+80139	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/11/16 10:00	2023/12/14 9:59
 80140	2	UiSignBanner	65	Advance to [Polaris Bond] Sign-in		1												2023/11/9 10:00	2023/12/11 5:00
 80141	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/11/9 10:00	2023/12/21 4:59
 80142	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2023/12/21 10:00	2024/2/1 4:59
-80143	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/12/21 18:00	2024/1/19 9:59
+80143	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/12/21 18:00	2024/1/19 9:59
 80144	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/1/19 10:00	
-80145	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2023/12/21 18:00	2024/1/19 9:59
+80145	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2023/12/21 18:00	2024/1/19 9:59
 80146	7	OpenLotto		Advance to event [Dreamcatcher]		1	11											2023/12/21 10:00	2024/1/19 9:59
 80147	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/2/1 10:00	2024/3/14 4:59
-80148	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/2/1 18:00	2024/2/29 9:59
+80148	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/2/1 18:00	2024/2/29 9:59
 80149	6	UiShop	3	Coating Shop	1001	1	1	0	504									2024/2/29 10:00	
-80150	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/2/1 18:00	2024/2/29 9:59
+80150	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/2/1 18:00	2024/2/29 9:59
 80151	6	UiShop	3	Coating Shop	1001	1	1	0	504									2024/2/29 10:00	
 80152	7	OnOpenGacha		Advance to event [Sinking Mermaid]	403	1	16											2024/2/8 10:00	2024/3/7 9:59
 80153	6	UiShop	3	Scene Shop	1001	1	1	0	506										
 80154	2	UiSignBanner	69	Advance to [Stars Ensnared] Sign-in		1												2024/2/1 10:00	2024/3/4 5:00
-80155	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/2/1 18:00	2024/2/29 9:59
+80155	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/2/1 18:00	2024/2/29 9:59
 80156	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/2/29 10:00	
-80157	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/2/1 18:00	2024/2/29 9:59
+80157	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/2/1 18:00	2024/2/29 9:59
 80158	7	OnOpenGacha		Advance to event [Solitary Longings]	403	1	16											2024/2/8 10:00	2024/3/7 9:59
 80159	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/3/14 10:00	2024/4/18 4:59
-80160	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/3/14 18:00	2024/4/12 9:59
-80161	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/3/14 18:00	2024/4/12 9:59
+80160	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/3/14 18:00	2024/4/12 9:59
+80161	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/3/14 18:00	2024/4/12 9:59
 80162	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/4/12 9:59	
-80163	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/3/14 18:00	2024/4/12 9:59
+80163	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/3/14 18:00	2024/4/12 9:59
 80164	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/4/12 9:59	
-80165	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/3/14 18:00	2024/4/12 9:59
+80165	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/3/14 18:00	2024/4/12 9:59
 80166	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/4/12 9:59	
-80167	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/4/18 10:00	2024/5/17 9:59
-80168	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/4/18 10:00	2024/5/17 9:59
+80167	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/4/18 10:00	2024/5/17 9:59
+80168	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/4/18 10:00	2024/5/17 9:59
 80169	7	OpenLotto		Go to event [Neon Dynamite]		1	13	1										2024/4/25 10:00	2024/5/23 9:59
 80170	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/4/18 10:00	2024/5/30 4:59
-80171	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/4/18 10:00	2024/5/17 9:59
-80172	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/5/30 10:00	2024/6/28 9:59
+80171	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/4/18 10:00	2024/5/17 9:59
+80172	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/5/30 10:00	2024/6/28 9:59
 80173	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/6/28 9:59	
-80174	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/5/30 10:00	2024/6/28 9:59
+80174	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/5/30 10:00	2024/6/28 9:59
 80175	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/6/28 9:59	
 80176	7	SkipToAreaWar		Go to event [Coordinated Simulation]	10349	1							1					2024/5/30 10:00	2024/7/1 5:00
 80177	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/7/1 5:00	
 80178	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/5/30 10:00	2024/7/11 4:59
-80179	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/5/30 10:00	2024/6/28 9:59
+80179	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/5/30 10:00	2024/6/28 9:59
 80180	7	OnOpenGacha		To Event [Tsubaki]	403	1	17											2024/7/18 10:00	2024/8/15 9:59
-80181	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/7/11 10:00	2024/8/9 9:59
+80181	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/7/11 10:00	2024/8/9 9:59
 80182	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/8/9 9:59	
-80183	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/7/11 10:00	2024/8/9 9:59
-80184	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/7/11 10:00	2024/8/9 9:59
+80183	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/7/11 10:00	2024/8/9 9:59
+80184	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/7/11 10:00	2024/8/9 9:59
 80185	2	UiSignBanner	75	Advance to [Shaper's Ripples] Sign-in		1												2024/7/11 10:00	2024/8/19 5:00
-80186	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/7/11 10:00	2024/8/9 9:59
+80186	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/7/11 10:00	2024/8/9 9:59
 80187	6	UiShop	3	Coating Shop	1001	1	1	0	504									2024/8/9 9:59	
 80188	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/7/11 10:00	2024/8/22 4:59
-80189	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/8/22 7:00	2024/9/20 9:59
+80189	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/8/22 7:00	2024/9/20 9:59
 80190	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/9/20 9:59	
-80191	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/8/22 7:00	2024/9/20 9:59
+80191	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/8/22 7:00	2024/9/20 9:59
 80192	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/8/22 7:00	2024/9/26 4:59
-80193	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/8/22 7:00	2024/9/20 9:59
+80193	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/8/22 7:00	2024/9/20 9:59
 80194	7	OnOpenGacha		Advance to event [Solitary Longings]	403	1	18											2024/8/22 7:00	2024/9/20 5:00
-80195	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/9/26 7:00	2024/11/7 5:00
+80195	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/9/26 7:00	2024/11/7 5:00
 80196	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/11/7 5:00	
-80197	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/9/26 7:00	2024/11/7 5:00
-80198	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/9/26 7:00	2024/11/7 5:00
+80197	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/9/26 7:00	2024/11/7 5:00
+80198	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/9/26 7:00	2024/11/7 5:00
 80199	6	UiShop	3	Coating Shop	1001	1	1	0	504									2024/11/7 5:00	
 80200	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/9/26 7:00	2024/11/7 4:59
 80201	7	SkipRift		Go to event [Path of Buried Wishes]	10437	1							1					2025/9/25 7:00	2025/11/3 5:00
 80202	7	OnOpenGacha		Advance to event [Solitary Dream]	403	1	19											2024/10/3 10:00	2024/10/31 9:59
 80203	7	OpenLotto		Advance to event [Tainted Moonrise]	10306	1	16	1											
-80204	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/11/7 7:00	2024/12/19 5:00
+80204	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/11/7 7:00	2024/12/19 5:00
 80205	6	UiShop	3	Coating Shop	1001	1	1	0	504									2024/12/19 5:00	
 80206	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/11/7 7:00	2024/12/19 4:59
 80207	7	OnOpenGacha		Advance to event [Tainted Moonrise]	403	1	16											2024/11/14 10:00	2024/12/12 9:59
-80208	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/11/7 7:00	2024/12/19 5:00
-80209	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/11/7 7:00	2024/12/19 5:00
+80208	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/11/7 7:00	2024/12/19 5:00
+80209	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/11/7 7:00	2024/12/19 5:00
 80210	6	UiShop	3	Coating Shop	1001	1	1	0	502									2024/12/19 5:00	
 80211	2	UiSignBanner	81	Advance to [Wither to Shine] Sign-in		1												2024/11/7 7:00	2024/12/9 5:00
 80212	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2024/12/19 7:00	2025/1/23 4:59
-80213	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/12/19 7:00	2025/1/23 5:00
-80214	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/12/19 7:00	2025/1/23 5:00
+80213	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/12/19 7:00	2025/1/23 5:00
+80214	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/12/19 7:00	2025/1/23 5:00
 80215	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/1/23 5:00	
-80216	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2024/12/19 7:00	2025/1/23 5:00
-80217	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/1/23 7:00	2025/3/6 5:00
+80216	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2024/12/19 7:00	2025/1/23 5:00
+80217	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/1/23 7:00	2025/3/6 5:00
 80218	6	UiShop	3	Coating Shop	1001	1	1	0	504									2025/3/6 5:00	
 80219	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/1/23 7:00	2025/3/6 4:59
 80220	7	OnOpenGacha		Advance to event [Love's Dawn]	403	1	31											2025/1/23 7:00	2025/3/6 5:00
-80221	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/1/23 7:00	2025/3/6 5:00
+80221	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/1/23 7:00	2025/3/6 5:00
 80222	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/3/6 5:00	
-80223	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/1/23 7:00	2025/3/6 5:00
+80223	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/1/23 7:00	2025/3/6 5:00
 80224	2	UiSignBanner	85	Advance to [Dream till the Timeless End] Sign-in		1												2025/1/23 7:00	2025/2/24 5:00
-80225	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/3/6 7:00	2025/4/10 5:00
-80226	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/3/6 7:00	2025/4/10 5:00
+80225	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/3/6 7:00	2025/4/10 5:00
+80226	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/3/6 7:00	2025/4/10 5:00
 80227	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/4/10 5:00	
 80228	2	UiSignBanner	88	Advance to [Dream till the Timeless End] Sign-in		1												2025/3/6 7:00	2025/4/7 5:00
-80229	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/3/6 7:00	2025/4/10 4:59
+80229	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/3/6 7:00	2025/4/10 4:59
 80230	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/3/6 7:00	2025/4/10 4:59
-80231	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
+80231	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
 80232	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/5/22 5:00	
-80233	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
+80233	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
 80234	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/4/10 7:00	2025/5/22 4:59
-80235	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
+80235	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
 80236	6	UiShop	3	Coating Shop	1001	1	1	0	504									2025/5/22 5:00	
-80237	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
-80238	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/4/10 7:00	2025/5/22 5:00
-80239	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/6 2:00	2025/9/19 1:59
-80240	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/5/22 7:00	2025/7/3 5:00
-80241	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/5/22 7:00	2025/7/3 5:00
+80237	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
+80238	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/4/10 7:00	2025/5/22 5:00
+80239	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/6 2:00	2025/9/19 1:59
+80240	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/5/22 7:00	2025/7/3 5:00
+80241	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/5/22 7:00	2025/7/3 5:00
 80242	7	SkipToBossInshot		To Event [Trial of Simulacrums]	10467													2025/8/6 2:00	2025/9/18 1:59
 80243	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/8/6 2:00	2025/9/19 1:59
-80244	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/5/22 7:00	2025/7/3 5:00
-80245	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/7/3 7:00	2025/8/21 5:00
+80244	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/5/22 7:00	2025/7/3 5:00
+80245	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/7/3 7:00	2025/8/21 5:00
 80246	6	UiShop	3	Coating Shop	1001	1	1	0	504									2025/8/21 5:00	
 80247	7	OnOpenPassport		Tactical Assessment Manual	400000	1	1											2025/9/19 2:00	2025/11/12 21:00
 80248	7	OnOpenGacha		前往活动【缘纺祈糸】	403	1	35											2025/7/3 7:00	2025/8/21 5:00
-80249	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/7/3 7:00	2025/8/21 5:00
-80250	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/7/3 7:00	2025/8/21 5:00
+80249	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/7/3 7:00	2025/8/21 5:00
+80250	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/7/3 7:00	2025/8/21 5:00
 80251	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/8/21 5:00	
 80252	2	UiSignBanner	1300610	Advance to [Through the Tide Home] Sign-in		1												2025/9/19 2:00	2025/11/12 21:00
-80253	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/21 7:00	2025/9/25 5:00
-80254	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/21 7:00	2025/9/25 5:00
+80253	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/21 7:00	2025/9/25 5:00
+80254	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/21 7:00	2025/9/25 5:00
 80255	7	OnOpenPassport		Tactical Assessment Manual	400000	1	1											2025/9/19 2:00	2025/11/12 21:00
-80256	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/21 7:00	2025/9/25 5:00
+80256	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/21 7:00	2025/9/25 5:00
 80257	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/9/25 5:00	
-80258	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/21 7:00	2025/9/25 5:00
-80259	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/8/21 7:00	2025/9/25 5:00
-80260	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/9/25 7:00	2025/11/13 5:00
-80261	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/9/25 7:00	2025/11/13 5:00
+80258	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/21 7:00	2025/9/25 5:00
+80259	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/8/21 7:00	2025/9/25 5:00
+80260	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/9/25 7:00	2025/11/13 5:00
+80261	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/9/25 7:00	2025/11/13 5:00
 80262	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/11/13 5:00	
-80263	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/9/25 7:00	2025/11/13 5:00
+80263	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/9/25 7:00	2025/11/13 5:00
 80264	6	UiShop	3	Coating Shop	1001	1	1	0	504									2025/11/13 5:00	
 80265	7	OnOpenPassport		Tactical Assessment Manual	400000	1	1											2025/9/19 2:00	2025/11/12 21:00
-80266	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/11/13 5:00	2025/12/22 5:00
+80266	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/11/13 5:00	2025/12/22 5:00
 80267	6	UiShop	3	Coating Shop	1001	1	1	0	504									2025/12/22 5:00	
 80268	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/11/13 5:00	2025/12/22 4:59
-80269	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/11/13 5:00	2025/12/22 5:00
+80269	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/11/13 5:00	2025/12/22 5:00
 80270	6	UiShop	3	Coating Shop	1001	1	1	0	502									2025/12/23 5:00	
 80271	7	OpenLotto		Go to Event [Nightfall Finale]	403	1	22	1				774800						2025/11/13 5:00	2025/12/22 5:00
 80272	7	SkipToRace		Go to Event [Stellar Rush]	10354	1							1					2025/11/13 5:00	2025/12/22 5:00
 80273	6	UiPurchase		From 1st Recharge	3	1	1	0	0										
-80274	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/12/23 0:00	2026/2/2 5:00
+80274	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/12/23 0:00	2026/2/2 5:00
 80275	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/2/2 5:00	
 80276	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2025/12/23 5:00	2026/2/2 4:59
-80277	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2025/12/23 0:00	2026/2/2 5:00
+80277	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2025/12/23 0:00	2026/2/2 5:00
 80278	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/2/2 5:00	
 80279	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2026/2/3 0:00	2026/3/16 22:59
-80280	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/2/3 0:00	2026/3/16 23:00
+80280	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/2/3 0:00	2026/3/16 23:00
 80281	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/3/16 23:00	
 80282	7	OnOpenGacha		Go to event [Night Sonata]	403	1	40											2026/2/3 0:00	2026/3/16 23:00
-80283	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/2/3 0:00	2026/3/16 23:00
+80283	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/2/3 0:00	2026/3/16 23:00
 80284	2	UiSignBanner	104	Advance to [Withering Crown] Sign-in		1												2026/2/3 5:00	2026/3/9 5:00
-80285	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/2/3 0:00	2026/3/16 23:00
+80285	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/2/3 0:00	2026/3/16 23:00
 80286	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/3/16 23:00	
-80287	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/3/17 0:00	2026/4/20 23:00
-80288	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/3/17 0:00	2026/4/20 23:00
-80289	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/3/17 5:00	2026/4/20 5:00
-80290	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/3/17 0:00	2026/4/20 23:00
+80287	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/3/17 0:00	2026/4/20 23:00
+80288	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/3/17 0:00	2026/4/20 23:00
+80289	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/3/17 5:00	2026/4/20 5:00
+80290	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/3/17 0:00	2026/4/20 23:00
 80291	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/4/20 23:00	
 80292	7	OnOpenPassport		Tactical Assessment Manual	10342	1												2026/3/17 5:00	2026/4/20 22:59
-80293	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/3/17 0:00	2026/4/20 23:00
+80293	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/3/17 0:00	2026/4/20 23:00
 80294	7	OnOpenPassport		Tactical Assessment Manual	10342	1						866500						2026/4/21 5:00	2026/6/1 22:59
-80295	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/4/21 0:00	2026/6/1 23:00
+80295	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/4/21 0:00	2026/6/1 23:00
 80296	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/6/1 23:00	
-80297	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/4/21 0:00	2026/6/1 23:00
+80297	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/4/21 0:00	2026/6/1 23:00
 80298	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/6/1 23:00	
 80299	7	OnOpenGacha		Go to Event [Fluttering Ballet]	403	1	49					1050153						2026/6/5 10:00	2026/7/16 23:00
-80300	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
-80301	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
+80300	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
+80301	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
 80302	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/7/16 23:00	
-80303	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
-80304	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
-80305	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/6/2 0:00	2026/7/16 23:00
+80303	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
+80304	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
+80305	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/6/2 0:00	2026/7/16 23:00
 80306	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/7/16 23:00	
 80307	7	OnOpenGacha		Go to Event [Fluttering Ballet]	403	1	49					1050153						2026/6/5 10:00	2026/7/16 23:00
-80308	6	UiPurchase		Purchase [Butter Hero Weapon Box]			2	0	9									2026/4/21 0:00	2026/6/1 23:00
-80309	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/7/17 0:00	2026/8/18 23:00
+80308	6	UiPurchase	0	Purchase [Butter Hero Weapon Box]	0	0	2	0	1			0	0	0				2026/4/21 0:00	2026/6/1 23:00
+80309	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/7/17 0:00	2026/8/18 23:00
 80310	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/8/18 23:00	
-80311	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/7/17 0:00	2026/8/18 23:00
+80311	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/7/17 0:00	2026/8/18 23:00
 80312	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/8/18 23:00	
-80313	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/7/17 0:00	2026/8/18 23:00
-80314	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/7/17 0:00	2026/8/18 23:00
-80315	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
+80313	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/7/17 0:00	2026/8/18 23:00
+80314	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/7/17 0:00	2026/8/18 23:00
+80315	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
 80316	6	UiShop	3	Coating Shop	1001	1	1	0	504									2026/9/23 23:00	
-80317	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
+80317	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
 80318	6	UiShop	3	Coating Shop	1001	1	1	0	502									2026/9/23 23:00	
 80319	10	XPBRGame		Go to the Blazing Rhapsody event.	10500	1						1050153			UiPBRTask	UiPBRMain		2025/8/19 5:00	2026/9/23 5:00
-80320	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
-80322	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
-80323	6	UiPurchase		Purchase Coating Supply Pack	5	1	2	0	4									2026/8/19 0:00	2026/9/23 23:00
+80320	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
+80321	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/9/24 0:00	2026/11/4 23:00
+80322	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
+80323	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/8/19 0:00	2026/9/23 23:00
+80324	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/9/24 0:00	2026/11/4 23:00
+80325	6	UiShop	3	Coating Shop	1001	1	1	0	502			0	0	0				2026/11/4 23:00	
+80326	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/9/29 10:00	2026/11/3 23:59
+80327	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/9/24 0:00	2026/11/4 23:00
+80328	6	UiShop	3	Coating Shop	1001	1	1	0	504			0	0	0				2026/11/4 23:00	
+80329	6	UiPurchase	0	Purchase Coating Supply Pack	5	1	2	0	5			0	0	0				2026/9/29 10:00	2026/11/3 23:59
 81001	7	SkipToSpringFestivalActivity		Purchase Coating Supply Pack		1													
 81002	7	SkipToSpringFestivalCollectWord		Card Collection Event	1308	1													
 81003	7	SkipToSpringFestivalSmashEggs		Smash Eggs Event		1													
@@ -3054,13 +3098,13 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 90006	6	UiShop		Weapon Harmony	1001	1	1	0	303										
 90007	6	UiShop		War Shop	1001	1	1	0	2001										
 90008	6	UiShop		Point Shop	1001	1	1	0	4001										
-90009	7	SkipToRepeatChallengeActivityShopByIndex		Purchase Overclock Material Box (α) to obtain	1001	1	2												
+90009	7	SkipToRepeatChallengeActivityShopByIndex	0	Simulation Shop Exchange	1001	1	2					0	0	0					
 90010	7	SkipToStageMemory		Designer's Pick Stage	10480								1						
 90011	7	SkipToMaverick3		Lone Gunner	10483		1							34001					
 90012	6	UiAnniversaryReviewEntrance		Anniversary Recap	10462									42722					
 90013	7	SkipToMusicGameActivityMain		To Event [Chrono Echoes]	10482														
 90014	7	SkipToLuckyTenant2		Lucky Tenant	10481								1						
-90015	7	SkipToRepeatChallengeActivityShopByIndex		Purchase Overclock Material Box (β) to obtain	1001	1	2												
+90015	7	SkipToRepeatChallengeActivityShopByIndex	0	Simulation Shop Exchange	1001	1	2					0	0	0					
 90016	7	SkipToPcg		To Card Game	10485														
 90017	7	SkipToVersionGiftMainUi		Combined Version Event	10487									41401					
 90018	7	SkipToPokerGuessing2			10486								1	44601					
@@ -3118,12 +3162,15 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 90070	7	OpenLotto		Advance to event [Vera Pool]	10306	1	2002	1											
 90071	7	OpenLotto		Advance to event [Karenina Pool]	10306	1	2003	1											
 90072	7	OpenLotto		Go to Event [Nightfall Finale]	10306	1	2004	1											
-90075	6	UiPurchase		4.7跳转到音乐场景礼包	3	1	2	0	7										
-90076	6	UiPurchase		4.7跳转到音乐涂装礼包	3	1	2	0	4										
-90078	7	OpenLotto		Advance to event [Luna Pool Story].	10306	1	2001	2											
-90079	7	OpenLotto		前往活动【薇拉卡池剧情】	10306	1	2002	2											
-90080	7	OpenLotto		Advance to event [Karenina Pool Story]	10306	1	2003	2											
-90081	7	OpenLotto		前往活动【慈悲者卡池剧情】	10306	1	2004	2											
+90073	7	OnOpenDALFestival	0	Go to Event [Dream of Stagnant Cycle]	10513	1	68					0	1	50202					
+90074	10	XPunishaar	0	Go to Event [Circuit Calculus]	10509	1						0	1	50201					
+90075	6	UiPurchase	0	4.7跳转到音乐场景礼包	3	1	2	0	8			0	0	0					
+90076	6	UiPurchase	0	4.7跳转到音乐涂装礼包	3	1	2	0	5			0	0	0					
+90077	1	UiTransfiniteTowerMain	0	Go to Event [Overclock Simulation]	10510	1						1050153	1	50100					
+90078	7	OpenLotto	0	Advance to event [Luna Pool Story].	10306	1	2001	2				1050153	0	0					
+90079	7	OpenLotto	0	Go to Event [Vera Pool Story]	10306	1	2002	2				1050153	0	0					
+90080	7	OpenLotto	0	Advance to event [Karenina Pool Story]	10306	1	2003	2				1050153	0	0					
+90081	7	OpenLotto	0	Go to Event [The Merciful One Pool Story]	10306	1	2004	2				1050153	0	0					
 1000001	2	UiSet	12		7		0	0	1										
 1300001	7	OnOpenSlotmachine		Operation Energy Recycling			1												
 1300002	2	UiSignBanner	1300001	[Frozen] Sign-in															
@@ -3169,7 +3216,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 1300126	7	OnOpenGacha		En1.17白毛卡池跳转	401		10002												
 1300130	2	UiSignBanner	1300100	En1.17一周年七天签到跳转															
 1300131	2	UiAutoWindow	7	En1.17白毛卡池打脸图跳转															
-1300140	6	UiPurchase		En1.17涂装限时返场公告跳转	3		2	0	4										
+1300140	6	UiPurchase	0	En1.17涂装限时返场公告跳转	3	0	2	0	5			0	0	0					
 1300141	2	UiAutoWindow	1002																
 1300142	2	UiAutoWindow	1003																
 1300143	6	UiNewDrawMain		En1.17deeplink跳转至白毛和服卡池	401		2	100001						2160018					
@@ -3183,13 +3230,13 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 1300175	6	UiNewDrawMain		EN1.18版本Banner跳转至成员狙击卡池	401		1	1											
 1300176	6	UiNewDrawMain		EN1.18版本Banner跳转至武器狙击卡池	401		1	4											
 1300177	6	UiNewDrawMain		EN1.18版本Banner跳转至S级轮换池	401		1	12											
-1300178	6	UiPurchase		EN1.18版本Banner跳转至涂装礼包商店	3		2	0	4										
+1300178	6	UiPurchase	0	EN1.18版本Banner跳转至涂装礼包商店	3	0	2	0	5			0	0	0					
 1300179	2	UiAutoWindow	1300179	EN1.19版本比安卡特效皮复刻打脸图															
 1300180	1	UiActivityBriefBase		EN1.19deeplink活动主界面跳转										2160041					
 1300181	6	UiNewDrawMain		EN1.19deeplinkr跳转至库洛姆卡池	401		1	11						2160042					
 1300190	1	UiActivityBriefBase		EN1.20deeplink迷境刻痕版本活动页跳转										2160052					
 1300191	6	UiNewDrawMain		EN1.20deeplink21号抽卡卡池跳转	401		1	1						2160053					
-1300192	6	UiPurchase		EN1.20Banner跳转至涂装礼包商店	3		2	0	4										
+1300192	6	UiPurchase	0	EN1.20Banner跳转至涂装礼包商店	3	0	2	0	5			0	0	0					
 1300200	1	UiActivityBriefBase		EN1.21deeplink绝海星火版本活动页跳转										2160071					
 1300201	6	UiNewDrawMain		EN1.21deeplinkS薇拉卡池跳转	401		1	11						2160072					
 1300210	2	UiSignBanner	1300210	EN1.22元旦签到															
@@ -3232,7 +3279,7 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 1300304	7	OpenLotto		EN1.30deeplink超丽芙涂装卡池		1	5							2160183					
 1300305	2	UiAutoWindow	1003	EN1.30泳装返场复刻打脸		1													
 1300400	1	UiActivityBriefBase		EN1.31deeplink未语庭言活动面板										2160192					
-1300401	6	UiPurchase		EN1.31deeplink罗塞塔涂装购买页	3	1	2	0	4					2160193					
+1300401	6	UiPurchase	0	EN1.31deeplink罗塞塔涂装购买页	3	1	2	0	5			0	0	2160193					
 1300402	6	UiNewDrawMain		EN1.31deeplink邦比卡池	401		1	1						2160194					
 1300500	1	UiActivityBriefBase		EN1.32deeplink刻命螺旋活动面板										2160200					
 1300501	6	UiNewDrawMain		EN1.32deeplink超里卡池	401	1	1	11						2160201					
@@ -3351,9 +3398,13 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 1300708	6	UiNewDrawMain		EN4.5神白毛角色卡池deeplink	401	1	1	11	1488					2160713					
 1300709	7	OnOpenGacha		EN4.5神丽芙涂装卡池deeplink	403	1	49							2160714					
 1300710	6	UiActivityBriefBase		EN4.6活动主题面板deeplink	10303	1	0	0	0					2160715					
-1300711	6	UiNewDrawMain		EN4.6海伦汀角色卡池deeplink	401	1	1	11						2160716					
+1300711	6	UiNewDrawMain	0	EN4.6海伦汀角色卡池deeplink	401	1	1	35				0	0	2160716					
 1300712	6	UiActivityBriefBase		EN4.7活动主题面板deeplink	10303	1	0	0	0					2160717					
 1300713	6	UiNewDrawMain		EN4.7卡列角色卡池deeplink	401	1	1	11						2160718					
+1300714	6	UiActivityBriefBase	0	EN4.8活动主题面板deeplink	10303	1	0	0	0			0	0	2160719					
+1300715	6	UiNewDrawMain	0	EN4.8阿德莱德卡池deeplink	401	1	1	35				0	0	2160720					
+1300716	6	UiNewDrawMain	0	EN4.8联动狂三卡池deeplink	401	1	1	37	5612			0	0	2160721					
+1300717	6	UiPurchase	0	EN4.8洁塔薇联动涂装deeplink	3	1	2	0	5			0	0	2160722					
 1300626	2	UiAccumulateExpendShopMain		累销商店			1												
 1300627	7	OpenUiPaintingExperiencePass		Coating Trial			58												
 1300628	7	OpenUiSoloReformChapterDetail		MiniRpg章节跳转			1	1	30163345										
@@ -3369,14 +3420,16 @@ SkipId	Origin	UiName	ParamId	Explain	FunctionalId	IsHideFunc	CustomParams[1]	Cus
 1300638	7	SkipToUiPurchase		Go to BUTTER DOG Pack banner			0	239											
 1300639	7	OpenUiPaintingExperiencePass		涂装试玩-4.4神威			120												
 1300640	1	UiMiniGamesCollectionMain		To Minigame Collection	10503							1050153	1	47501					
-1300641	6	UiPurchase		黄油小狗礼包界面			2	0	9										
-1300642	2	UiPassportAutoWindow	1300642	BP Face Close-Up			1789333200	1789938000				775500							
+1300641	6	UiPurchase	0	黄油小狗礼包界面	0	0	2	0	1			0	0	0					
+1300642	2	UiPassportAutoWindow	1300642	BP Face Close-Up	0	0	1792962000	1793566800				775500	0	0					
 1300643	7	OpenUiPaintingExperiencePass		涂装试玩-4.5白毛			121												
 1300644	7	OpenUiPaintingExperiencePass		涂装试玩-4.5奶龙			122												
 1300645	7	OpenUiPaintingExperiencePass		涂装试玩-4.6海伦汀			124					1050153							
 1300646	7	OpenUiPaintingExperiencePass		涂装试玩-4.6The赛			123					1050153							
 1300647	10	XPBRGame			10500							1050153	1	49920					
-1300648	7	OpenUiPaintingExperiencePass		涂装试玩-4.8洁塔薇			1					1050153							
+1300648	7	OpenUiPaintingExperiencePass	0	涂装试玩-4.8洁塔薇	0	0	127					1050153	0	0					
 1300649	7	OpenUiPaintingExperiencePass		涂装试玩-4.7卡列			128					1050153							
 1300650	7	OpenUiPaintingExperiencePass		涂装试玩-4.7比安卡			125					1050153							
 1300651	7	OpenUiPaintingExperiencePass		涂装试玩-4.7露娜涂鸦			133					1050153							
+1300652	7	OpenUiPaintingExperiencePass	0	涂装试玩-4.8阿德莱德试玩	0	0	139					1050153	0	0					
+1300653	7	OpenUiPaintingExperiencePass	0	涂装试玩-4.8涅缇娅试玩	0	0	138					1050153	0	0					

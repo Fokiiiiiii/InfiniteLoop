@@ -5,6 +5,9 @@ using AscNet.Common.Util;
 using AscNet.Table.V2.share.item;
 using AscNet.Table.V2.share.reward;
 using MessagePack;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Driver;
 
 namespace AscNet.GameServer.Handlers
 {
@@ -637,95 +640,235 @@ namespace AscNet.GameServer.Handlers
         public static void ItemBuyAssetRequestHandler(Session session, Packet.Request packet)
         {
             ItemBuyAssetRequest request = packet.Deserialize<ItemBuyAssetRequest>();
-            lock (session.player)
+            BuyAssetPendingOperation? pending = session.player.PendingBuyAsset;
+            if (pending is not null)
             {
-                // Resolve the requested conversion from the installed client's recipe table.
-                BuyAssetTable? asset = TableReaderV2.Parse<BuyAssetTable>().Find(row => row.Id == request.ItemId);
-                if (asset is null || request.Times <= 0 || asset.Config.Count == 0
-                    || asset.TimeId > 0
-                    || (asset.BuyLimit > 0 && request.Times > asset.BuyLimit))
+                // Same contract as ItemUse: an unfinished identical purchase is the client's retry; finish it once.
+                List<Item>? resumed = CompletePendingBuyAsset(session);
+                if (pending.ItemId == request.ItemId && pending.Times == request.Times)
                 {
-                    session.SendResponse(new ItemBuyAssetResponse { Code = 20012001 }, packet.Id);
+                    SendBuyAssetResult(session, packet.Id, resumed, pending);
                     return;
                 }
-                Item? owned = session.inventory.Items.FirstOrDefault(i => i.Id == request.ItemId);
-                int bought = owned is not null && PayModule.PurchaseDay(owned.LastBuyTime) == PayModule.PurchaseDay() ? owned.BuyTimes : 0;
-                if ((asset.DailyLimit > 0 && (long)bought + request.Times > asset.DailyLimit)
-                    || (asset.TotalLimit > 0 && (long)(owned?.TotalBuyTimes ?? 0) + request.Times > asset.TotalLimit)
-                    || (long)(owned?.TotalBuyTimes ?? 0) + request.Times > int.MaxValue)
+                if (resumed is not null)
+                    session.SendPush(new NotifyItemDataList { ItemDataList = resumed });
+            }
+
+            DateTimeOffset now = Game.DrawManager.UtcNow();
+            int code = TryPlanBuyAsset(session, request, now, out List<(int ItemId, int Count)> costPlan,
+                out int gain, out int buyTimes);
+            if (code != 0)
+            {
+                session.SendResponse(new ItemBuyAssetResponse { Code = code }, packet.Id);
+                return;
+            }
+
+            pending = new BuyAssetPendingOperation
+            {
+                ItemId = request.ItemId,
+                Times = request.Times,
+                Gain = gain,
+                BuyTimes = buyTimes + request.Times,
+                TotalBuyTimes = (session.inventory.Items.FirstOrDefault(item => item.Id == request.ItemId)?.TotalBuyTimes ?? 0)
+                    + request.Times,
+                OccurredAt = now.ToUnixTimeSeconds(),
+                Debits = costPlan.Select(cost => new BuyAssetPendingDebit { ItemId = cost.ItemId, Count = cost.Count }).ToList()
+            };
+            session.player.PendingBuyAsset = pending;
+            try { session.player.SaveChecked(); }
+            catch
+            {
+                session.player = Player.collection.Find(row => row.PlayerData.Id == session.player.PlayerData.Id).Single();
+                if (session.player.PendingBuyAsset?.ItemId != pending.ItemId
+                    || session.player.PendingBuyAsset.TotalBuyTimes != pending.TotalBuyTimes)
+                    throw;
+            }
+            SendBuyAssetResult(session, packet.Id, CompletePendingBuyAsset(session), pending);
+        }
+
+        private static void SendBuyAssetResult(Session session, int packetId, List<Item>? changed,
+            BuyAssetPendingOperation pending)
+        {
+            if (changed is null)
+            {
+                session.SendResponse(new ItemBuyAssetResponse { Code = 20012004 }, packetId);
+                return;
+            }
+            session.SendPush(new NotifyItemDataList { ItemDataList = changed });
+            TaskModule.SendTaskSync(session);
+            session.SendResponse(new ItemBuyAssetResponse { Count = pending.Gain, IsCrit = false }, packetId);
+        }
+
+        public static void ResumePendingBuyAsset(Session session)
+        {
+            if (session.player.PendingBuyAsset is not null)
+                CompletePendingBuyAsset(session);
+        }
+
+        // Journal steps: (1) inventory debit+credit in one document, idempotent via the TotalBuyTimes marker;
+        // (2) 11202 spend progress and journal clear in one Player write. Null = journal no longer applies (dropped).
+        private static List<Item>? CompletePendingBuyAsset(Session session)
+        {
+            BuyAssetPendingOperation pending = session.player.PendingBuyAsset
+                ?? throw new InvalidOperationException("No pending BuyAsset.");
+            HashSet<int> ids = pending.Debits.Select(debit => debit.ItemId).Append(pending.ItemId).ToHashSet();
+            Inventory inventory = session.inventory;
+            int Stored(Inventory source) =>
+                source.Items.FirstOrDefault(item => item.Id == pending.ItemId)?.TotalBuyTimes ?? 0;
+            if (Stored(inventory) != pending.TotalBuyTimes)
+            {
+                Item? stack = inventory.Items.FirstOrDefault(item => item.Id == pending.ItemId);
+                ItemTable? target = TableReaderV2.Parse<ItemTable>().Find(row => row.Id == pending.ItemId);
+                bool applies = target is not null
+                    && Stored(inventory) == pending.TotalBuyTimes - pending.Times
+                    && ids.All(id => inventory.Items.Count(item => item.Id == id) <= 1)
+                    && pending.Debits.All(debit =>
+                        (inventory.Items.FirstOrDefault(item => item.Id == debit.ItemId)?.Count ?? 0) >= debit.Count)
+                    && (stack?.Count ?? 0) + pending.Gain <= Inventory.GetMaxCount(target);
+                if (!applies)
                 {
-                    session.SendResponse(new ItemBuyAssetResponse { Code = 20012001 }, packet.Id);
-                    return;
+                    ClearPendingBuyAsset(session);
+                    return null;
                 }
-                var recipes = TableReaderV2.Parse<BuyAssetConfigTable>().Where(row => asset.Config.Contains(row.Id)).OrderBy(row => row.Times).ToArray();
-                if (recipes.Length != asset.Config.Count || recipes.Any(row => row.ConsumeId.Count == 0))
-                {
-                    session.SendResponse(new ItemBuyAssetResponse { Code = 20012001 }, packet.Id);
-                    return;
-                }
-                int currency = request.ConsumeId == 0 ? recipes[0].ConsumeId[0] : request.ConsumeId;
-                long cost = 0, count = 0;
-                // Unlimited exchanges have a fixed price; capped daily resources use a price ladder.
-                int iterations = recipes.Length == 1 ? 1 : request.Times;
-                if (iterations > 1000) { session.SendResponse(new ItemBuyAssetResponse { Code = 20012001 }, packet.Id); return; }
-                for (int i = 0; i < iterations; i++)
-                {
-                    var recipe = recipes.LastOrDefault(row => row.Times <= (long)bought + i + 1) ?? recipes[0];
-                    int index = recipe.ConsumeId.IndexOf(currency);
-                    if (index < 0 || index >= recipe.ConsumeCount.Count || recipe.GainCount <= 0
-                        || !Inventory.IsValidClientItemId(request.ItemId))
-                    {
-                        session.SendResponse(new ItemBuyAssetResponse { Code = 20012001 }, packet.Id);
-                        return;
-                    }
-                    int multiplier = recipes.Length == 1 ? request.Times : 1;
-                    cost += (long)recipe.ConsumeCount[index] * multiplier;
-                    count += (long)recipe.GainCount * multiplier;
-                }
-                if (request.ItemId == Inventory.Coin)
-                {
-                    var configs = TableReaderV2.Parse<AscNet.Table.V2.share.config.ConfigTable>();
-                    long factor = long.Parse(configs.Single(c => c.Key == "BuyAssetCoinBase").Value)
-                        + session.player.PlayerData.Level * long.Parse(configs.Single(c => c.Key == "BuyAssetCoinMul").Value);
-                    count = checked(count * factor);
-                }
-                ItemTable? item = TableReaderV2.Parse<ItemTable>().Find(row => row.Id == request.ItemId);
-                if (cost <= 0 || cost > int.MaxValue || count > int.MaxValue
-                    || session.inventory.SpendableCount(currency) < cost
-                    || session.inventory.Items.Where(i => i.Id == request.ItemId).Sum(i => i.Count) + count > Inventory.GetMaxCount(item))
-                {
-                    session.SendResponse(new ItemBuyAssetResponse { Code = 20012004 }, packet.Id);
-                    return;
-                }
-                var before = session.inventory.Items.Select(i => new Item { Id = i.Id, Count = i.Count,
-                    CreateTime = i.CreateTime, RefreshTime = i.RefreshTime, BuyTimes = i.BuyTimes,
-                    TotalBuyTimes = i.TotalBuyTimes, LastBuyTime = i.LastBuyTime }).ToList();
-                List<Item> changed;
+                foreach (BuyAssetPendingDebit debit in pending.Debits)
+                    inventory.Do(debit.ItemId, -debit.Count);
+                Item bought = inventory.Do(pending.ItemId, pending.Gain);
+                bought.BuyTimes = pending.BuyTimes;
+                bought.TotalBuyTimes = pending.TotalBuyTimes;
+                bought.LastBuyTime = pending.OccurredAt;
                 try
                 {
-                    changed = session.inventory.Spend(currency, (int)cost);
-                    Item updated = session.inventory.Do(request.ItemId, (int)count);
-                    updated.BuyTimes = checked(bought + request.Times);
-                    updated.TotalBuyTimes = checked(updated.TotalBuyTimes + request.Times);
-                    updated.LastBuyTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                    changed.Add(updated);
-                    session.inventory.SaveChecked();
+                    inventory.SaveChecked();
                 }
-                catch (Exception error)
+                catch
                 {
-                    session.inventory.Items = before;
-                    session.log.Error("Asset conversion failed", error);
-                    session.SendResponse(new ItemBuyAssetResponse { Code = 2 }, packet.Id);
-                    return;
+                    // Pre-write failure or ack loss after commit: adopt the stored document (as GuildModule does)
+                    // so a later Session.Save can neither roll back nor replay it; the marker tells which happened.
+                    session.inventory = Inventory.collection.Find(row => row.Uid == inventory.Uid).Single();
+                    if (Stored(session.inventory) != pending.TotalBuyTimes)
+                    {
+                        ClearPendingBuyAsset(session); // Nothing was bought: the request fails as an error.
+                        throw;
+                    }
                 }
-                session.SendPush(new NotifyItemDataList { ItemDataList = changed });
-                session.SendResponse(new ItemBuyAssetResponse { Count = (int)count }, packet.Id);
+            }
+
+            TaskModule.EnsureMissionResets(session);
+            session.player.PendingBuyAsset = null;
+            TaskModule.ApplyTableDrivenProgressUnsaved(session,
+                pending.Debits.Select(debit => (11202, (int?)debit.ItemId, debit.Count)), pending.OccurredAt);
+            try { session.player.SaveChecked(); }
+            catch
+            {
+                session.player = Player.collection.Find(row => row.PlayerData.Id == session.player.PlayerData.Id).Single();
+                if (session.player.PendingBuyAsset is not null)
+                    throw;
+            }
+            return session.inventory.Items.Where(item => ids.Contains(item.Id)).ToList();
+        }
+
+        private static void ClearPendingBuyAsset(Session session)
+        {
+            session.player.PendingBuyAsset = null;
+            try { session.player.SaveChecked(); }
+            catch
+            {
+                session.player = Player.collection.Find(row => row.PlayerData.Id == session.player.PlayerData.Id).Single();
+                if (session.player.PendingBuyAsset is not null)
+                    throw;
             }
         }
 
+        // Source: share/item/BuyAsset.tab + BuyAssetConfig.tab, priced like XItemManager.GetBuyAssetInfo/XUiBuyAsset
+        // (template by today's BuyTimes + 1, total = ConsumeCount[selected] * Times; ConsumeId 0 = first option).
+        internal static int TryPlanBuyAsset(Session session, ItemBuyAssetRequest request, DateTimeOffset now,
+            out List<(int ItemId, int Count)> costPlan, out int gain, out int buyTimes)
+        {
+            const int invalid = 20012001, notEnough = 20012004, capacity = 20012005, noTable = 20012007,
+                maxTimes = 20012008, badConsume = 20012029, notInTime = 20012035, maxTotal = 20012036;
+            costPlan = [];
+            gain = 0;
+            buyTimes = 0;
+            BuyAssetTable? asset = TableReaderV2.Parse<BuyAssetTable>().Find(row => row.Id == request.ItemId);
+            if (asset is null)
+                return noTable;
+            ItemTable? target = TableReaderV2.Parse<ItemTable>().Find(row => row.Id == request.ItemId);
+            if (target is null || !Inventory.IsValidClientItemId(request.ItemId))
+                return 20012003;
+            if (request.Times <= 0)
+                return invalid;
+            if (asset.BuyLimit > 0 && request.Times > asset.BuyLimit)
+                return maxTimes;
+            if (asset.TimeId > 0 && !Game.ActivityScheduleService.IsOpen(asset.TimeId, now))
+                return notInTime;
+
+            List<Item> targetStacks = session.inventory.Items.Where(item => item.Id == request.ItemId).ToList();
+            if (targetStacks.Count > 1)
+                return invalid;
+            Item? stack = targetStacks.FirstOrDefault();
+            long today = TaskModule.CurrentDailyResetPeriod(now.ToUnixTimeSeconds());
+            buyTimes = stack is not null && TaskModule.CurrentDailyResetPeriod(stack.LastBuyTime) == today
+                ? stack.BuyTimes : 0;
+            if (asset.DailyLimit > 0 && (long)buyTimes + request.Times > asset.DailyLimit)
+                return maxTimes;
+            if (asset.TotalLimit > 0 && (long)(stack?.TotalBuyTimes ?? 0) + request.Times > asset.TotalLimit)
+                return maxTotal;
+
+            Dictionary<int, BuyAssetConfigTable> configRows = TableReaderV2.Parse<BuyAssetConfigTable>()
+                .ToDictionary(row => row.Id);
+            if (asset.Config.Count == 0 || asset.Config.Any(id => !configRows.ContainsKey(id)))
+                return noTable;
+            List<BuyAssetConfigTable> templates = asset.Config.Select(id => configRows[id]).OrderBy(row => row.Times).ToList();
+            int purchaseOrdinal = buyTimes + 1;
+            BuyAssetConfigTable template = templates.LastOrDefault(row => row.Times <= purchaseOrdinal) ?? templates[0];
+
+            int option = request.ConsumeId == 0 ? 0 : template.ConsumeId.IndexOf(request.ConsumeId);
+            if (option < 0 || option >= template.ConsumeId.Count || option >= template.ConsumeCount.Count)
+                return badConsume;
+            int consumeId = template.ConsumeId[option];
+            if (Inventory.CombinedItemIds(consumeId).Contains(request.ItemId) || template.ConsumeCount[option] <= 0)
+                return badConsume;
+
+            long perTime = template.GainCount;
+            if (request.ItemId == Inventory.Coin)
+                perTime *= GuildBossModule.ConfigInt("BuyAssetCoinBase")
+                    + session.player.PlayerData.Level * GuildBossModule.ConfigInt("BuyAssetCoinMul");
+            long totalGain = perTime * request.Times;
+            if (perTime <= 0 || totalGain > int.MaxValue)
+                return invalid;
+
+            long cost = (long)template.ConsumeCount[option] * request.Times;
+            List<(int ItemId, int Count)>? plan;
+            if (consumeId is 2 or 3)
+            {
+                // Client XItemManager.GetCount shows item 2 + 3 as one black-card balance, so it will offer a purchase
+                // the balance covers. AscNet policy: spend item 2 (client FreeGem) first, then item 3 (client PaidGem).
+                long free = session.inventory.Items.Where(item => item.Id == 2).Sum(item => item.Count);
+                long paid = session.inventory.Items.Where(item => item.Id == 3).Sum(item => item.Count);
+                if (cost > int.MaxValue || free < 0 || paid < 0 || free + paid < cost)
+                    return notEnough;
+                long fromFree = Math.Min(free, cost);
+                plan = new[] { (2, (int)fromFree), (3, (int)(cost - fromFree)) }.Where(debit => debit.Item2 > 0).ToList();
+            }
+            else
+                plan = session.inventory.PlanCombinedCost(consumeId, cost, now);
+            if (plan is null)
+                return notEnough;
+            if (plan.Any(cost => session.inventory.Items.Count(item => item.Id == cost.ItemId) > 1))
+                return invalid;
+            if ((stack?.Count ?? 0) + totalGain > Inventory.GetMaxCount(target))
+                return capacity;
+
+            costPlan = plan;
+            gain = (int)totalGain;
+            return 0;
+        }
+
+        // The client displays stored BuyTimes verbatim; clear stale daily counts on login
+        // using the same reset period as TryPlanBuyAsset.
         internal static void ReconcileDailyAssetPurchaseCounts(Inventory inventory)
         {
-            long today = PayModule.PurchaseDay();
+            long today = TaskModule.CurrentDailyResetPeriod(Game.DrawManager.UtcNow().ToUnixTimeSeconds());
             HashSet<int> dailyAssets = TableReaderV2.Parse<BuyAssetTable>()
                 .Where(row => row.DailyLimit > 0)
                 .Select(row => row.Id)
@@ -733,7 +876,7 @@ namespace AscNet.GameServer.Handlers
             List<(Item Item, int BuyTimes)> stale = inventory.Items
                 .Where(item => item.BuyTimes != 0
                     && dailyAssets.Contains(item.Id)
-                    && PayModule.PurchaseDay(item.LastBuyTime) != today)
+                    && TaskModule.CurrentDailyResetPeriod(item.LastBuyTime) != today)
                 .Select(item => (item, item.BuyTimes))
                 .ToList();
             if (stale.Count == 0)

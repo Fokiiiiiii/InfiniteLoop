@@ -70,6 +70,7 @@ namespace AscNet.Common
         Fragment = 1 << 3,
         Gift = 1 << 4,
         WeaponFashion = 1 << 5,
+        NormalConsumableItem = 1 << 7,
         CardExp = 1 << 11 | 1 << 2,
         EquipExp = 1 << 12 | 1 << 2,
         EquipExpNotInBag = 1 << 12 | 1 << 3,

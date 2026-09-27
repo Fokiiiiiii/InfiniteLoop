@@ -93,6 +93,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 381	10102	1021007																																Own Omniframe Lucia: Inverse Crown	
 382	10102	1401003																																Own Omniframe Helentine: Lacrimosa	
 383	10102	1071005																																Own Omniframe Karenina: Effulgence	
+384	10102	1411003																																Own Omniframe Kurumi Tokisaki	
+385	10102	1421003																																Own Omniframe Adelyde: Anabasis	
 401	11105	6210204																																Coating owned	
 7001	10105	13010116																																Complete all Lucia Interludes	
 7002	10105	13010216																																Complete all Liv Interludes	
@@ -168,6 +170,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 10436068	17117	15	21000260	21000261	21000262	21000263	21000264																											Complete [Heart-Lock Trial] with a 3-star rating	
 10436069	10105	10150116																																Unlocks after clearing all stages of [Fragmented Memories]	
 10436070	11101	1206	1																															Reach <color=#C14F38>10</color>★ in <color=#C14F38>Arcade Anima - Heart-Lock Trial</color>	
+10436071	12104	12																																Unlocks when you have 12 Memory Resonances in your inventory	
 1046901	10105	30062951																																Clear Soul Disintegration - 02 to unlock	
 1046902	10105	30062952																																Clear Soul Disintegration - 03 to unlock	
 1046903	10105	30062953																																Clear Soul Disintegration - 04 to unlock	
@@ -1130,6 +1133,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 60480	11102	1021007	4																															Awaken Inverse Crown's Ultima Rank	
 60481	11102	1401003	4																															Awaken Lacrimosa's Ultima Rank	
 60482	11102	1071005	4																															Awaken Effulgence's Ultima Rank	
+60483	11102	1411003	4																															Awaken Kurumi Tokisaki's Ultima Rank	
+60484	11102	1421003	4																															Awaken Anabasis's Ultima Rank	
 60600	11102	1011002	5																																
 60601	11102	1021001	5																																
 60602	11102	1031001	5																																
@@ -1674,6 +1679,9 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 853022	10105	10410101																																Placeholder_通关主线普通剧情42-1后解锁	
 853023	10102	1071005																																Placeholder_解锁成员卡列尼娜·烬航	
 853024																																		Placeholder_生命树档案解锁卡列尼娜·烬航使用	853022|853023
+853025	10105	10420101																																Placeholder_通关主线普通剧情43-1后解锁	
+853026	10102	1421003																																Placeholder_解锁成员阿德莱德·破渊	
+853027	0																																	Placeholder_生命树档案解锁阿德莱德·破渊使用	853025|853026
 10010100	10101	1																																Recommended BP: 140	
 10010101	10101	1																																Recommended BP: 144	
 10010102	10101	1																																Recommended BP: 148	
@@ -2459,102 +2467,102 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 40062298	13108	3500																																Member reaches 3500 BP	
 40062299	13108	5000																																Member reaches 5000 BP	
 40062300	13108	6500																																Member reaches 6500 BP	
-40063001	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063002	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063003	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063004	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063005	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063006	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063007	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063008	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063009	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063010	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063011	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063012	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063013	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063014	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063015	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063016	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063017	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063018	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063019	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063020	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063021	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063022	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063023	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063024	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063025	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063026	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063027	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063028	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063029	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063030	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063031	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063032	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063033	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063034	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063035	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063036	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063037	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063038	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063039	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063040	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063041	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063042	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063043	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063044	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063045	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063046	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063047	13109	6	12																															Equip 6★ Resonance Skills x12	
-40063048	13109	6	12																															Equip 6★ Resonance Skills x12	
-40064001	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064002	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064003	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064004	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064005	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064006	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064007	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064008	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064009	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064010	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064011	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064012	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064013	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064014	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064015	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064016	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064017	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064018	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064019	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064020	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064021	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064022	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064023	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064024	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064025	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064026	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064027	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064028	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064029	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064030	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064031	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064032	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064033	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064034	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064035	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064036	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064037	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064038	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064039	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064040	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064041	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064042	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064043	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064044	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064045	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064046	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064047	13118	12																																Equip Hypertuned Resonance Skill x12	
-40064048	13118	12																																Equip Hypertuned Resonance Skill x12	
+40063001	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063002	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063003	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063004	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063005	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063006	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063007	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063008	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063009	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063010	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063011	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063012	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063013	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063014	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063015	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063016	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063017	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063018	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063019	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063020	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063021	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063022	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063023	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063024	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063025	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063026	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063027	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063028	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063029	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063030	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063031	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063032	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063033	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063034	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063035	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063036	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063037	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063038	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063039	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063040	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063041	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063042	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063043	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063044	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063045	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063046	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063047	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40063048	13109	6	12																															Equip 6★ Resonance Skills x12 	
+40064001	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064002	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064003	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064004	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064005	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064006	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064007	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064008	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064009	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064010	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064011	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064012	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064013	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064014	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064015	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064016	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064017	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064018	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064019	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064020	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064021	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064022	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064023	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064024	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064025	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064026	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064027	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064028	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064029	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064030	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064031	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064032	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064033	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064034	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064035	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064036	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064037	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064038	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064039	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064040	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064041	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064042	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064043	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064044	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064045	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064046	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064047	13118	12																																Equip Hypertuned Resonance Skill x12 	
+40064048	13118	12																																Equip Hypertuned Resonance Skill x12 	
 40006313	21101																																	Claim Monthly Pass?	
 40006314	21104																																	Is it time to show the Monthly Pass renewal popup?	
 30020101	18111	1	1																															Max unit: 1	
@@ -2871,12 +2879,14 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 6005605	11105	6005605																																Coating owned	
 6004706	11105	6004706																																Coating owned	
 6004606	11105	6004606																																Coating owned	
+6004906	11105	6004906																																Coating owned	
 6003907	11105	6003907																																Coating owned	
 6002909	11105	6002909																																Coating owned	
 6005704	11105	6005704																																Coating owned	
 7000001	11105	6005004	6003605	6004205	6004706																													Coating series owned	
 6005804	11105	6005804																																Coating owned	
 6005904	11105	6005904																																Coating owned	
+6005905	11105	6005905																																Coating owned	
 6005405	11105	6005405																																Coating owned	
 6005305	11105	6005305																																Coating owned	
 6004506	11105	6004506																																Coating owned	
@@ -2885,6 +2895,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 6004806	11105	6004806																																Coating owned	
 6006204	11105	6006204																																Coating owned	
 6006304	11105	6006304																																Coating owned	
+6006504	11105	6006504																																Coating owned	
 6005306	11105	6005306																																Coating owned	
 7005804																																		You do not own this Coating and have cleared 1-12.	770400&6005804
 7005405																																		You do not own this Coating and have cleared 1-12.	770400&6005405
@@ -2896,6 +2907,9 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 7004509																																		You do not own this Coating and have cleared 1-12.	770400&6006304
 7004510																																		You do not own this Coating and have cleared 1-12.	770400&6005306
 7004511																																		You do not own this Coating and have cleared 1-12.	770400&6003907
+7004512	0																																	You do not own this Coating and have cleared 1-12.	770400&6006504
+7004513	0																																	You do not own this Coating and have cleared 1-12.	770400&6005905
+7004514	0																																	You do not own this Coating and have cleared 1-12.	770400&6004906
 30499	10101	50																																Reach Commandant Level 50	
 30500	11106	6																																Prerequisite: Nightmare Stage 3-2 Terminal	
 30501	11106	7																																Prerequisite: Nightmare Stage 3-3 Driven by Instinct	
@@ -3190,12 +3204,12 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 841224	13108	6500																																A member reaches 6500 BP	
 841225	13108	6500																																A member reaches 6500 BP	
 841226	13108	6500																																A member reaches 6500 BP	
-841231	13118	12																																Equip Hypertuned Resonance Skill x12	
-841232	13118	12																																Equip Hypertuned Resonance Skill x12	
-841233	13118	12																																Equip Hypertuned Resonance Skill x12	
-841234	13118	12																																Equip Hypertuned Resonance Skill x12	
-841235	13118	12																																Equip Hypertuned Resonance Skill x12	
-841236	13118	12																																Equip Hypertuned Resonance Skill x12	
+841231	13118	12																																Equip Hypertuned Resonance Skill x12 	
+841232	13118	12																																Equip Hypertuned Resonance Skill x12 	
+841233	13118	12																																Equip Hypertuned Resonance Skill x12 	
+841234	13118	12																																Equip Hypertuned Resonance Skill x12 	
+841235	13118	12																																Equip Hypertuned Resonance Skill x12 	
+841236	13118	12																																Equip Hypertuned Resonance Skill x12 	
 842001	13103	80																																A member reaches Lv.80	
 842002	13108	5500																																A member reaches 5500 BP	
 842003	13109	6	12																															Equip 6★ Resonance Skill x12	
@@ -3725,6 +3739,24 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 990376	15103	13019726	2																															Obtain 2	
 990377	15103	13019726	3																															Obtain 3	
 990378	15103	13019726	4																															Obtain 4	
+990379	15103	13019730	2																															Obtain 2	
+990380	15103	13019730	3																															Obtain 3	
+990381	15103	13019730	5																															Obtain 5	
+990385	15103	13019732	2																															Obtain 2	
+990386	15103	13019732	3																															Obtain 3	
+990387	15103	13019732	4																															Obtain 4	
+990388	15103	13019733	2																															Obtain 2	
+990389	15103	13019733	3																															Obtain 3	
+990390	15103	13019733	4																															Obtain 4	
+990391	15103	13019734	2																															Obtain 2	
+990392	15103	13019734	3																															Obtain 3	
+990393	15103	13019734	4																															Obtain 4	
+990409	15103	13019736	2																															Obtain 2	
+990410	15103	13019736	3																															Obtain 3	
+990411	15103	13019736	5																															Obtain 5	
+990415	15103	13019738	2																															Obtain 2	
+990416	15103	13019738	3																															Obtain 3	
+990417	15103	13019738	4																															Obtain 4	
 84100101	10105	10010101																																Unlocks after clearing Main Story 1-1	
 84100102	10105	10010102																																Unlocks after clearing Main Story 1-2	
 84100103	10105	10010103																																Unlocks after clearing Main Story 1-3	
@@ -4786,6 +4818,35 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 84103473	10105	10410130																																Unlocks after clearing Hidden Story 42-30	
 84103474	10105	10410131																																Unlocks after clearing Hidden Story 42-31	
 84103475	10105	10410132																																Unlocks after clearing Hidden Story 42-32	
+84103476	10105	10420101																																Unlocks after clearing Main Story (Normal) 43-1	
+84103477	10105	10420102																																Unlocks after clearing Main Story (Normal) 43-2	
+84103478	10105	10420103																																Unlocks after clearing Main Story (Normal) 43-3	
+84103479	10105	10420104																																Unlocks after clearing Main Story (Normal) 43-4	
+84103480	10105	10420105																																Unlocks after clearing Main Story (Normal) 43-5	
+84103481	10105	10420106																																Unlocks after clearing Main Story (Normal) 43-6	
+84103482	10105	10420107																																Unlocks after clearing Main Story (Normal) 43-7	
+84103483	10105	10420108																																Unlocks after clearing Main Story (Normal) 43-8	
+84103484	10105	10420109																																Unlocks after clearing Main Story (Normal) 43-9	
+84103485	10105	10420110																																Unlocks after clearing Main Story (Normal) 43-10	
+84103486	10105	10420111																																Unlocks after clearing Main Story (Normal) 43-11	
+84103487	10105	10420112																																Unlocks after clearing Main Story (Normal) 43-12	
+84103488	10105	10420113																																Unlocks after clearing Main Story (Normal) 43-13	
+84103489	10105	10420114																																Unlocks after clearing Main Story (Normal) 43-14	
+84103490	10105	10420115																																Unlocks after clearing Main Story (Normal) 43-15	
+84103491	10105	10420116																																Unlocks after clearing Main Story (Normal) 43-16	
+84103492	10105	10420117																																Unlocks after clearing Main Story (Normal) 43-17	
+84103493	10105	10420118																																Unlocks after clearing Main Story (Normal) 43-18	
+84103494	10105	10420119																																Unlocks after clearing Main Story (Normal) 43-19	
+84103495	10105	10420120																																Unlocks after clearing Main Story (Normal) 43-20	
+84103496	10105	10420121																																Unlocks after clearing Main Story (Normal) 43-21	
+84103497	10105	10420122																																Unlocks after clearing Main Story (Normal) 43-22	
+84103498	10105	10420123																																Unlocks after clearing Main Story (Normal) 43-23	
+84103499	10105	10420124																																Unlocks after clearing Main Hidden Story 43-24	
+84103500	10105	10420125																																Unlocks after clearing Main Hidden Story 43-25	
+84103501	10105	10420126																																Unlocks after clearing Main Hidden Story 43-26	
+84103502	10105	10420127																																Unlocks after clearing Main Hidden Story 43-27	
+84103503	10105	10420128																																Unlocks after clearing Main Hidden Story 43-28	
+84103504	10105	10420129																																Unlocks after clearing Main Hidden Story 43-29	
 84200101	10105	11010101																																Unlocks after clearing Main Hidden Story 1-1	
 84200102	10105	11010102																																Unlocks after clearing Main Hidden Story 1-2	
 84200106	10105	11010106																																Unlocks after clearing Main Hidden Story 1-6	
@@ -5129,6 +5190,10 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 84330033	11104	6005705																																Unlocks from owning the coating "Drift Into Summer"	
 84330034	11104	6005306																																Unlocks from owning the Coating "Sunlit Tides"	
 84330035	11104	6006304																																Unlocks from owning the Coating "Blazing Rhythm"	
+84330036	10101	200																																Automatically unlocks after the event [Circuit Calculus]	
+84330037	11104	6004906																																Own Coating "Ember Ceremony" to unlock	
+84330038	11104	6005905																																Own Coating "Fading Reverie" to unlock	
+84330039	11104	6006504																																Own Coating "Calamity's End" to unlock	
 84400101	10105	30070101																																Unlocks after clearing Memory Rescue "Kuriko"	
 84400102	10105	30070102																																Unlocks after clearing Memory Rescue "Einsteina"	
 84400103	10105	30070103																																Unlocks after clearing Memory Rescue "Becky"	
@@ -5508,6 +5573,14 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 84600637	10105	15010313																																Unlocked after clearing Collab Event [Lamento di Phantasma] Stage - Devil May Cry	
 84600638	10105	15010314																																Unlocked after clearing Collab Event [Lamento di Phantasma] Stage - Destiny	
 84600639	10105	15010315																																Unlocked after clearing Collab Event [Lamento di Phantasma] Stage - Strawberry Sundae	
+84600640	10105	15010701																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Where the Dream Starts	
+84600641	10105	15010702																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Daydream Streets	
+84600642	10105	15010703																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Happiness or Embers	
+84600643	10105	15010704																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Fleeting Fireworks	
+84600644	10105	15010705																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - To Be Myself	
+84600645	10105	15010706																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Android and Electric Sheep	
+84600646	10105	15010707																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - Shatter the Nightmare	
+84600647	10105	15010708																																Unlocked after clearing Collab Event [Dream of Stagnant Cycle] Stage - To the World You Love	
 84600701	10105	30130901																																Unlocked after clearing Event "Sea of Stars" Stage - Special Comms	
 84600702	10105	30130902																																Unlocked after clearing Event "Sea of Stars" Stage - Oasis Flower	
 84600703	10105	30130903																																Unlocked after clearing Event "Sea of Stars" Stage - Best Partners	
@@ -6299,6 +6372,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 84602902	10105	30130495																																Unlocks after clearing [Tidal Wishes - Splash Calibration]	
 84602903	10105	30130496																																Unlocks after clearing [Tidal Wishes - Lingering Ripples]	
 84602904	10105	13021407																																Unlocks after clearing [Breakers Resurfaced - Submerged]	
+84602905	10105	13021507																																Unlocks after clearing [A Kindler's Watch - The Landfall]	
 84700101	15104	1																																Help other to clear Joint Warfare once	
 84700102	15104	10																																Help other to clear Joint Warfare 10 times	
 84700103	15104	50																																Help other to clear Joint Warfare 50 times	
@@ -6447,6 +6521,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 12660001	11113	12660001																																Coating owned	
 12570003	11113	12570003																																Coating owned	
 12670001	11113	12670001																																Coating owned	
+12690001	11113	12690001																																Coating owned	
 84700201	10101	52																																Unlocked when Commandant reaches Lv.52	
 84700202	10193	1																																Commandant's gender is set to Male	
 84700203	10193	2																																Commandant's gender is set to Female	
@@ -6895,6 +6970,12 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1000119	10136	16410000	0	10																														Have any Patrick reach Lv.10 (no Overclock)	
 1000120	10137	16410000	4																															Have any Patrick reach SS-Rank	
 1000121	10138	16410000	10																															Total skill level of any Patrick reaches Lv.10	
+1000122	10136	16420000	0	10																														Have any Zafkiel reach Lv.10 (no Overclock)	
+1000123	10137	16420000	4																															Have any Zafkiel reach SS-Rank	
+1000124	10138	16420000	10																															Total skill level of any Zafkiel reaches Lv.10	
+1000125	10136	16430000	0	10																														Have any Kelpie reach Lv.10 (no Overclock)	
+1000126	10137	16430000	4																															Have any Kelpie reach SS-Rank	
+1000127	10138	16430000	10																															Total skill level of any Kelpie reaches Lv.10	
 1001001	10142	16010000																																Unlock Yuan Ye	
 1001002	10142	16020000																																Unlock Noctua	
 1001003	10142	16030000																																Unlock Toniris	
@@ -6934,6 +7015,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1001037	10142	16390000																																Unlock Allos	
 1001038	10142	16400000																																Unlock Grand Duke	
 1001039	10142	16410000																																Unlock Patrick	
+1001040	10142	16390000																																test_Unlock Kurumi's CUB	
+1001041	10142	16430000																																Unlock Kelpie	
 1002001	10142	16010000																																Combine CUB "Yuan Ye" to unlock	
 1002002	10142	16020000																																Combine CUB "Noctua" to unlock	
 1002003	10142	16030000																																Combine CUB "Toniris" to unlock	
@@ -6974,7 +7057,9 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1002147	10142	16380000																																Combine CUB "Ignis" to unlock	
 1002148	10142	16390000																																Combine CUB "Allos" to unlock	
 1002149	10142	16400000																																Combine CUB "Grand Duke" to unlock	
+1002150	10142	16420000																																Combine CUB "Zafkiel" to unlock	
 1002151	10142	16410000																																Combine CUB "Patrick" to unlock	
+1002152	10142	16430000																																Combine CUB "Kelpie" to unlock	
 94031	10131	101																																Clear NA-01 in Norman Revival Plan	
 94032	10135	104																																Have never cleared NA-01 in Norman Revival Plan	
 94033	10131	104																																Clear SP-01 in Norman Revival Plan	
@@ -7688,6 +7773,34 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1006945	10210	30165430	6000																															Clear Stage 14 to unlock	
 1006946	10210	30165444	6000																															Clear Stage 14 to unlock	
 1006947	10210	30165458	6000																															Clear Stage 14 to unlock	
+1006948	10210	30165465	6000																															Clear Stage 1 to unlock	
+1006949	10210	30165466	6000																															Clear Stage 2 to unlock	
+1006950	10210	30165467	6000																															Clear Stage 3 to unlock	
+1006951	10210	30165468	6000																															Clear Stage 4 to unlock	
+1006952	10210	30165469	6000																															Clear Stage 5 to unlock	
+1006953	10210	30165470	6000																															Clear Stage 6 to unlock	
+1006954	10210	30165471	6000																															Clear Stage 7 to unlock	
+1006955	10210	30165472	6000																															Clear Stage 8 to unlock	
+1006956	10210	30165473	6000																															Clear Stage 9 to unlock	
+1006957	10210	30165474	6000																															Clear Stage 10 to unlock	
+1006958	10210	30165475	6000																															Clear Stage 11 to unlock	
+1006959	10210	30165476	6000																															Clear Stage 12 to unlock	
+1006960	10210	30165477	120																															Clear Stage 13 within 120s to unlock	
+1006961	10210	30165478	6000																															Clear Stage 14 to unlock	
+1006962	10210	30165480	6000																															Clear Stage 1 to unlock	
+1006963	10210	30165481	6000																															Clear Stage 2 to unlock	
+1006964	10210	30165482	6000																															Clear Stage 3 to unlock	
+1006965	10210	30165483	6000																															Clear Stage 4 to unlock	
+1006966	10210	30165484	6000																															Clear Stage 5 to unlock	
+1006967	10210	30165485	6000																															Clear Stage 6 to unlock	
+1006968	10210	30165486	6000																															Clear Stage 7 to unlock	
+1006969	10210	30165487	6000																															Clear Stage 8 to unlock	
+1006970	10210	30165488	6000																															Clear Stage 9 to unlock	
+1006971	10210	30165489	6000																															Clear Stage 10 to unlock	
+1006972	10210	30165490	6000																															Clear Stage 11 to unlock	
+1006973	10210	30165491	6000																															Clear Stage 12 to unlock	
+1006974	10210	30165492	120																															Clear Stage 13 within 120s to unlock	
+1006975	10210	30165493	6000																															Clear Stage 14 to unlock	
 1007001	10105	10010003																																	
 1007002	10105	10010304																																Clear prerequisite Main Story [Normal Story 1-12] to unlock	
 1007003	10105	10020304																																	
@@ -7841,6 +7954,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1007152	10105	10400128																																通关前置主线关卡【普通剧情41-28】	
 1007153	10105	15021820																																Clear prerequisite Floating Record [Normal Story ER16-20]	
 1007154	10105	10410126																																Clear prerequisite Main Story [Normal Story 42-26]	
+1007155	10105	10410132																																Clear prerequisite Main Story [Hidden Story 42-32]	
 1007200	10105	10380101																																Clear Main Stage 39-1	
 1007201	10105	10380102																																Clear Main Stage 39-2	
 1007202	10105	10380103																																Clear Main Stage 39-3	
@@ -7910,6 +8024,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1007266	10105	15021820																																Clear Stage ER16-20	
 1007267	10105	10410115																																Clear prerequisite Main Story [Normal Story 42-15]	
 1007268	10105	10410126																																Clear prerequisite Main Story [Normal Story 42-26]	
+1007269	10105	10420123																																Clear prerequisite Main Story [Normal Story 43-23]	
+1007270	0																																	通关前置主线关卡	1007266&1007269
 1008102	20114	1002																																Download story video resources pack	
 1008103	20114	1003																																Download story video resources pack	
 1008104	20114	1004																																Download story video resources pack	
@@ -7969,6 +8085,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1008158	20114	1058																																Download story video resources pack	
 1008159	20114	1059																																Download story video resources pack	
 1008160	20114	1060																																Download story video resources pack	
+1008161	20114	1061																																Download story video resources pack	
+1008215	20114	2015																																下载玩法视频资源包	
 890002	22002	1	2																																
 890003	16100	2																																Unlocked at Guild Lv.2	
 890004	22004	16																																	
@@ -8653,7 +8771,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 862713	10170	1	1																															Nanami The Mythic Paradise: 1-1 Completed	
 862714	10187	1	63201																															Nanami The Mythic Paradise: Guide 63201 Completed	
 862715	10170	1	4																															Nanami The Mythic Paradise: 1-4 Completed	
-862716	10256	1																																Nanami 2048 at Stage 1	
+862716	10256	1																																Nanami 2048 at Stage 1 	
 862717	10256	2																																Nanami 2048 at Stage 2	
 862718	10256	4																																Nanami 2048 at Stage 4	
 862719	10256	6																																Nanami 2048 at Stage 6	
@@ -9246,14 +9364,14 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1021004																																		[Unlocks after clearing Difficulty 1 with Alpha]	1021021|1021022|1021023|1021024|1021026|1021028
 1021005																																		[Unlocks after clearing Difficulty 3 with Alpha]	1021023|1021024|1021026|1021028
 1021001	23201	2	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021006	23201	3	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021007	23201	4	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021008	23201	5	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021009	23201	6	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021010	23201	7	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021011	23201	8	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021012	23201	9	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021013	23201	10	1																															[Advance "Shrouded Requiem" storyline to unlock]	
+1021006	23201	3	1																															Advance "Shrouded Requiem - Alpha" storyline to unlock	
+1021007	23201	4	1																															Advance "Shrouded Requiem - Alpha" storyline to unlock	
+1021008	23201	5	1																															Advance "Shrouded Requiem - Alpha" storyline to unlock	
+1021009	23201	6	1																															Advance "Shrouded Requiem - Alpha" storyline to unlock	
+1021010	23201	7	1																															Advance "Shrouded Requiem - Veronica" storyline to unlock	
+1021011	23201	8	1																															Advance "Shrouded Requiem - Veronica" storyline to unlock	
+1021012	23201	9	1																															Advance "Shrouded Requiem - Veronica" storyline to unlock	
+1021013	23201	10	1																															Advance "Shrouded Requiem - Veronica" storyline to unlock	
 1021014	23202	1	1																															[Unlocks after clearing Difficulty 1 with any character]	
 1021015	23202	2	1																															[Unlocks after clearing Difficulty 2 with any character]	
 1021016	23202	3	1																															[Unlocks after clearing Difficulty 3 with any character]	
@@ -9276,16 +9394,27 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1021033	23201	112	1																																
 1021034	23201	113	1																																
 1021035	23201	114	1																																
-1021036	23201	11	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021037	23201	12	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021038	23201	13	1																															[Advance "Shrouded Requiem" storyline to unlock]	
-1021039	23201	14	1																															[Advance "Shrouded Requiem" storyline to unlock]	
+1021036	23201	11	1																															Advance "Shrouded Requiem - Kamui" storyline to unlock	
+1021037	23201	12	1																															Advance "Shrouded Requiem - Kamui" storyline to unlock	
+1021038	23201	13	1																															Advance "Shrouded Requiem - Kamui" storyline to unlock	
+1021039	23201	14	1																															Advance "Shrouded Requiem - Kamui" storyline to unlock	
+1021040	23201	115	1																																
+1021041	23201	116	1																																
+1021042	23201	117	1																																
+1021043	23201	118	1																																
+1021044	23201	119	1																																
+1021045	0																																	[Unlocks after clearing Difficulty 1 or higher with Nirvatia]	1021040|1021041|1021042|1021043|1021044
+1021046	0																																	[Unlocks after clearing Difficulty 3 or higher with Nirvatia]	1021042|1021043|1021044
 1021100																																		[Unlocked after owning at least 2 archives]	1021001&1021104
-1021101																																		[Unlocks after clearing Difficulty 4 with any character and reaching [Mist Walker] in Phantom Clash]	1021102&(1021103|1021105)
+1021101																																		[Unlocks after clearing Difficulty 4 with any character]	1021102&(1021103|1021105)
 1021102	23202	4	1																																
 1021103	23212	1	3																																
 1021104	23203	2																																[Unlocked after owning at least 2 archives]	
 1021105	23001	37																																	
+1021106	23201	15	1																															Advance "Shrouded Requiem - Nirvatia" storyline to unlock	
+1021107	23201	16	1																															Advance "Shrouded Requiem - Nirvatia" storyline to unlock	
+1021108	23201	17	1																															Advance "Shrouded Requiem - Nirvatia" storyline to unlock	
+1021109	23201	18	1																															Advance "Shrouded Requiem - Nirvatia" storyline to unlock	
 1030001	17227	30110301	0																															Clear Regular Challenge I	
 1030002	17227	30110303	0																															Regular Challenge III	
 1030003	17227	30110305	0																															Regular Challenge V	
@@ -9618,6 +9747,7 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1050360	20114	3000																																	
 1050361	20114	3001																																	
 1050362	20114	3002																																	
+1050363	10105	30163484																																Benchmark Test - 3 Not Cleared	
 1050286																																		Roguelike 5 Accessory - 40004 - Rounds<=3 & Win Streak>=1	1050254&1050255
 1050287																																		Roguelike 5 Accessory - 40004 - Rounds>=4 & Win Streak>=1	1050256&1050255
 1050288																																		Roguelike 5 Accessory - 40008 - Wins>=3 & Wins<=5	1050258&1050259
@@ -9708,7 +9838,13 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 1050377	11105	6001607																																Grandiose Glamor Not Owned	
 1050378	11105	6002306																																Neon Dynamite Not Owned	
 1050379	11105	6004606																																Nightfall Finale Not Owned	
-1050380																																		上面五个串起来	100001&774800&(1050374|1050376|1050377|1050378|1050379)
+1050380																																		Link the five above	100001&774800&(1050374|1050376|1050377|1050378|1050379)
+1050381	11105	6005305																																Night Sonata not owned	
+1050382	11105	6004805																																Threads of Destiny not owned	
+1050383	11105	6004305																																Love's Dawn not owned	
+1050384	11105	6002907																																Tsubaki not owned	
+1050385	10334	4	5																															4.8未选择自选卡池	
+1050386	0																																	Link the five above	100001&774800&(1050381|1050382|1050383|1050384|1050385)
 1060001	10159	1	1968	1	2	2																												买了6元礼包，过了2秒	
 1060002	10159	1	10004	1	2	2																												买了12元礼包，过了2秒	
 1060003	10159	1	10004	0	1																													没买12元礼包	
@@ -9893,6 +10029,20 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 863181	10108	10410116																																引导-4.7海外主线断章提醒用-未通关42-16	
 863182	10187	0	64932																															引导-4.7海外主线断章提醒用-未完成引导64932	
 863183	10187	0	64931																															引导-4.7海外主线断章提醒用-未完成引导64931	
+863184	23303	2	2	100101																														引导-大巴扎节点1-2	
+863185	23303	3	3	100101																														引导-大巴扎节点1-3	
+863186	23303	4	4	100101																														引导-大巴扎节点1-4	
+863187	23303	6	6	100101																														引导-大巴扎节点1-6	
+863188	23303	2	2	100102																														引导-大巴扎节点2-2	
+863189	23303	15	15	100104																														引导-大巴扎节点4-15	
+863190	23401	4																																引导-超限启航-关卡页面在峰值演算	
+863191	23401	2	3	4																														引导-超限启航-关卡页面在α或β或峰值演算	
+863192	17417	5011																																引导-忽忽破坏王5011战斗界面	
+863193	17435	5012																																引导-忽忽破坏王5012详情界面	
+863194	17417	5012																																引导-忽忽破坏王5012战斗界面	
+863195	17435	5013																																引导-忽忽破坏王5013详情界面	
+863196	17435	5021																																引导-忽忽破坏王5021详情界面	
+863197	17417	5023																																引导-忽忽破坏王5023战斗界面	
 863200	10101	30																																Reach Commandant Level 30	
 863201	10164	99037																																Nirvatia Affection limited-time mission incomplete	
 863202																																		指挥官等级到达30级且未完成涅缇娅好感限时任务99037	863200&863201
@@ -9947,6 +10097,10 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 863259																																		Placeholder_指挥官等级到达30级且未完成海伦汀好感限时任务99044	863200&863258
 863260	23001	48135																																Placeholder_在4.6海伦汀好感剧情限时任务时间内	
 863261																																		Placeholder_指挥官等级到达30级且未完成海伦汀好感限时任务99044且在活动时间内	863200&863258&863260
+863262	10164	99051																																Placeholder_未完成阿德莱德好感限时任务	
+863263	0																																	Placeholder_指挥官等级到达30级且未完成阿德莱德好感限时任务99051	863200&863262
+863264	23001	50920																																Placeholder_在4.8阿德莱德好感剧情限时任务时间内	
+863265	0																																	Placeholder_指挥官等级到达30级且未完成阿德莱德好感限时任务99051且在活动时间内	863200&863262&863264
 864000	23002	0	9006	1																														Win a battle on Nightmare difficulty to unlock	
 864001	23002	0	9011	1																														Win a battle on Nightmare difficulty to unlock	
 864002																																		Win a battle on Nightmare difficulty to unlock	864000|864001
@@ -10082,15 +10236,8 @@ Id	Type	Params[1]	Params[2]	Params[3]	Params[4]	Params[5]	Params[6]	Params[7]	Pa
 866601	23202	2	1																															Clear [Difficulty 2] to unlock	
 866602	23202	3	1																															Clear [Difficulty 3] to unlock	
 866603	23202	4	1																															Clear [Difficulty 4] to unlock	
-990379	15103	13019730	2																															Obtain 2	
-990380	15103	13019730	3																															Obtain 3	
-990381	15103	13019730	4																															Obtain 4	
-990385	15103	13019732	2																															Obtain 2	
-990386	15103	13019732	3																															Obtain 3	
-990387	15103	13019732	4																															Obtain 4	
-990388	15103	13019733	2																															Obtain 2	
-990389	15103	13019733	3																															Obtain 3	
-990390	15103	13019733	4																															Obtain 4	
+866610	10187	1	53403																															Complete Quick Upgrade Guide 53403	
 990418	23001	49402																																Not yet available	
 990419																																		Clear Main Story 42-15 and wait until 08/26 03:00 (UTC) to unlock.	1007267&990418
 990420																																		Clear Main Story 42-26 and wait until 08/26 03:00 (UTC) to unlock.	1007268&990418
+990421	23001	912																																Not yet available	

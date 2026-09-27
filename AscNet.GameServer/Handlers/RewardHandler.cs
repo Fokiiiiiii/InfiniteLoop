@@ -4,6 +4,7 @@ using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
 using AscNet.GameServer.Handlers.Drops;
 using AscNet.Table.V2.share.character;
+using AscNet.Table.V2.share.chat;
 using AscNet.Table.V2.share.exhibition;
 using AscNet.Table.V2.share.character.quality;
 using AscNet.Table.V2.share.item;
@@ -13,6 +14,7 @@ using AscNet.Table.V2.share.fashion;
 using AscNet.Table.V2.share.headportrait;
 using AscNet.Table.V2.share.condition;
 using AscNet.Table.V2.share.scoretitle;
+using AscNet.Table.V2.share.photomode;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
@@ -34,6 +36,8 @@ namespace AscNet.GameServer.Handlers
         public bool NotifyAsRecycle;
         public int ConvertFrom;
         internal ChatEmojiRewardOutcome? EmojiOutcome;
+        internal long? NameplateGrantTime;
+        internal long? ChatBoardGrantTime;
     }
 
     internal sealed record RewardGrant(
@@ -45,6 +49,8 @@ namespace AscNet.GameServer.Handlers
     internal sealed class RewardApplicationResult
     {
         public List<RewardGoods> RewardGoods { get; } = [];
+        // Post-resolution outcomes (duplicate characters already converted to shards).
+        internal List<Reward> ResolvedRewards { get; } = [];
         internal NotifyEquipDataList EquipData { get; } = new();
         internal FashionSyncNotify FashionData { get; } = new();
         internal NotifyCharacterDataList CharacterData { get; } = new();
@@ -53,10 +59,15 @@ namespace AscNet.GameServer.Handlers
         internal NotifyWeaponFashionInfo WeaponFashionData { get; } = new();
         internal NotifyHeadPortraitInfos HeadPortraitData { get; } = new();
         internal bool DormFurnitureChanged { get; set; }
+        internal bool ChatBoardChanged { get; set; }
         internal NotifyScoreTitleInfo ScoreTitleData { get; } = new() { IsLogined = true };
         internal bool ManualGuideChanged { get; set; }
         internal List<int> GatherRewardIds { get; } = [];
         internal List<NotifyChatLoginData.NotifyChatLoginDataUnlockEmoji> Emojis { get; } = [];
+        internal bool DrawTicketChanged { get; set; }
+        internal List<NameplateData> Nameplates { get; } = [];
+        internal List<int> BackgroundIds { get; } = [];
+        internal List<NotifyChatBoardInfo.NotifyChatBoardInfoChatBoard> ChatBoards { get; } = [];
 
 
         public void SendPushes(Session session)
@@ -93,10 +104,18 @@ namespace AscNet.GameServer.Handlers
                 session.SendPush(ScoreTitleData);
             foreach (var emoji in Emojis)
                 session.SendPush(new NotifyChatEmoji { Emoji = emoji });
+            foreach (NameplateData nameplate in Nameplates)
+                session.SendPush(new NotifyNameplateInfo { Nameplate = nameplate });
+            foreach (int backgroundId in BackgroundIds)
+                session.SendPush(new NotifyAddBackground { BackgroundId = backgroundId });
+            foreach (var chatBoard in ChatBoards)
+                session.SendPush(new NotifyChatBoardInfo { ChatBoard = chatBoard });
             if (manualChanged || ItemData.ItemDataList.Any(item => item.Id == Inventory.TeamExp))
                 session.SendPush(WheelchairManualModule.BuildPayload(session, DateTimeOffset.UtcNow));
             else if (ManualGuideChanged)
                 Game.WheelchairManualGuideManager.SendUpdate(session);
+            if (DrawTicketChanged)
+                session.SendPush(Game.DrawTicketManager.BuildNotify(session.player));
         }
 
         internal void AddPushes(RewardApplicationResult source)
@@ -127,6 +146,16 @@ namespace AscNet.GameServer.Handlers
                 if (!GatherRewardIds.Contains(id))
                     GatherRewardIds.Add(id);
             }
+            foreach (int id in source.BackgroundIds)
+            {
+                if (!BackgroundIds.Contains(id))
+                    BackgroundIds.Add(id);
+            }
+            foreach (var chatBoard in source.ChatBoards)
+            {
+                if (ChatBoards.All(entry => entry.Id != chatBoard.Id))
+                    ChatBoards.Add(chatBoard);
+            }
             foreach (HeadPortraitList head in source.HeadPortraitData.Heads)
             {
                 if (!HeadPortraitData.Heads.Any(existing => existing.Id == head.Id))
@@ -137,8 +166,13 @@ namespace AscNet.GameServer.Handlers
                 if (ScoreTitleData.Titles.All(existing => existing.Id != title.Id))
                     ScoreTitleData.Titles.Add(title);
             }
+            DrawTicketChanged |= source.DrawTicketChanged;
             DormFurnitureChanged |= source.DormFurnitureChanged;
+            ChatBoardChanged |= source.ChatBoardChanged;
             Emojis.AddRange(source.Emojis);
+            foreach (NameplateData nameplate in source.Nameplates)
+                if (Nameplates.All(value => value.Id != nameplate.Id))
+                    Nameplates.Add(nameplate);
 
         }
     }
@@ -147,6 +181,8 @@ namespace AscNet.GameServer.Handlers
     {
         private static readonly Lazy<Dictionary<int, ScoreTitleTable>> ScoreTitles = new(() =>
             TableReaderV2.Parse<ScoreTitleTable>().ToDictionary(row => row.Id));
+        private static readonly Lazy<Dictionary<int, ChatBoardTable>> ChatBoards = new(() =>
+            TableReaderV2.Parse<ChatBoardTable>().ToDictionary(row => row.Id));
         private static readonly Lazy<Dictionary<int, ConditionTable>> ScoreTitleConditions = new(() =>
             TableReaderV2.Parse<ConditionTable>().Where(row => row.Type == 15103).ToDictionary(row => row.Id));
         private static readonly Lazy<IReadOnlyDictionary<int, IReadOnlyList<RewardGoodsTable>>> RewardGoodsByRewardId = new(() =>
@@ -251,11 +287,30 @@ namespace AscNet.GameServer.Handlers
                 })
                 .ToList();
             List<int> originalGatherRewards = session.player.GatherRewards.ToList();
+            List<int>? originalBackgrounds = session.player.OwnedBackgroundIds?.ToList();
             List<WheelchairManualGuideRewardReceipt> originalGuideReceipts = session.player.WheelchairManualGuideRewardReceipts;
             PlayerDormState? originalDorm = grants.SelectMany(grant => grant.Goods)
                 .Any(goods => GetRewardType(goods) == RewardType.Furniture)
                 ? BsonSerializer.Deserialize<PlayerDormState>(session.player.Dorm.ToBson())
                 : null;
+            PlayerDrawState? originalDrawState = grants.SelectMany(grant => grant.Goods)
+                .Any(goods => GetRewardType(goods) == RewardType.DrawTicket)
+                ? BsonSerializer.Deserialize<PlayerDrawState>((session.player.DrawState ?? new PlayerDrawState()).ToBson())
+                : null;
+            List<ChatBoardUnlockState>? originalChatBoards = grants.SelectMany(grant => grant.Goods)
+                .Any(goods => GetRewardType(goods) == RewardType.ChatBoard)
+                ? session.player.UnlockedChatBoards
+                    .Select(board => new ChatBoardUnlockState
+                    {
+                        Id = board.Id,
+                        GetTime = board.GetTime,
+                        EndTime = board.EndTime
+                    })
+                    .ToList()
+                : null;
+            List<string>? originalChatBoardClaims = originalChatBoards is null
+                ? null
+                : (session.player.ChatBoardRewardClaims ?? []).ToList();
 
             Inventory stagedInventory =
                 BsonSerializer.Deserialize<Inventory>(originalInventory.ToBson());
@@ -272,6 +327,7 @@ namespace AscNet.GameServer.Handlers
             bool inventoryPersisted = false;
             bool characterPersisted = false;
             bool playerPersisted = false;
+            bool playerDirty = false;
             try
             {
                 // Completed plans are no longer needed; retain every partially saved outcome.
@@ -317,6 +373,26 @@ namespace AscNet.GameServer.Handlers
                     if (prepared.Count != grant.Goods.Count)
                         throw new InvalidDataException(
                             $"Reward claim {grant.ClaimKey} contains an unsupported reward type.");
+                    foreach (Reward nameplate in prepared.Where(reward => reward.Type == RewardType.Nameplate))
+                    {
+                        if (!stagedInventory.RewardClaimTimes.TryGetValue(grant.ClaimKey, out long grantTime))
+                        {
+                            grantTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                            stagedInventory.RewardClaimTimes.Add(grant.ClaimKey, grantTime);
+                            inventoryDirty = true;
+                        }
+                        nameplate.NameplateGrantTime = grantTime;
+                    }
+                    foreach (Reward chatBoard in prepared.Where(reward => reward.Type == RewardType.ChatBoard))
+                    {
+                        if (!stagedInventory.RewardClaimTimes.TryGetValue(grant.ClaimKey, out long grantTime))
+                        {
+                            grantTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                            stagedInventory.RewardClaimTimes.Add(grant.ClaimKey, grantTime);
+                            inventoryDirty = true;
+                        }
+                        chatBoard.ChatBoardGrantTime = grantTime;
+                    }
                     List<Reward> emojiRewards = prepared.Where(reward => reward.Type == RewardType.ChatEmoji).ToList();
                     if (emojiRewards.Count > 0 && (!inventoryClaimed || !characterClaimed))
                     {
@@ -348,21 +424,57 @@ namespace AscNet.GameServer.Handlers
                     }
                     List<Reward> resolved = ResolveRewards(prepared.Where(reward =>
                         reward.Type != RewardType.ChatEmoji || !inventoryClaimed || !characterClaimed), session);
+                    result.ResolvedRewards.AddRange(resolved);
                     foreach (Reward reward in resolved.Where(reward =>
                                  (inventoryClaimed && IsInventoryDocumentReward(reward))
                                  || (characterClaimed && IsCharacterDocumentReward(reward))))
                     {
                         AddCurrentStatePush(reward, session, grantResult);
                     }
+                    bool ticketNotClaimed = resolved.Any(reward => reward.Type == RewardType.DrawTicket)
+                        && !(session.player.DrawState?.FreeTicketRewardClaims?.Contains(grant.ClaimKey) == true);
+                    // Chat board ownership lives on Player; the claim receipt lands atomically with that save.
+                    bool chatBoardNotClaimed = resolved.Any(reward => reward.Type == RewardType.ChatBoard)
+                        && session.player.ChatBoardRewardClaims?.Contains(grant.ClaimKey) != true;
+                    if (!chatBoardNotClaimed)
+                    {
+                        // Claimed retry: replay committed ownership so a lost response cannot leave the client stale.
+                        foreach (Reward reward in resolved.Where(reward => reward.Type == RewardType.ChatBoard))
+                            AddCurrentStatePush(reward, session, grantResult);
+                    }
+                    // Older Nameplate claims recorded receipts while their grant branch was a no-op.
+                    bool missingNameplates = resolved.Any(reward => reward.Type == RewardType.Nameplate
+                        && !stagedCharacter.Nameplates.Any(value =>
+                            Character.GetNameplateConfig(value.Id)?.Group == Character.GetNameplateConfig(reward.Id)?.Group));
+                    characterDirty |= missingNameplates;
                     ApplyResolvedRewards(
                         resolved.Where(reward =>
                             (!inventoryClaimed && IsInventoryDocumentReward(reward))
                             || (!characterClaimed && IsCharacterDocumentReward(reward))
+                            || (missingNameplates && reward.Type == RewardType.Nameplate
+                                && !stagedCharacter.Nameplates.Any(value =>
+                                    Character.GetNameplateConfig(value.Id)?.Group == Character.GetNameplateConfig(reward.Id)?.Group))
                             // A character receipt cannot prove the later player-owned entitlement save succeeded.
                             || (reward.Type == RewardType.HeadPortrait
-                                && !session.player.HeadPortraits.Any(head => head.Id == reward.Id))),
+                                && !session.player.HeadPortraits.Any(head => head.Id == reward.Id))
+                            // Background ownership lives on Player; re-grant until that save is proven.
+                            || (reward.Type == RewardType.Background
+                                && session.player.OwnedBackgroundIds?.Contains(reward.Id) != true)
+                            // Chat board ownership lives on Player; re-grant until that claim save is proven.
+                            || (chatBoardNotClaimed && reward.Type == RewardType.ChatBoard)
+                            || (ticketNotClaimed && reward.Type == RewardType.DrawTicket)),
                         session,
                         grantResult);
+                    if (ticketNotClaimed)
+                    {
+                        (session.player.DrawState ??= new PlayerDrawState()).FreeTicketRewardClaims.Add(grant.ClaimKey);
+                        grantResult.DrawTicketChanged = true;
+                    }
+                    if (chatBoardNotClaimed)
+                    {
+                        (session.player.ChatBoardRewardClaims ??= []).Add(grant.ClaimKey);
+                        grantResult.ChatBoardChanged = true;
+                    }
                     result.AddPushes(grantResult);
 
                     if (!inventoryClaimed)
@@ -395,10 +507,14 @@ namespace AscNet.GameServer.Handlers
                     stagedCharacter.SaveChecked();
                     characterPersisted = true;
                 }
-                if (result.DormFurnitureChanged
+                playerDirty = result.DormFurnitureChanged
+                    || result.ChatBoardChanged
                     || result.GatherRewardIds.Count > 0
+                    || result.DrawTicketChanged
                     || session.player.HeadPortraits.Count != originalHeadPortraits.Count
-                    || !ReferenceEquals(session.player.WheelchairManualGuideRewardReceipts, originalGuideReceipts))
+                    || (session.player.OwnedBackgroundIds?.Count ?? 0) != (originalBackgrounds?.Count ?? 0)
+                    || !ReferenceEquals(session.player.WheelchairManualGuideRewardReceipts, originalGuideReceipts);
+                if (playerDirty)
                 {
                     session.player.SaveChecked();
                     playerPersisted = true;
@@ -419,8 +535,42 @@ namespace AscNet.GameServer.Handlers
                     CopyCharacter(originalCharacter, stagedCharacter);
                 if (!playerPersisted)
                 {
+                    // Chat board ownership lives on Player, so a failed Player write is uncertain: the
+                    // replacement may have landed before the exception. The durable document settles
+                    // which happened, so a later Player save can neither drop a landed grant nor replay
+                    // one that never landed.
+                    Player? committed = originalChatBoards is not null && playerDirty
+                        ? Player.TryFromPlayerId(session.player.PlayerData.Id)
+                        : null;
                     session.player.HeadPortraits = originalHeadPortraits;
+                    session.player.OwnedBackgroundIds = originalBackgrounds ?? [];
+                    if (originalChatBoards is not null)
+                    {
+                        if (committed is not null)
+                        {
+                            session.player.UnlockedChatBoards = committed.UnlockedChatBoards ?? [];
+                            session.player.ChatBoardRewardClaims = committed.ChatBoardRewardClaims ?? [];
+                        }
+                        else if (playerDirty)
+                        {
+                            // A failed read and a missing document are the same answer here: unresolved, so
+                            // the in-memory player may disagree with the durable one. Close the transport
+                            // without persisting it. The attempted ownership stays because it is a pure
+                            // function of the durable inventory claim clock, so even a session that cannot
+                            // be closed converges on its next write instead of losing a landed grant.
+                            session.log.Warn(
+                                $"Chat board ownership for player {session.player.PlayerData.Id} could not be reconciled after a failed save; closing the session without persisting it.");
+                            session.DisconnectProtocol(persistState: false);
+                        }
+                        else
+                        {
+                            session.player.UnlockedChatBoards = originalChatBoards;
+                            session.player.ChatBoardRewardClaims = originalChatBoardClaims ?? [];
+                        }
+                    }
                     session.player.GatherRewards = originalGatherRewards;
+                    if (originalDrawState is not null)
+                        session.player.DrawState = originalDrawState;
                     session.player.WheelchairManualGuideRewardReceipts = originalGuideReceipts;
                     if (originalDorm is not null)
                         session.player.Dorm = originalDorm;
@@ -472,12 +622,14 @@ namespace AscNet.GameServer.Handlers
         private static bool IsCharacterDocumentReward(Reward reward) =>
             reward.Type is RewardType.Character
                 or RewardType.Equip
+                or RewardType.Partner
                 or RewardType.Fashion
                 or RewardType.WeaponFashion
                 or RewardType.FashionColor
                 or RewardType.Furniture
                 or RewardType.HeadPortrait
                 or RewardType.ChatEmoji
+                or RewardType.Nameplate
                 or RewardType.Collection;
 
         private static List<ChatEmojiRewardOutcome> PlanChatEmojiRewards(
@@ -545,6 +697,12 @@ namespace AscNet.GameServer.Handlers
                 case RewardType.ChatEmoji:
                     AddChatEmojiPush(reward.Id, session.character, result);
                     break;
+                case RewardType.Nameplate:
+                    NameplateData? nameplate = session.character.Nameplates.FirstOrDefault(value =>
+                        Character.GetNameplateConfig(value.Id)?.Group == Character.GetNameplateConfig(reward.Id)?.Group);
+                    if (nameplate is not null && result.Nameplates.All(value => value.Id != nameplate.Id))
+                        result.Nameplates.Add(nameplate);
+                    break;
                 case RewardType.Item:
                     Item? item = session.inventory.Items.FirstOrDefault(entry => entry.Id == reward.Id);
                     if (item is not null
@@ -578,6 +736,16 @@ namespace AscNet.GameServer.Handlers
                             result.EquipData.EquipDataList.Add(equip);
                     }
                     break;
+                case RewardType.Partner:
+                    foreach (PartnerData partner in session.character.Partners.Where(entry => entry.TemplateId == reward.Id))
+                    {
+                        if (result.PartnerData.PartnerDataList.All(entry => entry.Id != partner.Id))
+                        {
+                            result.PartnerData.PartnerDataList.Add(partner);
+                            result.PartnerData.OperateTypes.Add(1);
+                        }
+                    }
+                    break;
                 case RewardType.Fashion:
                     FashionList? fashion = session.character.Fashions
                         .FirstOrDefault(entry => entry.Id == reward.Id);
@@ -601,6 +769,19 @@ namespace AscNet.GameServer.Handlers
                         && result.WeaponFashionData.WeaponFashionDataList.All(
                             entry => entry.Id != weaponFashion.Id))
                         result.WeaponFashionData.WeaponFashionDataList.Add(weaponFashion);
+                    break;
+                case RewardType.ChatBoard:
+                    ChatBoardUnlockState? chatBoard = (session.player.UnlockedChatBoards ?? [])
+                        .FirstOrDefault(unlock => unlock.Id == reward.Id);
+                    if (chatBoard is not null && result.ChatBoards.All(entry => entry.Id != chatBoard.Id))
+                    {
+                        result.ChatBoards.Add(new NotifyChatBoardInfo.NotifyChatBoardInfoChatBoard
+                        {
+                            Id = chatBoard.Id,
+                            GetTime = chatBoard.GetTime,
+                            EndTime = chatBoard.EndTime
+                        });
+                    }
                     break;
                 case RewardType.Collection:
                     NotifyScoreTitleData.NotifyScoreTitleDataTitleInfo? title = session.character.ScoreTitles
@@ -649,6 +830,8 @@ namespace AscNet.GameServer.Handlers
             target.FashionColors = source.FashionColors;
             target.ScoreTitles = source.ScoreTitles;
             target.ChatEmojis = source.ChatEmojis;
+            target.Nameplates = source.Nameplates;
+            target.CurrentWearNameplate = source.CurrentWearNameplate;
         }
 
         private static void ApplyRewards(
@@ -865,6 +1048,47 @@ namespace AscNet.GameServer.Handlers
             return changed;
         }
 
+        // Shared chat-board grant: create a fresh unlock or extend a live timed one from the grant clock.
+        public static bool UnlockChatBoardReward(
+            int chatBoardId,
+            Player player,
+            long grantedAt,
+            List<NotifyChatBoardInfo.NotifyChatBoardInfoChatBoard>? chatBoards = null)
+        {
+            if (!ChatBoards.Value.TryGetValue(chatBoardId, out ChatBoardTable? chatBoard))
+                throw new InvalidDataException($"Invalid chat board reward {chatBoardId}.");
+
+            player.UnlockedChatBoards ??= [];
+            ChatBoardUnlockState? existing = player.UnlockedChatBoards.Find(unlock => unlock.Id == chatBoardId);
+            bool changed = false;
+            if (existing is null)
+            {
+                existing = new ChatBoardUnlockState
+                {
+                    Id = chatBoardId,
+                    GetTime = grantedAt,
+                    EndTime = chatBoard.Duration > 0 ? checked(grantedAt + chatBoard.Duration) : 0
+                };
+                player.UnlockedChatBoards.Add(existing);
+                changed = true;
+            }
+            else if (existing.EndTime != 0 && chatBoard.Duration > 0)
+            {
+                existing.EndTime = checked(Math.Max(grantedAt, existing.EndTime) + chatBoard.Duration);
+                changed = true;
+            }
+            if (chatBoards is not null && chatBoards.All(entry => entry.Id != chatBoardId))
+            {
+                chatBoards.Add(new NotifyChatBoardInfo.NotifyChatBoardInfoChatBoard
+                {
+                    Id = existing.Id,
+                    GetTime = existing.GetTime,
+                    EndTime = existing.EndTime
+                });
+            }
+            return changed;
+        }
+
         public static bool UnlockHeadPortraitReward(
             int headPortraitId,
             Session session,
@@ -1042,6 +1266,11 @@ namespace AscNet.GameServer.Handlers
                 case RewardType.WeaponFashion:
                     UnlockWeaponFashionReward(reward.Id, session, weaponFashionDataList);
                     break;
+                case RewardType.ChatBoard:
+                    if (UnlockChatBoardReward(reward.Id, session.player,
+                        reward.ChatBoardGrantTime ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds(), result.ChatBoards))
+                        result.ChatBoardChanged = true;
+                    break;
                 case RewardType.FashionColor:
                     UnlockFashionColorReward(reward.Id, session, fashionData);
                     break;
@@ -1049,6 +1278,15 @@ namespace AscNet.GameServer.Handlers
                     GrantScoreTitle(reward, session, result);
                     break;
                 case RewardType.Background:
+                    if (reward.Id <= 0 || !TableReaderV2.Parse<BackgroundTable>().Any(row => row.Id == reward.Id))
+                        throw new InvalidDataException($"Invalid background reward {reward.Id}.");
+                    session.player.OwnedBackgroundIds ??= [];
+                    if (!session.player.OwnedBackgroundIds.Contains(reward.Id))
+                    {
+                        session.player.OwnedBackgroundIds.Add(reward.Id);
+                        if (!result.BackgroundIds.Contains(reward.Id))
+                            result.BackgroundIds.Add(reward.Id);
+                    }
                     break;
                 case RewardType.Pokemon:
                     break;
@@ -1064,17 +1302,23 @@ namespace AscNet.GameServer.Handlers
                     result.PartnerData.OperateTypes.Add(1);
                     break;
                 case RewardType.Nameplate:
+                    NameplateData grantedNameplate = session.character.GrantNameplate(
+                        reward.Id, reward.Count, reward.NameplateGrantTime ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                    if (result.Nameplates.All(value => value.Id != grantedNameplate.Id))
+                        result.Nameplates.Add(grantedNameplate);
                     break;
                 case RewardType.RankScore:
                     break;
                 case RewardType.Medal:
                     break;
                 case RewardType.DrawTicket:
+                    Game.DrawTicketManager.Grant(session.player, reward.Id, reward.Count, DateTimeOffset.UtcNow);
+                    result.DrawTicketChanged = true;
                     break;
             }
         }
 
-        private static EquipData CloneEquipForNotification(EquipData equip, bool isRecycle)
+        internal static EquipData CloneEquipForNotification(EquipData equip, bool isRecycle)
         {
             return new EquipData
             {

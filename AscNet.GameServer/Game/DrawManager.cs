@@ -13,7 +13,7 @@ using AscNet.Table.V2.share.partner;
 
 namespace AscNet.GameServer.Game;
 
-internal static class DrawManager
+internal static partial class DrawManager
 {
     internal const int CatalogUnavailableCode = 1;
     private const int MinDrawItemShowQuality = 3;
@@ -4833,15 +4833,14 @@ internal static class DrawManager
     
     private readonly record struct DrawRotationWindow(int TimeId, long StartTime, long EndTime, int[] CharacterIds);
 
-    /// <summary>Generic server-owned category template for a 4.7 draw derived from DrawServerCatalog.
-    /// Currency, cost, banner, tag, type, priority and order follow the established per-category
-    /// conventions already present in this catalog (themed/fate character, target weapon, CUB target);
-    /// identity/target/window/guarantee come from the authoritative derived rows.</summary>
+    /// <summary>Derive scheduled banner identity from the client preview and the
+    /// official event window; category-specific cost and presentation follow the
+    /// corresponding existing draw conventions.</summary>
     private static DrawInfo BuildServerCatalogDraw(DrawServerCatalogTable row)
     {
         DrawInfo draw = row.Category switch
         {
-            "Themed" => new DrawInfo
+            "Themed" or "Collab" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50005,
@@ -4851,7 +4850,7 @@ internal static class DrawManager
                 IsShowBubble = false,
                 BtnDrawCount = [1, 10],
             },
-            "Fate" => new DrawInfo
+            "Fate" or "CollabFate" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50005,
@@ -4861,7 +4860,7 @@ internal static class DrawManager
                 IsShowBubble = false,
                 BtnDrawCount = [1, 10],
             },
-            "Weapon" => new DrawInfo
+            "Weapon" or "CollabWeapon" => new DrawInfo
             {
                 DrawType = 2,
                 UseItemId = 50003,
@@ -4872,7 +4871,7 @@ internal static class DrawManager
                 BtnDrawCount = [1, 10],
                 PurchaseUiType = [5, 6, 2],
             },
-            "Cub" => new DrawInfo
+            "Cub" or "Otherworld" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50009,
@@ -4884,6 +4883,17 @@ internal static class DrawManager
             },
             _ => throw new InvalidOperationException($"DrawServerCatalog has unknown category {row.Category}")
         };
+        // AscNet local policy (not recovered retail binding): collab banners display the paid
+        // ItemCombine primary; earned 50021-50023 fund it through Inventory.PlanCombinedCost.
+        if (row.Category is "Collab" or "CollabFate")
+            draw.UseItemCount = 175; // Official Kurumi ticket cost.
+        draw.UseItemId = row.Category switch
+        {
+            "Collab" or "CollabFate" => 50017,
+            "CollabWeapon" => 50018,
+            "Otherworld" => 50019,
+            _ => draw.UseItemId,
+        };
         draw.Id = row.Id;
         draw.GroupId = row.GroupId;
         draw.ResourceIds = new() { [1] = row.TargetId };
@@ -4894,26 +4904,15 @@ internal static class DrawManager
         return draw;
     }
 
-       private static DrawGroupInfo BuildServerCatalogGroup(DrawServerCatalogTable row)
+    private static DrawGroupInfo BuildServerCatalogGroup(DrawServerCatalogTable row)
     {
-        // Tab (Tag), Type, Priority and Order are authoritative DrawServerCatalog presentation fields:
-        // Tag maps to a DrawTabs entry (the featured Current Season banner is DrawTabs Id=2), while
-        // Type/Priority/Order are server-pushed display ordering. Identity/target/window/guarantee
-        // come from the same authoritative rows; the per-category currency/cost/banner convention
-        // remains inherited from the generic category templates below.
-        DrawGroupInfo group = row.Category switch
+        DrawInfo draw = BuildServerCatalogDraw(row);
+        DrawGroupInfo group = new()
         {
-            "Themed" => new DrawGroupInfo
-            {
-                UseItemId = 50005,
-                Banner = "Assets/Product/Ui/ComponentPrefab/DrawCollaboration/UiDrawCollaborationCharacterNormalV4P5.prefab",
-            },
-            "Fate" => new DrawGroupInfo
-            {
-                UseItemId = 50005,
-                Banner = "Assets/Product/Ui/ComponentPrefab/DrawCollaboration/UiDrawCollaborationCharacterFateV4P5.prefab",
-            },
-            _ => throw new InvalidOperationException($"DrawServerCatalog group {row.GroupId} category {row.Category} has no group template")
+            UseItemId = draw.UseItemId,
+            Banner = draw.Banner,
+            UiPrefab = "UiDraw",
+            UiBackGround = "Assets/Product/Ui/ComponentPrefab/DrawBackGround/DrawBackGround01.prefab"
         };
         group.Id = row.GroupId;
         group.Tag = row.Tag;
@@ -4941,10 +4940,19 @@ internal static class DrawManager
             }
             else
             {
-                // The 4.7 weapon/CUB draw joins the existing generic weapon (4) / CUB (22) group.
+                // A new season may share a group with an expired banner; retain
+                // historical draws but present the current season's tab/window.
                 if (!existing.OptionalDrawIdList.Contains(row.Id))
                     existing.OptionalDrawIdList.Add(row.Id);
                 existing.UseDrawIdDict.TryAdd(0, row.Id);
+                if (existing.EndTime != 0 && row.EndTime > existing.EndTime)
+                {
+                    existing.EndTime = row.EndTime;
+                    existing.Tag = row.Tag;
+                    existing.Type = row.Type;
+                    existing.Priority = row.Priority;
+                    existing.Order = row.Order;
+                }
             }
         }
         return groups.ToArray();
@@ -5096,10 +5104,12 @@ internal static class DrawManager
         }
     }
 
-    private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    internal static Func<DateTimeOffset> UtcNow = () => DateTimeOffset.UtcNow;
+    private static long Now() => UtcNow().ToUnixTimeSeconds();
     private static bool IsActive(DrawGroupInfo group) => (group.StartTime == 0 || group.StartTime <= Now()) && (group.EndTime == 0 || Now() < group.EndTime);
-    private static bool IsActive(DrawInfo draw) => GroupsById.TryGetValue(draw.GroupId, out DrawGroupInfo? group) && IsActive(group) && (draw.StartTime == 0 || draw.StartTime <= Now()) && (draw.EndTime == 0 || Now() < draw.EndTime);
-    private static bool HasActiveDraws(DrawGroupInfo group) => DrawsByGroup.TryGetValue(group.Id, out List<DrawInfo>? draws) && draws.Any(IsActive);
+    private static bool IsActive(DrawInfo draw) => GroupsById.TryGetValue(draw.GroupId, out DrawGroupInfo? group) && IsActive(group) && HasAvailablePityLaw(draw) && (draw.StartTime == 0 || draw.StartTime <= Now()) && (draw.EndTime == 0 || Now() < draw.EndTime);
+    private static bool HasActiveDraws(DrawGroupInfo group) =>
+        DrawsByGroup.TryGetValue(group.Id, out List<DrawInfo>? draws) && draws.Any(IsActive);
 
     public static List<DrawGroupInfo> GetDrawGroupInfos(Player player)
     {
@@ -5116,11 +5126,23 @@ internal static class DrawManager
                 value.EndTime = value.BannerEndTime;
                 value.OptionalDrawIdList = activeDraws.Select(x => x.Id).ToList();
             }
+            else if (DrawServerCatalog.Any(row => row.GroupId == group.Id && row.GroupId is not (4 or 22)))
+            {
+                value.BannerBeginTime = activeDraws.Min(x => x.StartTime);
+                value.BannerEndTime = activeDraws.Max(x => x.EndTime);
+                value.StartTime = value.BannerBeginTime;
+                value.EndTime = value.BannerEndTime;
+                value.OptionalDrawIdList = activeDraws.Select(x => x.Id).ToList();
+            }
+            else
+                value.OptionalDrawIdList = value.OptionalDrawIdList.Where(id =>
+                    DrawsById.TryGetValue(id, out DrawInfo? draw) && IsActive(draw)).ToList();
             value.UseDrawIdDict = GetSelections(player, group);
             value.SwitchDrawIdCount = player.DrawState.SwitchCountByGroup.GetValueOrDefault(group.Id);
             DrawInfo selected = GetSelected(player, group);
-            value.BottomTimes = GetPlayerBottomTimes(player, selected);
-            value.MaxBottomTimes = selected.MaxBottomTimes;
+            DrawInfo status = BuildDrawInfo(selected, player);
+            value.BottomTimes = status.BottomTimes;
+            value.MaxBottomTimes = status.MaxBottomTimes;
             return value;
         }).ToList();
     }
@@ -5129,9 +5151,10 @@ internal static class DrawManager
 
     public static (int BottomTimes, int MaxBottomTimes) GetDrawHistoryStatus(Player player, int groupId, int groupSubType)
     {
-        if (!GroupsById.TryGetValue(groupId, out DrawGroupInfo? group) || !IsActive(group)) return (0, 0);
+        if (!GroupsById.TryGetValue(groupId, out DrawGroupInfo? group) || !IsActive(group) || !HasActiveDraws(group)) return (0, 0);
         DrawInfo draw = DrawsByGroup[groupId].FirstOrDefault(x => x.GroupSubType == groupSubType) ?? GetSelected(player, group);
-        return (GetPlayerBottomTimes(player, draw), draw.MaxBottomTimes);
+        DrawInfo status = BuildDrawInfo(draw, player);
+        return (status.BottomTimes, status.MaxBottomTimes);
     }
 
     public static List<(RewardGoods RewardGoods, long DrawTime)> GetDrawHistory(Player player, int groupId, int groupSubType)
@@ -5248,20 +5271,11 @@ internal static class DrawManager
     public static List<RewardGoods> DrawDraw(Player player, int drawId, int pullOffset = 0)
     {
         if (!DrawsById.TryGetValue(drawId, out DrawInfo? draw) || !IsActive(draw)) return [];
-        if (draw.GroupId == 1)
-        {
-            RewardGoods? member = DrawMemberReward(player, draw, Random.Shared.NextDouble(), Random.Shared.NextDouble(), Random.Shared.NextDouble(), Random.Shared.NextDouble());
-            return member is null ? [] : [member];
-        }
-        bool forceRare = draw.MaxBottomTimes > 0 && GetBottomTimes(draw, GetPityCount(player, draw.GroupId) + pullOffset) == 1;
-        RewardGoods? reward = draw.GroupId switch
-        {
-            2 or 4 => DrawEquipReward(draw, forceRare),
-            13 => DrawLegacyCharacterReward(draw, forceRare),
-            22 => DrawPartnerReward(draw),
-            _ => DrawCharacterReward(draw, forceRare)
-        };
-        return reward is null ? [] : [reward];
+        // Member draws run the shared pity engine; their per-banner reward
+        // composition stays inside the member branch of RollDraw.
+        if (draw.GroupId == 1 && !MemberTargetPools.Value.ContainsKey(drawId)) return [];
+        // Each result advances its own pity round, including within a ten-pull.
+        return [RollDraw(player, draw, Random.Shared)];
     }
 
     private static void EnsureState(Player player) => player.DrawState ??= new();
@@ -5335,13 +5349,12 @@ internal static class DrawManager
         PlayerDrawProgress progress = GetProgress(player, template.Id);
         value.TodayCount = progress.TodayCount;
         value.TotalCount = progress.TotalCount;
-        value.BottomTimes = GetPlayerBottomTimes(player, template);
+        PlayerDrawPityRound round = GetPityRound(player, template, Random.Shared);
+        value.MaxBottomTimes = round.Limit;
+        value.BottomTimes = Math.Max(1, round.Limit - round.Misses);
+        value.IsTriggerSpecified = round.GuaranteedTarget;
         return value;
     }
-
-    private static int GetPlayerBottomTimes(Player player, DrawInfo draw) => draw.GroupId == 1
-        ? MemberTargetSGuarantee - GetMemberTargetPity(player).SinceS
-        : GetBottomTimes(draw, GetPityCount(player, draw.GroupId));
 
     private static PlayerMemberTargetPity GetMemberTargetPity(Player player)
     {
@@ -5364,6 +5377,10 @@ internal static class DrawManager
         pity.SinceAOrS = Math.Min(pity.SinceAOrS, MemberTargetAGuarantee - 1);
         return player.DrawState.MemberTargetPity = pity;
     }
+
+    private static bool MemberHistoryHasRare(Player player) =>
+        player.DrawState.HistoryByGroup.TryGetValue(1, out var group)
+        && group.HistoryBySubType.Values.SelectMany(x => x).Any(x => GetDrawCharacterQuality(x.RewardGoods) == 3);
 
     private static int GetDrawCharacterQuality(RewardGoods reward) => CharacterMinQualityById.GetValueOrDefault(
         reward.ConvertFrom > 0 ? reward.ConvertFrom : reward.RewardType == (int)RewardType.Character ? reward.TemplateId : 0);
@@ -5439,32 +5456,41 @@ internal static class DrawManager
     }
 
     public static bool HasRewardConfiguration(int drawId) => DrawsById.TryGetValue(drawId, out var draw)
-        && (draw.GroupId != 1 || MemberTargetPools.Value.ContainsKey(drawId));
+        && HasAvailablePityLaw(draw) && (draw.GroupId != 1 || MemberTargetPools.Value.ContainsKey(drawId));
 
-    private static RewardGoods? DrawMemberReward(Player player, DrawInfo draw, double categoryRoll, double rankRoll, double targetRoll, double itemRoll)
+    // The shared pity engine (PityRounds[1]) decides rare/lower-rarity pulls and
+    // owns the counters; this method only resolves the member reward composition.
+    private static RewardGoods? DrawMemberReward(Player player, DrawInfo draw, bool rare, bool forceLower, double categoryRoll, double rankRoll, double targetRoll, double itemRoll)
     {
         if (!MemberTargetPools.Value.TryGetValue(draw.Id, out var pool)) return null;
-        PlayerMemberTargetPity pity = GetMemberTargetPity(player);
-        int category = 0;
-        double cumulative = pool.Weights[0];
-        while (category < pool.Weights.Length - 1 && categoryRoll >= cumulative) cumulative += pool.Weights[++category];
-        if (pity.SinceS >= MemberTargetSGuarantee - 1) category = 0;
-        bool forceA = category != 0 && pity.SinceAOrS >= MemberTargetAGuarantee - 1;
-        if (forceA) category = 1;
+        EnsureState(player);
+        int category;
+        if (rare)
+        {
+            category = 0;
+        }
+        else if (forceLower)
+        {
+            category = 1;
+        }
+        else
+        {
+            // Non-S categories roll on their conditional (non-S) share.
+            double scaled = categoryRoll * (1 - pool.Weights[0]);
+            category = 1;
+            double cumulative = pool.Weights[1];
+            while (category < pool.Weights.Length - 1 && scaled >= cumulative) cumulative += pool.Weights[++category];
+        }
         int[] ids = pool.Goods[category];
         if (category == 1)
         {
             // Local policy: rank odds follow the visible full-character A/B pool counts.
-            bool isA = forceA || rankRoll < (double)pool.A.Length / (pool.A.Length + pool.B.Length);
+            bool isA = forceLower || rankRoll < (double)pool.A.Length / (pool.A.Length + pool.B.Length);
             ids = isA ? pool.A : pool.B;
             if (isA && pool.Target != 0)
             {
                 if (targetRoll < pool.TargetChance)
-                {
-                    RewardGoods target = Create(RewardType.Character, pool.Target, 1, 1);
-                    AdvanceMemberTargetPity(pity, 2);
-                    return target;
-                }
+                    return Create(RewardType.Character, pool.Target, 1, 1);
                 ids = pool.OtherA;
             }
         }
@@ -5476,19 +5502,9 @@ internal static class DrawManager
             && selectedS != 0 && MemberTargetCalibrationTargets.Value.Contains(selectedS))
         {
             player.DrawState.MemberTargetCalibrationConsumed = true;
-            AdvanceMemberTargetPity(pity, 3);
             return Create(RewardType.Character, selectedS, 1, 1);
         }
-        RewardGoods reward = Create(type, ids[(int)(itemRoll * ids.Length)], count, type is RewardType.Character or RewardType.Equip ? 1 : 0);
-        AdvanceMemberTargetPity(pity, GetDrawCharacterQuality(reward));
-        return reward;
-    }
-
-    private static int GetBottomTimes(DrawInfo draw, int totalCount)
-    {
-        if (draw.MaxBottomTimes <= 0) return 0;
-        int consumed = totalCount % draw.MaxBottomTimes;
-        return consumed == 0 ? draw.MaxBottomTimes : draw.MaxBottomTimes - consumed;
+        return Create(type, ids[(int)(itemRoll * ids.Length)], count, type is RewardType.Character or RewardType.Equip ? 1 : 0);
     }
 
     private static RewardGoods? DrawCharacterReward(DrawInfo draw, bool forceRare)

@@ -1,0 +1,22 @@
+Key	Desc	Param[1]	Param[2]	Param[3]	Param[4]
+MasterCardTypeList	Main Card Type List	1	2		
+SubCardTypeList	Sub-Card Type List	3	4		
+InitialBattleCardAreaCount	Starting battle zone slots	4			
+GrowBattleCardAreaCount	Battle zone slots gained per victory	1			
+MaxBattleCardAreaCount	Maximum battle zone slots	8			
+InitialBagCardAreaCount	Starting inventory slots	4			
+GrowBagCardAreaCount	Inventory slots gained per victory	1			
+MaxBagCardAreaCount	Maximum inventory slots	8			
+ShopRefresh	Coins required to refresh the shop	1	1		
+Durability	Durability per match, or the number of retries allowed after defeat	3			
+HPValue	Commandant's Initial HP at the start of the stage	400			
+HPGrowthValue	Commandant HP restored per stage victory	250			
+InitialGoldCount	Starting Coins	4			
+EndlessStageBuff	Enemy HP and ATK increase at the start of each new Infinite Stage	2500	130		
+ShopRandomAmount	Number of shops generated per shop node	2			
+FightRandomAmount	Number of battles generated per Type 4 battle node	2			
+MasterCardSlotTypeLimit	Main/sub-card pairing rules: A sub-card in an even-numbered slot can be equipped to the main card in the preceding odd-numbered slot.	1	3	2	4
+MaxSaveCount	Maximum stages with saved progress	2			
+EndlessMaxRound	Maximum Infinite Stage rounds	10			
+MaxShopCardAreaCount	Maximum Shop Slots	8			
+RemedyShopHudGroupId	补强商店使用的hudgroupId	11			

@@ -5,6 +5,8 @@ using AscNet.GameServer.Game;
 using AscNet.Table.V2.share.miniactivity.envelope;
 using AscNet.Table.V2.share.miniactivity.musicgame.concertpreheating;
 using AscNet.Table.V2.share.pbr;
+using AscNet.Table.V2.share.reward;
+using AscNet.Table.V2.share.task;
 namespace AscNet.GameServer.Handlers
 {
     /// <summary>
@@ -14,17 +16,26 @@ namespace AscNet.GameServer.Handlers
     /// </summary>
     internal static class Version47EventModule
     {
-        // No capture exercises the Envelope failure path, so this code is unverified retail value.
-        // ponytail: unverified Envelope not-open code (20428001); any non-zero signals failure and
-        // the acceptance only requires "not falsely returns success". Replace once a retail
-        // Envelope error capture is available.
+        // Envelope errors are sourced from the installed CodeText table; packet-level retail
+        // failure ordering is not captured.
         private const int EnvelopeActivityNotOpen = 20428001;
 
         // 4.7 event daily grants roll over at 05:00 UTC.
         private static readonly DateTime BusinessDayEpoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        // Test/consumer seam (same pattern as DrawManager.UtcNow / TransfiniteTowerModule.Clock): registered
+        // Envelope/Concert Pre-Heating handlers and Envelope task evaluation must be exercisable while the
+        // authored window is closed. Production default stays the real clock.
+        internal static Func<DateTimeOffset> Clock = () => DateTimeOffset.UtcNow;
+
         private static readonly Lazy<IReadOnlyList<EnvelopeActivityTable>> EnvelopeActivities = new(() =>
             TableReaderV2.Parse<EnvelopeActivityTable>());
+        private static readonly Lazy<IReadOnlyList<EnvelopeListTable>> EnvelopeLists = new(() =>
+            TableReaderV2.Parse<EnvelopeListTable>());
+        private static readonly Lazy<IReadOnlyList<EnvelopeInstrumentTable>> EnvelopeInstruments = new(() =>
+            TableReaderV2.Parse<EnvelopeInstrumentTable>());
+        private static readonly Lazy<HashSet<int>> EnvelopeCharacters = new(() =>
+            TableReaderV2.Parse<EnvelopeCharacterTable>().Select(row => row.Id).ToHashSet());
         private static readonly Lazy<IReadOnlyList<PBRActivityTable>> PbrActivities = new(() =>
             TableReaderV2.Parse<PBRActivityTable>());
         private static readonly Lazy<IReadOnlyList<ConcertPreHeatingActivityTable>> ConcertActivities = new(() =>
@@ -132,7 +143,7 @@ namespace AscNet.GameServer.Handlers
         public static void ConcertPreHeatingStart(Session session, Packet.Request packet)
         {
             ConcertPreHeatingStartRequest request = packet.Deserialize<ConcertPreHeatingStartRequest>();
-            session.SendResponse(StartConcertPreHeating(request.StageId, DateTimeOffset.UtcNow), packet.Id);
+            session.SendResponse(StartConcertPreHeating(request.StageId, Clock()), packet.Id);
         }
 
         internal static ConcertPreHeatingStartResponse StartConcertPreHeating(int stageId, DateTimeOffset now)
@@ -303,14 +314,14 @@ namespace AscNet.GameServer.Handlers
             return new NotifyEnvelope
             {
                 ActivityId = activity.Id,
-                HasReward = state.LastDailyGrantBusinessDay != BusinessDay(now)
+                HasReward = state.LastDailyGrantBusinessDay != BusinessDay(now) || state.PendingTaskReissues.Count > 0
             };
         }
 
         [RequestPacketHandler("EnvelopeEnterRequest")]
         public static void EnvelopeEnter(Session session, Packet.Request packet)
         {
-            HandleEnvelopeEnter(session, packet.Id, DateTimeOffset.UtcNow);
+            HandleEnvelopeEnter(session, packet.Id, Clock());
         }
 
         internal static void HandleEnvelopeEnter(Session session, int requestId, DateTimeOffset now)
@@ -328,35 +339,221 @@ namespace AscNet.GameServer.Handlers
                 return response;
             }
 
+            TaskModule.EnsureMissionResets(session);
             EnvelopeState state = ReconcileEnvelope(session.player, activity.Id);
             response.Code = 0;
             int businessDay = BusinessDay(now);
-            if (state.LastDailyGrantBusinessDay != businessDay)
+            if (state.LastDailyGrantBusinessDay != businessDay || state.PendingTaskReissues.Count > 0)
             {
-                RewardApplicationResult result = RewardHandler.ApplyRewards(
-                    RewardHandler.GetRewardGoods(activity.DailyTicketRewardId), session);
-                if (result.RewardGoods.Count > 0)
+                // AscNet policy (no retail capture): every authored event business day from the
+                // schedule start through today accrues one DailyTicketReward under its own receipt.
+                // The player's first-ever entry day receives the authored FirstDayReward instead;
+                // any existing receipt for this activity means that entry already happened. Receipts
+                // make reconnects/retries non-multiplying; ActiveEnvelope already rejected closed windows.
+                List<RewardGoodsTable> dailyGoods = RewardHandler.GetRewardGoods(activity.DailyTicketRewardId);
+                List<RewardGoodsTable> firstGoods = RewardHandler.GetRewardGoods(activity.FirstDayRewardId);
+                if (dailyGoods.Count == 0 || firstGoods.Count == 0)
                 {
-                    response.RewardGoodsList.AddRange(result.RewardGoods);
-                    state.LastDailyGrantBusinessDay = businessDay;
-                    session.inventory.Save();
-                    session.character.Save();
-                    session.player.Save();
+                    response.Code = 20428005;
+                    return response;
                 }
-                else
+                ActivityScheduleService.TryGet(activity.TimeId, out ActivityScheduleEntry window);
+                int startDay = window.StartTime > 0
+                    ? Math.Min(businessDay, BusinessDay(DateTimeOffset.FromUnixTimeSeconds(window.StartTime)))
+                    : businessDay;
+                startDay = Math.Max(startDay, state.LastDailyGrantBusinessDay + 1);
+                string dailyPrefix = $"envelope-daily:{activity.Id}:";
+                string firstPrefix = $"envelope-first:{activity.Id}:";
+                // AscNet policy: the business day that owns FirstDayRewardId is frozen by its own receipt key, so a
+                // retry whose marker write was lost rebuilds the grant it already paid (same key, same goods) rather
+                // than re-planning that day as a plain daily ticket and reporting the wrong composition.
+                int? firstDay = null;
+                foreach (string claim in session.inventory.AppliedRewardClaims)
                 {
-                    if (result.DormFurnitureChanged || result.GatherRewardIds.Count > 0 || result.HeadPortraitData.Heads.Count > 0)
-                        session.player.Save();
-                    session.log.Error(
-                        $"No reward is configured for Envelope daily ticket reward {activity.DailyTicketRewardId}.");
+                    if (claim.StartsWith(firstPrefix, StringComparison.Ordinal)
+                        && int.TryParse(claim[firstPrefix.Length..], out int claimedDay))
+                    {
+                        firstDay = claimedDay;
+                        break;
+                    }
                 }
-                result.SendPushes(session);
+                bool firstEntry = firstDay is null && state.LastDailyGrantBusinessDay <= 0
+                    && !session.inventory.AppliedRewardClaims.Any(claim =>
+                        claim.StartsWith(dailyPrefix, StringComparison.Ordinal));
+                if (firstEntry)
+                    firstDay = businessDay;
+                List<RewardGrant> daily = Enumerable.Range(startDay, Math.Max(0, businessDay - startDay + 1))
+                    .Select(day => day == firstDay
+                        ? new RewardGrant(firstPrefix + day, firstGoods)
+                        : new RewardGrant(dailyPrefix + day, dailyGoods))
+                    .ToList();
+                // Earned-but-unclaimed daily tasks captured at rollover reuse their own period claim key.
+                Dictionary<int, TaskTable> tasks = TableReaderV2.Parse<TaskTable>()
+                    .Where(TaskModule.IsEnvelopeTask).ToDictionary(task => task.Id);
+                List<RewardGrant> reissued = state.PendingTaskReissues
+                    .Where(pending => tasks.ContainsKey(pending.Value))
+                    .Select(pending => new RewardGrant(pending.Key, RewardHandler.GetRewardGoods(tasks[pending.Value].RewardId ?? 0)))
+                    .Where(grant => grant.Goods.Count > 0)
+                    .ToList();
+                RewardApplicationResult? dailyResult = daily.Count == 0 ? null : RewardHandler.ApplyRewardsOnceAndPersist(daily, session);
+                RewardApplicationResult? taskResult = reissued.Count == 0 ? null : RewardHandler.ApplyRewardsOnceAndPersist(reissued, session);
+                int previousDay = state.LastDailyGrantBusinessDay;
+                Dictionary<string, int> previousPending = state.PendingTaskReissues;
+                state.LastDailyGrantBusinessDay = businessDay;
+                state.PendingTaskReissues = new Dictionary<string, int>();
+                try { session.player.SaveChecked(); }
+                catch
+                {
+                    state.LastDailyGrantBusinessDay = previousDay;
+                    state.PendingTaskReissues = previousPending;
+                    throw;
+                }
+                if (dailyResult is not null)
+                {
+                    response.RewardGoodsList.AddRange(dailyResult.RewardGoods);
+                    dailyResult.SendPushes(session);
+                }
+                if (taskResult is not null)
+                {
+                    response.TaskRewardGoodsList.AddRange(taskResult.RewardGoods);
+                    taskResult.SendPushes(session);
+                }
             }
 
             response.OpenedCharacterIds = state.OpenedCharacterIds.Distinct().Order().ToList();
+            TaskModule.SendEnvelopeTaskSync(session, now);
             response.InstrumentBindings = new Dictionary<int, int>(state.InstrumentBindings);
             response.AvgWatchedCharacterIds = state.AvgWatchedCharacterIds.Distinct().Order().ToList();
             return response;
+        }
+
+        [RequestPacketHandler("EnvelopeRecordAvgRequest")]
+        public static void EnvelopeRecordAvg(Session session, Packet.Request packet) =>
+            HandleEnvelopeRecordAvg(session, packet.Deserialize<EnvelopeRecordAvgRequest>(), packet.Id, Clock());
+
+        internal static void HandleEnvelopeRecordAvg(Session session, EnvelopeRecordAvgRequest request, int requestId, DateTimeOffset now)
+        {
+            EnvelopeActivityTable? activity = ActiveEnvelope(now);
+            int code = activity is null ? EnvelopeActivityNotOpen : 0;
+            if (activity is not null)
+            {
+                EnvelopeState state = ReconcileEnvelope(session.player, activity.Id);
+                if (!EnvelopeCharacters.Value.Contains(request.CharacterId))
+                    code = 20428002;
+                else if (!state.OpenedCharacterIds.Contains(request.CharacterId))
+                    code = 20428008;
+                else if (state.AvgWatchedCharacterIds.Contains(request.CharacterId))
+                    code = 20428012;
+                else
+                {
+                    state.AvgWatchedCharacterIds.Add(request.CharacterId);
+                    session.player.Save();
+                    TaskModule.SendEnvelopeTaskSync(session, now);
+                }
+            }
+            session.SendResponse(new EnvelopeRecordAvgResponse { Code = code }, requestId);
+        }
+
+        [RequestPacketHandler("EnvelopeOpenRequest")]
+        public static void EnvelopeOpen(Session session, Packet.Request packet) =>
+            HandleEnvelopeOpen(session, packet.Deserialize<EnvelopeOpenRequest>(), packet.Id, Clock());
+
+        internal static void HandleEnvelopeOpen(Session session, EnvelopeOpenRequest request, int requestId, DateTimeOffset now)
+        {
+            EnvelopeActivityTable? activity = ActiveEnvelope(now);
+            int code = activity is null ? EnvelopeActivityNotOpen : 0;
+            if (activity is not null)
+            {
+                EnvelopeState state = ReconcileEnvelope(session.player, activity.Id);
+                EnvelopeListTable? envelope = EnvelopeLists.Value.FirstOrDefault(row => row.Id == request.Id);
+                if (envelope is null)
+                    code = 20428003;
+                else if (state.OpenedCharacterIds.Contains(envelope.CharacterId))
+                    code = 20428004;
+                else
+                    code = OpenEnvelopeCharacter(session, activity, state, envelope.CharacterId, false);
+            }
+            if (code == 0)
+                TaskModule.SendEnvelopeTaskSync(session, now);
+            session.SendResponse(new EnvelopeOpenResponse { Code = code }, requestId);
+        }
+
+        [RequestPacketHandler("EnvelopeSelectOpenRequest")]
+        public static void EnvelopeSelectOpen(Session session, Packet.Request packet) =>
+            HandleEnvelopeSelectOpen(session, packet.Deserialize<EnvelopeSelectOpenRequest>(), packet.Id, Clock());
+
+        internal static void HandleEnvelopeSelectOpen(Session session, EnvelopeSelectOpenRequest request, int requestId, DateTimeOffset now)
+        {
+            EnvelopeActivityTable? activity = ActiveEnvelope(now);
+            int code = activity is null ? EnvelopeActivityNotOpen : 0;
+            if (activity is not null)
+            {
+                EnvelopeState state = ReconcileEnvelope(session.player, activity.Id);
+                if (!EnvelopeCharacters.Value.Contains(request.CharacterId))
+                    code = 20428002;
+                else if (state.OpenedCharacterIds.Contains(request.CharacterId))
+                    code = 20428004;
+                else
+                    code = OpenEnvelopeCharacter(session, activity, state, request.CharacterId, true);
+            }
+            if (code == 0)
+                TaskModule.SendEnvelopeTaskSync(session, now);
+            session.SendResponse(new EnvelopeSelectOpenResponse { Code = code }, requestId);
+        }
+
+        private static int OpenEnvelopeCharacter(Session session, EnvelopeActivityTable activity, EnvelopeState state, int characterId, bool selected)
+        {
+            if (activity.TicketItemId <= 0 || (selected && activity.SelectChoiceItemId <= 0))
+                return 20428005;
+            if ((session.inventory.Items.FirstOrDefault(item => item.Id == activity.TicketItemId)?.Count ?? 0) < 1
+                || (selected && (session.inventory.Items.FirstOrDefault(item => item.Id == activity.SelectChoiceItemId)?.Count ?? 0) < 1))
+                return 20012004;
+
+            NotifyItemDataList changed = new();
+            changed.ItemDataList.Add(session.inventory.Do(activity.TicketItemId, -1));
+            if (selected)
+                changed.ItemDataList.Add(session.inventory.Do(activity.SelectChoiceItemId, -1));
+            state.OpenedCharacterIds.Add(characterId);
+            session.inventory.Save();
+            session.player.Save();
+            session.SendPush(changed);
+            return 0;
+        }
+
+        [RequestPacketHandler("EnvelopeBindRequest")]
+        public static void EnvelopeBind(Session session, Packet.Request packet) =>
+            HandleEnvelopeBind(session, packet.Deserialize<EnvelopeBindRequest>(), packet.Id, Clock());
+
+        internal static void HandleEnvelopeBind(Session session, EnvelopeBindRequest request, int requestId, DateTimeOffset now)
+        {
+            EnvelopeActivityTable? activity = ActiveEnvelope(now);
+            int code = activity is null ? EnvelopeActivityNotOpen : 0;
+            if (activity is not null)
+            {
+                EnvelopeState state = ReconcileEnvelope(session.player, activity.Id);
+                Dictionary<int, int>? bindings = request.Bindings;
+                if (bindings is null || bindings.Count > EnvelopeInstruments.Value.Count)
+                    code = 20428010;
+                else
+                {
+                    foreach ((int instrumentId, int characterId) in bindings)
+                    {
+                        EnvelopeInstrumentTable? instrument = EnvelopeInstruments.Value.FirstOrDefault(row => row.Id == instrumentId);
+                        if (instrument is null) { code = 20428006; break; }
+                        if (state.OpenedCharacterIds.Count < instrument.OpenTarget) { code = 20428007; break; }
+                        if (!state.OpenedCharacterIds.Contains(characterId)) { code = 20428008; break; }
+                    }
+                    if (code == 0 && bindings.Values.Distinct().Count() != bindings.Count)
+                        code = 20428009;
+                    if (code == 0)
+                    {
+                        state.InstrumentBindings = new Dictionary<int, int>(bindings);
+                        session.player.Save();
+                        TaskModule.SendEnvelopeTaskSync(session, now);
+                    }
+                }
+            }
+            session.SendResponse(new EnvelopeBindResponse { Code = code }, requestId);
         }
 
         private static EnvelopeActivityTable? ActiveEnvelope(DateTimeOffset now) =>
@@ -377,6 +574,7 @@ namespace AscNet.GameServer.Handlers
             state.OpenedCharacterIds = new List<int>();
             state.InstrumentBindings = new Dictionary<int, int>();
             state.AvgWatchedCharacterIds = new List<int>();
+            state.PendingTaskReissues = new Dictionary<string, int>();
             return state;
         }
 

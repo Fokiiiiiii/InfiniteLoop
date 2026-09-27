@@ -33,6 +33,11 @@ public sealed class EnvelopeState
 
     [BsonElement("avg_watched_character_ids")]
     public List<int> AvgWatchedCharacterIds { get; set; } = new();
+
+    /// <summary>AscNet policy: prior-period daily task claim key → task id, earned but unclaimed at rollover; reissued once on Enter.</summary>
+    [BsonElement("pending_task_reissues")]
+    [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+    public Dictionary<string, int> PendingTaskReissues { get; set; } = new();
 }
 
 /// <summary>Durable 4.7 PBR activity root (empty/default meta progression, stage records, compendiums, segment settle).</summary>

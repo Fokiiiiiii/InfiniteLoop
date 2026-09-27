@@ -1,0 +1,9 @@
+Id	Name	WinEffect	CostCoinNum	RowCount	ColumnCount	RewardId	CanFailedCounts[1]	CanFailedCounts[2]	CanFailedCounts[3]	CanFailedCounts[4]
+101	1_1	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	2	5	8	69473	5	10	15	25
+102	1_2	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	3	5	8	69474	5	10	15	25
+103	2_1	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	2	5	8	69475	5	10	15	25
+104	2_2	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	3	5	8	69476	5	10	15	25
+105	3_1	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	2	5	8	69477	5	10	15	25
+106	3_2	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	3	5	8	69478	5	10	15	25
+107	4_1	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	2	5	8	69479	5	10	15	25
+108	4_2	Assets/Product/Effect/Prefab/FxUi/FxUiMineSweepingMain/FxUiMineSweepingMainSao9.prefab	3	5	8	69480	5	10	15	25

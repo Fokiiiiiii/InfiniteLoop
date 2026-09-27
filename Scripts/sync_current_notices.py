@@ -135,6 +135,8 @@ def main() -> int:
     parser.add_argument("--dest", type=Path, default=None,
                         help="override destination directory (default: Resources/Configs/Notices/<version>)")
     parser.add_argument("--timeout", type=float, default=30.0, help="per-request timeout in seconds")
+    parser.add_argument("--no-schedule", action="store_true",
+                        help="skip activity schedule regeneration when syncing notices independently")
     args = parser.parse_args()
 
     base_url = args.base_url if args.base_url.endswith("/") else args.base_url + "/"
@@ -189,7 +191,7 @@ def main() -> int:
             print(f"OK   {asset_path}: {len(payload)} bytes <- {url}")
 
         stale_assets = remove_stale_managed_assets(dest, referenced_assets)
-        schedule_regenerated = regenerate_schedule_if_available(dest / "GameNotice.json")
+        schedule_regenerated = False if args.no_schedule else regenerate_schedule_if_available(dest / "GameNotice.json")
     except Exception as err:
         print(f"FAIL {err}", file=sys.stderr)
         return 1

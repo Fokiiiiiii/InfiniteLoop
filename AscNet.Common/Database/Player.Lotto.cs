@@ -1,4 +1,5 @@
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Options;
 
 namespace AscNet.Common.Database;
 
@@ -6,6 +7,9 @@ public sealed class LottoState
 {
     [BsonElement("infos")]
     public List<LottoStateInfo> Infos { get; set; } = new();
+    [BsonElement("selected_primary_id_to_lotto_id")]
+    [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+    public Dictionary<int, int> SelectedPrimaryIdToLottoId { get; set; } = new();
 }
 
 public sealed class LottoStateInfo

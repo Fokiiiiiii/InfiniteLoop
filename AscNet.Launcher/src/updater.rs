@@ -174,7 +174,8 @@ pub fn stage(release: &Release) -> Result<StagedUpdate> {
     fs::create_dir(&root)?;
     let result = (|| -> Result<()> {
         let archive = root.join("release.zip");
-        let response = client()?.get(&release.url).send()?.error_for_status()?;
+        // Metadata keeps the client's 180 s total; the ~93 MB asset needs slow-link headroom.
+        let response = client()?.get(&release.url).timeout(Duration::from_secs(2 * 60 * 60)).send()?.error_for_status()?;
         if let Some(length) = response.content_length() { ensure!(length == release.size, "release Content-Length mismatch"); }
         let mut input = response.take(release.size + 1);
         let mut output = OpenOptions::new().write(true).create_new(true).open(&archive)?;
@@ -426,7 +427,15 @@ pub fn startup() -> Result<bool> {
             worker(args[1].parse()?, Path::new(&args[2]))?;
             return Ok(true);
         }
-        let install = install_dir()?;
+        // A renamed or linked deployment only disables self-update; stage() refuses it again.
+        let install = match install_dir() {
+            Ok(install) => install,
+            Err(error) if !args.iter().any(|a| a.starts_with("--self-update")) => {
+                let _ = crate::local::launcher_log(&format!("Launcher self-update disabled: {error:#}"));
+                return Ok(false);
+            }
+            Err(error) => return Err(error),
+        };
         let root = install.join(TRANSACTION);
         if args.as_slice() == ["--self-update-health"] {
             let journal = read_journal(&root, "journal.json")?;

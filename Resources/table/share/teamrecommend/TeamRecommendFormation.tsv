@@ -1,0 +1,13 @@
+Id	Name	Desc	Order	Tags[1]	Tags[2]	FormationType	StageType	NeedLevel	NeedScore	MinCharacterQualityStar	MaxCharacterQualityStar
+1	High-Investment Team Recommendation - Cage		3	Element Team		1	5	9	340000	5000	6000
+2	Mid-Investment Team Recommendation - Cage		2	Element Team		1	5	8	330000	4003	4010
+3	Low-Investment Team Recommendation - Cage		1	Element Team		1	5	8	300000	3000	4002
+4	High-Investment Team Recommendation - War Zone		3	Element Team		1	12	7	15000000	5000	6000
+5	Mid-Investment Team Recommendation - War Zone		2	Element Team		1	12	6	5000000	4003	4010
+6	Low-Investment Team Recommendation - War Zone		1	Element Team		1	12	6	3000000	3000	4002
+7	High-Investment Team Recommendation - Cage		3	Effect Team		2	5	9	340000	5000	6000
+8	Mid-Investment Team Recommendation - Cage		2	Effect Team		2	5	8	330000	4003	4010
+9	Low-Investment Team Recommendation - Cage		1	Effect Team		2	5	8	300000	3000	4002
+10	High-Investment Team Recommendation - War Zone		3	Effect Team		2	12	7	15000000	5000	6000
+11	Mid-Investment Team Recommendation - War Zone		2	Effect Team		2	12	6	5000000	4003	4010
+12	Low-Investment Team Recommendation - War Zone		1	Effect Team		2	12	6	3000000	3000	4002

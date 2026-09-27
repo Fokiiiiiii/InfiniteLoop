@@ -141,8 +141,20 @@ namespace AscNet.GameServer.Handlers
             int roundDays = TotalDays(sign);
             if (sign.Type == 2)
             {
+                int remaining = (int)Math.Clamp(got && claims > 0 ? claims - 1 : claims, 0, roundDays - 1);
+                if (sign.RoundDays.Count == 0) { round = day = 1; return; }
                 round = 1;
-                day = (int)Math.Min(got ? claims : claims + 1, roundDays);
+                foreach (int length in sign.RoundDays)
+                {
+                    if (remaining < length)
+                    {
+                        day = remaining + 1;
+                        return;
+                    }
+                    remaining -= length;
+                    round++;
+                }
+                throw new InvalidDataException($"SignIn {sign.Id} has invalid RoundDays.");
             }
             else
             {

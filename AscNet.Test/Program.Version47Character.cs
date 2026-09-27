@@ -182,12 +182,14 @@ internal partial class Program
         AscNet.Common.Database.Character awakenedRoster =
             CreateTestCharacterRoster(liberationCandidate.CharacterId, 80);
         CharacterData awakened = RequiredCharacterData(awakenedRoster, liberationCandidate.CharacterId);
-        awakened.LiberateLv = liberationCandidate.RequiredLiberation;
+        awakened.LiberateLv = 1;
         awakened.SkillList.RemoveAll(skill => skill.Id == liberationCandidate.SkillId);
         int liberationReward = TableReaderV2.Parse<ExhibitionRewardTable>()
             .First(row => row.CharacterId == liberationCandidate.CharacterId
                 && row.LevelId >= liberationCandidate.RequiredLiberation).Id;
         awakenedRoster.NormalizeCharactersForCurrentTables([liberationReward]);
+        AssertEqual(liberationCandidate.RequiredLiberation, awakened.LiberateLv,
+            "claimed liberation milestone repairs stale cached liberation level");
         AssertEqual(false, awakened.SkillList.Any(skill => skill.Id == liberationCandidate.SkillId),
             "Ultima eligibility does not perform a manual unlock during normalization");
         awakened.SkillList.Add(new CharacterSkill { Id = liberationCandidate.SkillId, Level = 1 });
@@ -266,14 +268,18 @@ internal partial class Program
         AssertEqual("100086:1,123001:1,123005:1", Signature(Expected(observer, 2, 3)), "Owned full skills include both authored ice Tank effect rows");
         AssertEqual("123000:1,123005:1,200450:1", Signature(Expected(observer, 8, 2)), "Owned full skills include both authored fire Breaker effect rows");
         CharacterData tank = Character(1121003), support = Character(1211002), fireSupport = Character(1031004);
+        CharacterData nihilTank = Character(1061003), fusion = Character(1421003);
         CharacterData attacker = Character(1021006);
         foreach (CharacterData subject in new[] { observer, trial.Character })
         {
             Check(subject, 5, tank, attacker);
             Check(subject, 2, support, attacker);
             Check(subject, 8, fireSupport, attacker);
+            Check(subject, 9, nihilTank, attacker);
+            Check(subject, 8, fusion, attacker);
             CharacterData physicalSupport = Character(characters.First(row => row.Element == 1 && row.Career == 3).Id);
-            Check(subject, 5, tank, physicalSupport);
+            AssertEqual("", Signature(Actual(subject, subject, tank, physicalSupport)),
+                "A second configured career blocks Observation even when physical");
             AssertEqual("", Signature(Actual(subject, subject, tank, support)), "Two elemental role candidates cannot activate Observer");
             AssertEqual("", Signature(Actual(subject, subject, observer == subject ? trial.Character : observer, tank)),
                 "Multiple Observers cannot activate");
@@ -307,7 +313,10 @@ internal partial class Program
                 AssertEqual("{}", other["MagicIds"]!.ToString(Newtonsoft.Json.Formatting.None), $"{label} does not affect other characters");
         }
         int packetId = 12_710;
-        foreach (var composition in new[] { (Partner: tank, Career: 5), (Partner: support, Career: 2), (Partner: fireSupport, Career: 8) })
+        foreach (var composition in new[] {
+            (Partner: tank, Career: 5), (Partner: support, Career: 2), (Partner: fireSupport, Career: 8),
+            (Partner: nihilTank, Career: 9), (Partner: fusion, Career: 8)
+        })
         {
             foreach (bool useTrial in new[] { false, true })
             {
@@ -685,7 +694,7 @@ internal partial class Program
         {
             Id = 1021001,
             Level = 80,
-            LiberateLv = 4,                        // GrowUpLevel.Higher
+            LiberateLv = 1,                        // stale pre-4.6 cache
             FashionId = defaultFashionId,
             CharacterHeadInfo = new CharacterData.CharacterHead
             {
@@ -699,20 +708,24 @@ internal partial class Program
             new FashionList { Id = defaultFashionId, IsLock = false },
             new FashionList { Id = selectableFashionId, IsLock = false }
         ];
+        Player player = CreateDrawCompatibilityPlayer(playerId);
+        player.GatherRewards = [TableReaderV2.Parse<ExhibitionRewardTable>()
+            .First(row => row.CharacterId == luciaRow.Id && row.LevelId >= 4).Id];
         using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(
             out _, out RecordingMongoCollectionProxy<AscNet.Common.Database.Character> characterSaves, out _);
-        using LoopbackSessionHarness harness = new(character, CreateDrawCompatibilityPlayer(playerId),
+        using LoopbackSessionHarness harness = new(character, player,
             CreateDrawCompatibilityInventory(playerId, []), "v47-character-head");
 
         int packetId = 12_301;
         // Type 0 (default) succeeds.
         AssertHeadSelectionSucceeds(harness, characterSaves, packetId++, defaultFashionId, 0, "default");
-        // Type 1 (liberation) with Higher liberation succeeds.
+        // Type 1 (liberation) uses the claimed milestone despite the stale cache.
         AssertHeadSelectionSucceeds(harness, characterSaves, packetId++, defaultFashionId, 1, "liberation");
         // Type 2 (owned same-character coating) succeeds.
         AssertHeadSelectionSucceeds(harness, characterSaves, packetId++, selectableFashionId, 2, "fashion");
 
-        // Liberation head without Higher liberation is rejected.
+        // Liberation head without the claimed milestone is rejected.
+        player.GatherRewards = [];
         lucia.LiberateLv = 3;
         AssertHeadSelectionRejected(harness, packetId++, defaultFashionId, 1, "liberation without Higher");
         lucia.LiberateLv = 4;

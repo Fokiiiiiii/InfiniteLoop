@@ -25,6 +25,11 @@ Id	ChoosePoolIds[1]	ChoosePoolIds[2]	ChoosePoolIds[3]	ChoosePoolIds[4]	ChoosePoo
 121	21100	21100	21100	21100	21100	21100	21030	21030	21030	21030	21030	21030									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2101	2103	3001
 130	22000	22000	22000	22000	22000	22010	22010	22020	22020	22020	22020	22020									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2200	2202	3009
 131	22030	22030	22030	22030	22030	22030	22100	22100	22100	22100	22100	22100									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2201	2203	3008
+140	22210	22210	22210	22210	22210	22210	22210	22210	22200	22200	22201	22202									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2300	2202	3001
+141	22203	22203	22203	22210	22210	22210	22210	22210	22210	22210	22210	22210									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2301	2203	3001
+150	22300	22301	22302	22303	22304	22304	22304	22305	22306	22306	22306	22306									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2302	2202	3001
+160	22400	22400	22401	22402	22402	22402	22403	22404	22404	22404	22404	22404									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2303	2202	3001
+170	22500	22500	22501	22502	22510	22510	22510	22510	22510	22510	22510	22510									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	2304	2202	3001
 201	2001	3001	2001	3001	2001	3001	2001	2001	2001	4001	2001	3001									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	101	101	2000
 202	2002	3002	3002	2002	3002	3002	2002	2002	4001	2002	2002	2002									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	103	103	2010
 203	2003	3003	2003	3003	2003	2003	3003	2003	3003	2003	4001	2003									Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RoomEitherorBg.png	104	104	2020

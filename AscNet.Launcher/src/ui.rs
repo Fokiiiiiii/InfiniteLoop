@@ -26,7 +26,8 @@ use windows::{
         Foundation::*,
         Graphics::{Dwm::*, Gdi::*},
         System::{
-            Com::*, LibraryLoader::GetModuleHandleW, SystemServices::{SS_NOTIFY, SS_OWNERDRAW},
+            Com::*, LibraryLoader::GetModuleHandleW,
+            SystemServices::{SS_ENDELLIPSIS, SS_NOTIFY, SS_OWNERDRAW, SS_RIGHT},
             Threading::CreateMutexW,
         },
         UI::{Controls::*, Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
@@ -65,6 +66,7 @@ const ID_LAUNCHER_HEADING: i32 = 132;
 const ID_FPS_LABEL: i32 = 133;
 const ID_MUSIC_LABEL: i32 = 134;
 const ID_FPS_UNIT: i32 = 135;
+const ID_STATUS_LINE: i32 = 136;
 const CENTERED_EDIT_HEIGHT: i32 = 22;
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -495,7 +497,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
                 let _ = SetBkColor(dc, COLORREF(0x00221c1b));
                 return LRESULT((*ptr).edit_brush.0);
             }
-            let color = if id == ID_SUBTITLE || id == ID_PATH_LABEL || id == ID_DETAIL {
+            let color = if matches!(id, ID_SUBTITLE | ID_PATH_LABEL | ID_DETAIL | ID_STATUS_LINE) {
                 COLORREF(0x00c9c5c2)
             } else {
                 COLORREF(0x00f4f1ef)
@@ -687,10 +689,23 @@ unsafe extern "system" fn backdrop_control_subclass(
     if msg == WM_ERASEBKGND {
         return LRESULT(1);
     }
+    // The log has no native scrollbar (it is drawn below), so scroll it here.
+    if msg == WM_MOUSEWHEEL && GetDlgCtrlID(hwnd) == ID_DETAIL {
+        let delta = (wp.0 >> 16) as u16 as i16 as isize;
+        let _ = SendMessageW(hwnd, EM_LINESCROLL, WPARAM(0), LPARAM(-delta * 3 / 120));
+        let _ = InvalidateRect(hwnd, None, false);
+        return LRESULT(0);
+    }
     if msg != WM_PAINT {
         let result = DefSubclassProc(hwnd, msg, wp, lp);
         if matches!(GetDlgCtrlID(hwnd), ID_FPS_ENABLED | ID_MUSIC_MUTED)
             && matches!(msg, BM_SETCHECK | BM_SETSTATE | WM_SETFOCUS | WM_KILLFOCUS | WM_ENABLE)
+        {
+            let _ = InvalidateRect(hwnd, None, false);
+        }
+        // The log EDIT scrolls by copying pixels; repaint so the backdrop is not smeared.
+        if GetDlgCtrlID(hwnd) == ID_DETAIL
+            && matches!(msg, WM_VSCROLL | EM_LINESCROLL | EM_SCROLLCARET | WM_SETTEXT | WM_KEYDOWN | WM_TIMER | WM_MOUSEMOVE)
         {
             let _ = InvalidateRect(hwnd, None, false);
         }
@@ -726,6 +741,9 @@ unsafe extern "system" fn backdrop_control_subclass(
             LPARAM(PRF_CLIENT as isize),
         );
     }
+    if GetDlgCtrlID(hwnd) == ID_DETAIL {
+        draw_log_thumb(hwnd, target, rect);
+    }
     if buffered {
         let _ = BitBlt(dc, 0, 0, rect.right, rect.bottom, buffer, 0, 0, SRCCOPY);
         let _ = SelectObject(buffer, old);
@@ -738,6 +756,32 @@ unsafe extern "system" fn backdrop_control_subclass(
     }
     let _ = EndPaint(hwnd, &ps);
     LRESULT(0)
+}
+
+// ponytail: wheel/keyboard/selection scrolling only; the thumb is not draggable.
+unsafe fn draw_log_thumb(edit: HWND, dc: HDC, rect: RECT) {
+    let font = HFONT(SendMessageW(edit, WM_GETFONT, WPARAM(0), LPARAM(0)).0);
+    let old = SelectObject(dc, font);
+    let mut metrics = TEXTMETRICW::default();
+    let _ = GetTextMetricsW(dc, &mut metrics);
+    let _ = SelectObject(dc, old);
+    let total = SendMessageW(edit, EM_GETLINECOUNT, WPARAM(0), LPARAM(0)).0 as i32;
+    let first = SendMessageW(edit, EM_GETFIRSTVISIBLELINE, WPARAM(0), LPARAM(0)).0 as i32;
+    let visible = rect.bottom / metrics.tmHeight.max(1);
+    if total <= visible || visible <= 0 {
+        return;
+    }
+    let height = (rect.bottom * visible / total).max(24);
+    let top = (rect.bottom - height) * first / (total - visible).max(1);
+    let brush = CreateSolidBrush(COLORREF(0x00857f7a));
+    let thumb = RECT {
+        left: rect.right - 4,
+        top,
+        right: rect.right,
+        bottom: top + height,
+    };
+    let _ = FillRect(dc, &thumb, brush);
+    let _ = DeleteObject(brush);
 }
 
 unsafe fn draw_toggle(hwnd: HWND, dc: HDC, rect: RECT, state: &Window) {
@@ -884,9 +928,9 @@ unsafe fn create_controls(hwnd: HWND, state: &Window) {
     );
     control(
         hwnd,
-        w!("STATIC"),
+        w!("EDIT"),
         PCWSTR::null(),
-        WS_VISIBLE,
+        WS_VISIBLE | WINDOW_STYLE((ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL) as u32),
         ID_DETAIL,
         0,
         0,
@@ -1026,9 +1070,20 @@ unsafe fn create_controls(hwnd: HWND, state: &Window) {
     control(
         hwnd,
         w!("STATIC"),
-        w!("SERVER LOG"),
+        w!("ACTIVITY"),
         WS_VISIBLE,
         ID_CARD_HEADING,
+        0,
+        0,
+        0,
+        0,
+    );
+    control(
+        hwnd,
+        w!("STATIC"),
+        w!(""),
+        WS_VISIBLE | WINDOW_STYLE(SS_RIGHT.0 | SS_ENDELLIPSIS.0),
+        ID_STATUS_LINE,
         0,
         0,
         0,
@@ -1058,6 +1113,7 @@ unsafe fn create_controls(hwnd: HWND, state: &Window) {
         ID_PATH_LABEL,
         ID_DETAIL,
         ID_CARD_HEADING,
+        ID_STATUS_LINE,
         ID_FPS_STATUS,
         ID_FPS_ENABLED,
         ID_MUSIC_MUTED,
@@ -1096,6 +1152,7 @@ unsafe fn create_controls(hwnd: HWND, state: &Window) {
         (ID_FPS_LABEL, state.body_font),
         (ID_MUSIC_LABEL, state.body_font),
         (ID_FPS_UNIT, state.label_font),
+        (ID_STATUS_LINE, state.label_font),
     ] {
         let _ = SendMessageW(
             GetDlgItem(hwnd, id),
@@ -1104,6 +1161,13 @@ unsafe fn create_controls(hwnd: HWND, state: &Window) {
             LPARAM(1),
         );
     }
+    // Keep log text clear of the self-drawn scroll thumb.
+    let _ = SendMessageW(
+        GetDlgItem(hwnd, ID_DETAIL),
+        EM_SETMARGINS,
+        WPARAM(EC_RIGHTMARGIN as usize),
+        LPARAM(10 << 16),
+    );
     for id in [
         ID_BROWSE,
         ID_STATUS,
@@ -1223,7 +1287,7 @@ unsafe fn layout(hwnd: HWND, width: i32, height: i32, settings: bool) {
     let _ = MoveWindow(GetDlgItem(hwnd, ID_SETTINGS), width - 158, 9, 46, 34, true);
     let _ = MoveWindow(GetDlgItem(hwnd, ID_MINIMIZE), width - 106, 9, 46, 34, true);
     let _ = MoveWindow(GetDlgItem(hwnd, ID_CLOSE), width - 54, 9, 46, 34, true);
-    for id in [ID_STATUS, ID_DETAIL] {
+    for id in [ID_STATUS, ID_DETAIL, ID_STATUS_LINE] {
         let _ = ShowWindow(
             GetDlgItem(hwnd, id),
             if settings { SW_HIDE } else { SW_SHOW },
@@ -1255,7 +1319,7 @@ unsafe fn layout(hwnd: HWND, width: i32, height: i32, settings: bool) {
     set_text(
         hwnd,
         ID_CARD_HEADING,
-        if settings { "SETTINGS" } else { "SERVER LOG" },
+        if settings { "SETTINGS" } else { "ACTIVITY" },
     );
     for id in [ID_CHECK, ID_SETTINGS] {
         let _ = ShowWindow(
@@ -1404,8 +1468,16 @@ unsafe fn layout(hwnd: HWND, width: i32, height: i32, settings: bool) {
             GetDlgItem(hwnd, ID_CARD_HEADING),
             log.left + 16,
             log.top + 14,
-            log.right - log.left - 32,
+            120,
             24,
+            true,
+        );
+        let _ = MoveWindow(
+            GetDlgItem(hwnd, ID_STATUS_LINE),
+            log.left + 140,
+            log.top + 18,
+            log.right - log.left - 156,
+            20,
             true,
         );
         let _ = MoveWindow(
@@ -1483,7 +1555,8 @@ unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
                 }
                 if m.settings.selected_game.is_none() {
                     ID_BROWSE
-                } else if m.build.is_none()
+                } else if m.update_available == Some(true)
+                    || m.build.is_none()
                     || m.package.is_none()
                     || !matches!(m.patch, Some(PatchState::Current))
                 {
@@ -1962,6 +2035,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
     m.busy = false;
     let mut automatic_prepare = false;
     let mut source_status = None;
+    let mut patch_status = None;
     let log = match &work.result {
         Ok(WorkResult::LauncherChecked(_)) => "Launcher check complete",
         Ok(WorkResult::Refresh { .. }) => "Check complete",
@@ -1995,12 +2069,12 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
                             PostQuitMessage(0);
                             return;
                         }
-                        Err(e) => local::logged_error(&format!("Launcher update deferred: {e:#}")),
+                        Err(e) => local::summarized_error("apply launcher update", &e),
                     }
                 }
                 Ok(Some(_)) => "Launcher update deferred while local services are running".to_owned(),
                 Ok(None) => "Launcher is current".to_owned(),
-                Err(e) => local::logged_error(&format!("Launcher update unavailable: {e:#}")),
+                Err(e) => local::summarized_error("check for launcher updates", &e),
             };
             drop(m);
             append_log(hwnd, state, &message);
@@ -2017,6 +2091,9 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
         }) => {
             m.build = build;
             m.package = package;
+            if let Some(PatchState::Unsupported(reason) | PatchState::RepairRequired(reason)) = &patch {
+                patch_status = Some(format!("Game patch unavailable: {reason}"));
+            }
             m.patch = patch;
             m.fps = Some(fps);
             match update {
@@ -2026,7 +2103,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
                 }
                 Err(e) => {
                     m.update_available = None;
-                    m.update_error = Some(local::logged_error(&format!("{e:#}")))
+                    m.update_error = Some(local::summarized_error("check for source updates", &e))
                 }
             }
             automatic_prepare = automatic
@@ -2079,7 +2156,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
     }
     drop(m);
     append_log(hwnd, state, log);
-    if let Some(message) = source_status {
+    for message in [source_status, patch_status].into_iter().flatten() {
         append_log(hwnd, state, &message);
     }
     update_view(hwnd, &state.model);
@@ -2088,7 +2165,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
             Ok(false) => start_prepare(hwnd, state),
             Ok(true) => append_log(hwnd, state, "Source update deferred while PGR is running"),
             Err(e) => {
-                let message = local::logged_error(&format!("Source update deferred: {e:#}"));
+                let message = local::summarized_error("start source update", &e);
                 append_log(hwnd, state, &message);
             }
         }
@@ -2096,7 +2173,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
 }
 
 unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
-    let (update_available, runtime, busy, can_restore, can_launch, fps_status) = {
+    let (update_available, runtime, busy, can_restore, can_launch, fps_status, status_line) = {
         let m = model.lock().unwrap();
         (
             m.update_available,
@@ -2105,8 +2182,10 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
             m.settings.selected_game.is_some(),
             can_play(&m).is_ok(),
             m.fps,
+            status_line(&m),
         )
     };
+    set_text(hwnd, ID_STATUS_LINE, &status_line);
     set_text(
         hwnd,
         ID_ACTION,
@@ -2148,7 +2227,7 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
         "RUNNING"
     } else if !can_restore {
         "SELECT GAME"
-    } else if update_available == Some(true) && !can_launch {
+    } else if update_available == Some(true) {
         "UPDATE"
     } else if !can_launch {
         "SETUP"
@@ -2158,6 +2237,36 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
     set_text(hwnd, ID_HOME_ACTION, home_text);
     set_enabled(hwnd, ID_HOME_ACTION, !busy && !runtime);
     set_busy(hwnd, false, "");
+}
+
+fn status_line(m: &Model) -> String {
+    if m.settings.selected_game.is_none() {
+        return "No game selected".to_owned();
+    }
+    // Before setup builds the patch package, show the version this launcher release targets.
+    let bundled = serde_json::from_slice::<serde_json::Value>(include_bytes!("../supported-client.json"))
+        .ok()
+        .and_then(|v| v["applicationVersion"].as_str().map(str::to_owned));
+    let client = m
+        .package
+        .as_ref()
+        .map(|p| p.manifest.application_version.clone())
+        .or(bundled)
+        .unwrap_or_else(|| "unknown".to_owned());
+    let patch = match &m.patch {
+        None | Some(PatchState::Unpatched) => "not installed",
+        Some(PatchState::Current) => "current",
+        Some(PatchState::UpdateAvailable | PatchState::AdoptionRequired) => "update available",
+        Some(PatchState::Unsupported(_)) => "unsupported",
+        Some(PatchState::RepairRequired(_)) => "repair needed",
+    };
+    let server = match (&m.runtime, &m.server) {
+        (None, _) => "stopped",
+        (Some(_), Some(s)) if s.maintenance => "maintenance",
+        (Some(_), Some(s)) if s.online => "running",
+        (Some(_), _) => "offline",
+    };
+    format!("Client {client} · Patch: {patch} · Server: {server}")
 }
 
 fn can_play(m: &Model) -> Result<()> {
@@ -2282,24 +2391,17 @@ fn window_model(hwnd: HWND) -> Option<Arc<Mutex<Model>>> {
 }
 unsafe fn append_log(hwnd: HWND, state: &mut Window, text: &str) {
     if state.log.back().map_or(true, |last| last != text) {
-        if state.log.len() == 32 {
+        if state.log.len() == 200 {
             state.log.pop_front();
         }
         state.log.push_back(text.to_owned());
     }
-    set_text(
-        hwnd,
-        ID_DETAIL,
-        &state
-            .log
-            .iter()
-            .rev()
-            .take(7)
-            .rev()
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\r\n"),
-    );
+    let joined = state.log.iter().map(String::as_str).collect::<Vec<_>>().join("\r\n");
+    set_text(hwnd, ID_DETAIL, &joined);
+    let edit = GetDlgItem(hwnd, ID_DETAIL);
+    let end = GetWindowTextLengthW(edit) as usize;
+    let _ = SendMessageW(edit, EM_SETSEL, WPARAM(end), LPARAM(end as isize));
+    let _ = SendMessageW(edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
 }
 
 unsafe fn set_text(hwnd: HWND, id: i32, text: &str) {

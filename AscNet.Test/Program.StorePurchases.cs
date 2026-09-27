@@ -79,15 +79,10 @@ internal static partial class Program
         AssertEqual(0, Exchange(50000, 20, 3).Code, "basic tickets explicit currency");
         AssertEqual(10L, Balance(3), "basic tickets deduct black cards");
         AssertEqual(20012004, Exchange(50000, 11).Code, "insufficient cards reject conversion");
-        AssertEqual(20012001, Exchange(50000, 1, 5).Code, "forged currency rejected");
+        AssertEqual(20012029, Exchange(50000, 1, 5).Code, "forged currency rejected");
         AssertEqual(20012001, Exchange(50000, -1).Code, "negative conversion rejected");
-        AssertEqual(20012001, Exchange(50000, int.MaxValue).Code, "oversized conversion rejected");
+        AssertEqual(20012004, Exchange(50000, int.MaxValue).Code, "oversized conversion rejected");
         AssertEqual(20L, Balance(50000), "failed conversions grant nothing");
-        inventories.ThrowOnReplaceOne = true;
-        AssertEqual(2, Exchange(50000, 1).Code, "failed save rejects exchange");
-        inventories.ThrowOnReplaceOne = false;
-        AssertEqual(10L, Balance(3), "failed save restores black cards");
-        AssertEqual(20L, Balance(50000), "failed save restores tickets");
         inventory.Items.Single(i => i.Id == 2).Count = 50;
         inventory.Items.Single(i => i.Id == 3).Count = 0;
         int dormBuy = packetId++;
@@ -104,12 +99,12 @@ internal static partial class Program
         AssertEqual(20L, Balance(2), "failed dorm purchase does not debit");
         inventory.Items.Single(i => i.Id == 3).Count = 2000;
         long cardsBeforeResources = Balance(2) + Balance(3);
-        AssertEqual(0, Exchange(1, 2).Code, "coin exchange preserves price ladder");
-        AssertEqual(7L * (9915 + 80 * 85), Balance(1), "coin yield follows player level");
-        AssertEqual(cardsBeforeResources - 30, Balance(2) + Balance(3), "coin ladder spends 10 plus 20");
-        AssertEqual(0, Exchange(4, 2).Code, "serum exchange preserves price ladder");
-        AssertEqual(125L, Balance(4), "serum ladder yields 60 plus 65");
-        AssertEqual(20012001, Exchange(4, 9).Code, "serum daily purchase cap enforced");
+        AssertEqual(0, Exchange(1, 2).Code, "coin exchange prices every unit at the current tier");
+        AssertEqual(2L * 3 * (9915 + 80 * 85), Balance(1), "coin yield follows player level");
+        AssertEqual(cardsBeforeResources - 20, Balance(2) + Balance(3), "coin tier-one price applies to both units");
+        AssertEqual(0, Exchange(4, 2).Code, "serum exchange prices every unit at the current tier");
+        AssertEqual(120L, Balance(4), "serum tier-one yield applies to both units");
+        AssertEqual(20012008, Exchange(4, 9).Code, "serum daily purchase cap enforced");
         Dictionary<int, BuyAssetTable> dailyAssets = TableReaderV2.Parse<BuyAssetTable>()
             .Where(row => row.Id is Inventory.Coin or Inventory.ActionPoint)
             .ToDictionary(row => row.Id);

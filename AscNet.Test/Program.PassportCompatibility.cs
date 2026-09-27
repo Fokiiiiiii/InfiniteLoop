@@ -1,6 +1,7 @@
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.GameServer;
+using AscNet.GameServer.Game;
 using AscNet.GameServer.Handlers;
 using MessagePack;
 using System.Reflection;
@@ -12,28 +13,80 @@ internal static partial class Program
 {
     private static void ValidatePassportCompatibility()
     {
+        // The newest authored season is exercised inside a TEST-ONLY in-memory copy of its own
+        // authored window shifted to contain now (Theatre6/FangKuai pattern), restored in finally;
+        // Resources keep the official dated calendar and no date is authored here.
+        AscNet.Table.V2.share.passport.PassportActivityTable newest =
+            AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportActivityTable>()
+                .MaxBy(row => row.Id)!;
+        ActivityScheduleEntry[] schedules = (ActivityScheduleEntry[])ActivityScheduleService.All;
+        int seasonIndex = Array.FindIndex(schedules, entry => entry.Id == newest.TimeId);
+        if (seasonIndex < 0)
+            throw new InvalidDataException($"Passport season {newest.Id} time {newest.TimeId} has no authored schedule.");
+        ActivityScheduleEntry authoredWindow = schedules[seasonIndex];
+        if (authoredWindow.StartTime <= 0 || authoredWindow.EndTime <= authoredWindow.StartTime)
+            throw new InvalidDataException($"Passport season {newest.Id} schedule is not a dated window.");
+        long syntheticStart = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 3_600;
+        schedules[seasonIndex] = authoredWindow with
+        {
+            StartTime = syntheticStart,
+            EndTime = syntheticStart + (authoredWindow.EndTime - authoredWindow.StartTime),
+            Source = "synthetic-test:Passport"
+        };
+        try
+        {
+            ValidatePassportSeasonFlow();
+        }
+        finally
+        {
+            schedules[seasonIndex] = authoredWindow;
+        }
+    }
+
+    private static void ValidatePassportSeasonFlow()
+    {
         using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForShopCompatibility();
+        List<AscNet.Table.V2.share.passport.PassportActivityTable> seasons =
+            AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportActivityTable>()
+                .OrderBy(row => row.Id).ToList();
+        AscNet.Table.V2.share.passport.PassportActivityTable season = seasons[^1];
+        int previousSeasonId = seasons[^2].Id;
+        List<AscNet.Table.V2.share.passport.PassportTypeInfoTable> types =
+            AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportTypeInfoTable>()
+                .Where(row => row.ActivityId == season.Id).OrderBy(row => row.Id).ToList();
+        int freeTypeId = types.Single(row => row.IsFree == 1).Id;
+        AscNet.Table.V2.share.passport.PassportTypeInfoTable premiumType = types.First(row => row.IsFree != 1);
+        List<AscNet.Table.V2.share.passport.PassportLevelTable> levels =
+            AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportLevelTable>()
+                .Where(row => row.ActivityId == season.Id).OrderBy(row => row.Level).ToList();
+        int LevelFor(long exp) => levels.Where(row => (row.TotalExp ?? 0) <= exp).Max(row => row.Level);
+        long Exp(Inventory owner) => owner.Items.FirstOrDefault(item => item.Id == Inventory.PassportExp)?.Count ?? 0;
+
         const long playerId = 99_460;
         Player player = CreateDrawCompatibilityPlayer(playerId);
+        player.Passport.ActivityId = previousSeasonId;
         Inventory inventory = CreateDrawCompatibilityInventory(playerId,
         [
             new Item { Id = 3, Count = 10_000 },
-            new Item { Id = 5, Count = 100 }
+            new Item { Id = 5, Count = 100 },
+            new Item { Id = Inventory.PassportExp, Count = 2_000 }
         ]);
         using LoopbackSessionHarness harness = new(
             CreateDrawCompatibilityCharacter(playerId), player, inventory, "passport-compat-test");
         harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
 
         Type module = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.PassportModule");
-        RequiredMethod(module, "ReconcileAndPushLogin", BindingFlags.Static | BindingFlags.NonPublic,
-            [typeof(Session)]).Invoke(null, [harness.Session]);
+        MethodInfo login = RequiredMethod(module, "ReconcileAndPushLogin", BindingFlags.Static | BindingFlags.NonPublic,
+            [typeof(Session)]);
+        login.Invoke(null, [harness.Session]);
         NotifyPassportBaseInfo loginBase = ReadPushPayload<NotifyPassportBaseInfo>(
             harness, nameof(NotifyPassportBaseInfo), "Passport login base info");
         NotifyPassportData loginData = ReadPushPayload<NotifyPassportData>(
             harness, nameof(NotifyPassportData), "Passport login data");
-        AssertEqual(46, loginData.ActivityId, "Passport current activity");
-        AssertEqual(1, loginBase.BaseInfo.Level, "Passport initial level");
-        AssertEqual(0L, loginBase.BaseInfo.Exp, "Passport initial EXP");
+        AssertEqual(season.Id, loginData.ActivityId, "Passport newest authored season is live");
+        AssertEqual(1, loginBase.BaseInfo.Level, "Passport rollover initial level");
+        AssertEqual(0L, loginBase.BaseInfo.Exp, "Passport rollover resets EXP");
+        AssertEqual(2_000L, player.Passport.LastTimeBaseInfo.Exp, "Passport rollover keeps previous season EXP");
         object taskData = RequiredMethod(
             RequiredAscNetGameServerType("AscNet.GameServer.Handlers.TaskModule"),
             "BuildTaskData",
@@ -60,22 +113,24 @@ internal static partial class Program
             "Passport Total Activity progress");
         AssertEqual(3, totalActivity.Value<int>("State"), "Passport Total Activity achieved state");
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        HashSet<long> roundTimeIds = AscNet.Common.Util.TableReaderV2
+            .Parse<AscNet.Table.V2.share.passport.PassportTaskGroupTable>()
+            .Where(group => group.Group == season.WeekTaskGroup && group.Type == 2 && group.TimeId is > 0)
+            .Select(group => (long)group.TimeId!.Value)
+            .ToHashSet();
         object controlsResult = RequiredMethod(
             RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
             "BuildTimeLimitControlConfigList",
             BindingFlags.Static | BindingFlags.NonPublic,
             [typeof(DateTimeOffset), typeof(bool)]).Invoke(null, [now, false])
             ?? throw new InvalidDataException("Passport time controls were nil.");
-        JArray roundControls = JArray.FromObject(controlsResult);
-        AssertEqual(1, roundControls.Count(control =>
-                control.Value<long>("Id") is >= 49_905 and <= 49_910
+        JToken[] activeRounds = JArray.FromObject(controlsResult).Where(control =>
+                roundTimeIds.Contains(control.Value<long>("Id"))
                 && control.Value<long>("StartTime") <= now.ToUnixTimeSeconds()
-                && now.ToUnixTimeSeconds() < control.Value<long>("EndTime")),
-            "Passport active round time control");
-        int activeRoundTimeId = roundControls.Single(control =>
-            control.Value<long>("Id") is >= 49_905 and <= 49_910
-            && control.Value<long>("StartTime") <= now.ToUnixTimeSeconds()
-            && now.ToUnixTimeSeconds() < control.Value<long>("EndTime")).Value<int>("Id");
+                && now.ToUnixTimeSeconds() < control.Value<long>("EndTime"))
+            .ToArray();
+        AssertEqual(1, activeRounds.Length, "Passport active round time control");
+        int activeRoundTimeId = activeRounds[0].Value<int>("Id");
         AscNet.Table.V2.share.passport.PassportTaskGroupTable activeRound =
             AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportTaskGroupTable>()
                 .Single(group => group.TimeId == activeRoundTimeId);
@@ -109,7 +164,8 @@ internal static partial class Program
             (15216, first => recordStageClear.Invoke(null, [harness.Session, siegeStageId, 1, 0, first]))
         })
         {
-            AscNet.Table.V2.share.task.ConditionTable condition = roundConditions[conditionType];
+            if (!roundConditions.TryGetValue(conditionType, out AscNet.Table.V2.share.task.ConditionTable? condition))
+                continue;
             record(true);
             AssertEqual(1, player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
                 $"Passport first-clear condition {conditionType}");
@@ -120,38 +176,58 @@ internal static partial class Program
         while (harness.TryReadAvailablePacket("Passport mission progress push", out _))
         {
         }
-        AssertIntegerList([136], loginData.PassportInfos.Select(info => (long)info.Id).ToArray(),
+        AssertIntegerList([freeTypeId], loginData.PassportInfos.Select(info => (long)info.Id).ToArray(),
             "Passport initial free tier");
 
         const int supplyPacketId = 46_001;
         InvokeRegisteredRequestHandler(nameof(PassportGetSupplyRewardRequest), harness.Session, supplyPacketId,
             new PassportGetSupplyRewardRequest());
-        NotifyPassportBaseInfo suppliedBase = ReadPushPayload<NotifyPassportBaseInfo>(
-            harness, nameof(NotifyPassportBaseInfo), "Passport supply base info");
-        _ = ReadPushPayload<NotifyItemDataList>(harness, nameof(NotifyItemDataList), "Passport supply item push");
-        PassportGetSupplyRewardResponse supply = ReadResponsePayload<PassportGetSupplyRewardResponse>(
-            harness, supplyPacketId, nameof(PassportGetSupplyRewardResponse), "Passport supply response");
-        AssertEqual(0, supply.Code, "Passport supply Code");
-        AssertEqual(5_600L, suppliedBase.BaseInfo.Exp, "Passport supply EXP");
-        AssertEqual(5_600L, inventory.Items.Single(item => item.Id == Inventory.PassportExp).Count,
-            "Passport persisted supply EXP");
+        if (season.SupplyReward is > 0)
+        {
+            NotifyPassportBaseInfo suppliedBase = ReadPushPayload<NotifyPassportBaseInfo>(
+                harness, nameof(NotifyPassportBaseInfo), "Passport supply base info");
+            _ = ReadPushPayload<NotifyItemDataList>(harness, nameof(NotifyItemDataList), "Passport supply item push");
+            PassportGetSupplyRewardResponse supply = ReadResponsePayload<PassportGetSupplyRewardResponse>(
+                harness, supplyPacketId, nameof(PassportGetSupplyRewardResponse), "Passport supply response");
+            AssertEqual(0, supply.Code, "Passport supply Code");
+            AssertEqual(Exp(inventory), suppliedBase.BaseInfo.Exp, "Passport persisted supply EXP");
+        }
+        else
+        {
+            PassportGetSupplyRewardResponse supply = ReadResponsePayload<PassportGetSupplyRewardResponse>(
+                harness, supplyPacketId, nameof(PassportGetSupplyRewardResponse), "Passport unauthored supply");
+            AssertEqual(20137017, supply.Code, "Passport unauthored supply Code");
+            AssertEqual(false, player.Passport.IsGetSupplyReward, "Passport unauthored supply not claimed");
+        }
 
+        long expBeforeTask = Exp(inventory);
         const int taskPacketId = 46_002;
         InvokeRegisteredRequestHandler("FinishMultiTaskRequest", harness.Session, taskPacketId,
             new Dictionary<string, object> { ["TaskIds"] = new[] { 80_000 } });
         NotifyPassportBaseInfo taskBase = ReadPushPayload<NotifyPassportBaseInfo>(
             harness, nameof(NotifyPassportBaseInfo), "Passport task base info");
-        _ = ReadPushPayload<NotifyTask>(harness, nameof(NotifyTask), "Passport task sync");
-        _ = ReadPushPayload<NotifyItemDataList>(harness, nameof(NotifyItemDataList), "Passport task item push");
-        JObject task = ReadResponseMapPayload(
-            harness, taskPacketId, "FinishMultiTaskResponse", "Passport task response");
+        HashSet<string> taskPushes = new();
+        Packet taskPacket = harness.ReadPacket("Passport task packet");
+        for (int index = 1; taskPacket.Type == Packet.ContentType.Push && index < 8; index++)
+        {
+            taskPushes.Add(MessagePackSerializer.Deserialize<Packet.Push>(taskPacket.Content).Name);
+            taskPacket = harness.ReadPacket($"Passport task packet {index + 1}");
+        }
+        AssertEqual(true, taskPushes.IsSupersetOf([nameof(NotifyTask), nameof(NotifyItemDataList)]),
+            "Passport task sync and item pushes");
+        AssertEqual(Packet.ContentType.Response, taskPacket.Type, "Passport task response packet type");
+        Packet.Response taskResponse = MessagePackSerializer.Deserialize<Packet.Response>(taskPacket.Content);
+        AssertEqual(taskPacketId, taskResponse.Id, "Passport task response id");
+        AssertEqual("FinishMultiTaskResponse", taskResponse.Name, "Passport task response name");
+        JObject task = JObject.Parse(MessagePackSerializer.ConvertToJson(taskResponse.Content));
         AssertEqual(0, task.Value<int>("Code"), "Passport task Code");
         AssertIntegerList([80_000], task["SuccessTaskIds"]!.Select(value => value.Value<long>()).ToArray(),
             "Passport task success ids");
-        AssertEqual(5_700L, taskBase.BaseInfo.Exp, "Passport task EXP");
+        AssertEqual(true, taskBase.BaseInfo.Exp > expBeforeTask, "Passport task EXP credited");
+        AssertEqual(Exp(inventory), taskBase.BaseInfo.Exp, "Passport task EXP persisted");
 
         int firstRewardId = AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportRewardTable>()
-            .Where(row => row.PassportId == 136 && row.Level == 1 && row.RewardId > 0)
+            .Where(row => row.PassportId == freeTypeId && row.Level == 1 && row.RewardId > 0)
             .OrderBy(row => row.Id).First().Id;
         const int singlePacketId = 46_003;
         InvokeRegisteredRequestHandler(nameof(PassportRecvRewardRequest), harness.Session, singlePacketId,
@@ -160,40 +236,58 @@ internal static partial class Program
             harness, singlePacketId, nameof(PassportRecvRewardResponse), "Passport single reward response",
             typeof(PassportRecvRewardResponse), maxPacketsToRead: 8);
         AssertEqual(0, single.Code, "Passport single reward Code");
-        AssertEqual(true, player.Passport.PassportInfos.Single(info => info.Id == 136).GotRewardList.Contains(firstRewardId),
+        AssertEqual(true, player.Passport.PassportInfos.Single(info => info.Id == freeTypeId).GotRewardList.Contains(firstRewardId),
             "Passport single reward persisted claim");
 
-        const int allPacketId = 46_004;
-        InvokeRegisteredRequestHandler(nameof(PassportRecvAllRewardRequest), harness.Session, allPacketId,
-            new PassportRecvAllRewardRequest());
-        PassportRecvAllRewardResponse all = (PassportRecvAllRewardResponse)ReadResponsePayload(
-            harness, allPacketId, nameof(PassportRecvAllRewardResponse), "Passport all rewards response",
-            typeof(PassportRecvAllRewardResponse), maxPacketsToRead: 16);
-        AssertEqual(0, all.Code, "Passport all rewards Code");
-        AssertEqual(true, all.RewardList.Count > 0, "Passport all rewards goods");
+        long expAfterClaim = Exp(inventory);
+        login.Invoke(null, [harness.Session]);
+        NotifyPassportBaseInfo reloadBase = ReadPushPayload<NotifyPassportBaseInfo>(
+            harness, nameof(NotifyPassportBaseInfo), "Passport reload base info");
+        NotifyPassportData reloadData = ReadPushPayload<NotifyPassportData>(
+            harness, nameof(NotifyPassportData), "Passport reload data");
+        AssertEqual(expAfterClaim, reloadBase.BaseInfo.Exp, "Passport reload keeps season EXP");
+        AssertEqual(true, reloadData.PassportInfos.Single(info => info.Id == freeTypeId).GotRewardList.Contains(firstRewardId),
+            "Passport reload keeps claimed reward");
+
+        const int replayPacketId = 46_007;
+        InvokeRegisteredRequestHandler(nameof(PassportRecvRewardRequest), harness.Session, replayPacketId,
+            new PassportRecvRewardRequest { Id = firstRewardId });
+        PassportRecvRewardResponse replay = (PassportRecvRewardResponse)ReadResponsePayload(
+            harness, replayPacketId, nameof(PassportRecvRewardResponse), "Passport replayed reward response",
+            typeof(PassportRecvRewardResponse), maxPacketsToRead: 8);
+        AssertEqual(true, replay.Code != 0, "Passport replayed reward rejected");
+        AssertEqual(1, player.Passport.PassportInfos.Single(info => info.Id == freeTypeId).GotRewardList
+            .Count(id => id == firstRewardId), "Passport replayed reward not duplicated");
 
         const int tierPacketId = 46_005;
+        long currencyBeforeTier = inventory.Items.Single(item => item.Id == 5).Count;
         InvokeRegisteredRequestHandler(nameof(PassportBuyPassportRequest), harness.Session, tierPacketId,
-            new PassportBuyPassportRequest { Id = 137 });
+            new PassportBuyPassportRequest { Id = premiumType.Id });
         NotifyPassportBaseInfo premiumBase = ReadPushPayload<NotifyPassportBaseInfo>(
             harness, nameof(NotifyPassportBaseInfo), "Passport premium EXP base info");
         PassportBuyPassportResponse tier = (PassportBuyPassportResponse)ReadResponsePayload(
             harness, tierPacketId, nameof(PassportBuyPassportResponse), "Passport tier purchase response",
             typeof(PassportBuyPassportResponse), maxPacketsToRead: 8);
         AssertEqual(0, tier.Code, "Passport tier purchase Code");
-        AssertEqual(70L, inventory.Items.Single(item => item.Id == 5).Count, "Passport tier purchase cost");
-        AssertEqual(true, player.Passport.PassportInfos.Any(info => info.Id == 137),
+        AssertEqual(currencyBeforeTier - (premiumType.CostItemCount ?? 0), inventory.Items.Single(item => item.Id == 5).Count,
+            "Passport tier purchase cost");
+        AssertEqual(true, player.Passport.PassportInfos.Any(info => info.Id == premiumType.Id),
             "Passport premium tier ownership");
-        AssertEqual(10_700L, premiumBase.BaseInfo.Exp, "Passport premium tier EXP");
-        AssertEqual(22, premiumBase.BaseInfo.Level, "Passport premium tier level");
+        AssertEqual(Exp(inventory), premiumBase.BaseInfo.Exp, "Passport premium tier EXP");
+        AssertEqual(LevelFor(premiumBase.BaseInfo.Exp), premiumBase.BaseInfo.Level, "Passport premium tier level");
 
-        List<AscNet.Table.V2.share.passport.PassportLevelTable> levels =
-            AscNet.Common.Util.TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportLevelTable>()
-                .Where(row => row.ActivityId == 46).OrderBy(row => row.Level).ToList();
-        long expBeforePurchase = inventory.Items.Single(item => item.Id == Inventory.PassportExp).Count;
-        int currentLevel = levels.Where(row => (row.TotalExp ?? 0) <= expBeforePurchase).Max(row => row.Level);
+        const int allPacketId = 46_004;
+        InvokeRegisteredRequestHandler(nameof(PassportRecvAllRewardRequest), harness.Session, allPacketId,
+            new PassportRecvAllRewardRequest());
+        PassportRecvAllRewardResponse all = (PassportRecvAllRewardResponse)ReadResponsePayload(
+            harness, allPacketId, nameof(PassportRecvAllRewardResponse), "Passport all rewards response",
+            typeof(PassportRecvAllRewardResponse), maxPacketsToRead: 32);
+        AssertEqual(0, all.Code, "Passport all rewards Code");
+        AssertEqual(true, all.RewardList.Count > 0, "Passport all rewards goods");
+
+        long expBeforePurchase = Exp(inventory);
         AscNet.Table.V2.share.passport.PassportLevelTable destination =
-            levels.Single(row => row.Level == currentLevel + 1);
+            levels.Single(row => row.Level == LevelFor(expBeforePurchase) + 1);
         const int expPacketId = 46_006;
         InvokeRegisteredRequestHandler(nameof(PassportBuyExpRequest), harness.Session, expPacketId,
             new PassportBuyExpRequest { ToLevel = destination.Level });
@@ -201,7 +295,6 @@ internal static partial class Program
             harness, expPacketId, nameof(PassportBuyExpResponse), "Passport EXP purchase response",
             typeof(PassportBuyExpResponse), maxPacketsToRead: 4);
         AssertEqual(0, buyExp.Code, "Passport EXP purchase Code");
-        AssertEqual((long)(destination.TotalExp ?? 0), inventory.Items.Single(item => item.Id == Inventory.PassportExp).Count,
-            "Passport purchased EXP");
+        AssertEqual((long)(destination.TotalExp ?? 0), Exp(inventory), "Passport purchased EXP");
     }
 }

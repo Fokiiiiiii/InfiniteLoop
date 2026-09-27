@@ -88,6 +88,11 @@ namespace AscNet.Common.Database
         [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
         public Dictionary<int, int> ConditionCounters { get; set; } = new();
 
+        // Business-day spend counters for source TaskTimeLimit.DayTaskId tasks; cleared on daily rollover.
+        [BsonElement("day_task_condition_counters")]
+        [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+        public Dictionary<int, int> DayTaskConditionCounters { get; set; } = new();
+
         [BsonElement("claimed_task_ids")]
         public List<int> ClaimedTaskIds { get; set; } = new();
 
@@ -333,7 +338,7 @@ namespace AscNet.Common.Database
 
     public partial class Player
     {
-        public static readonly IMongoCollection<Player> collection = Common.db.GetCollection<Player>("players");
+        public static IMongoCollection<Player> collection = Common.db.GetCollection<Player>("players");
         private static readonly Logger log = new(typeof(Player), LogLevel.WARN, LogLevel.WARN);
 
         public static void EnsureIndexes()
@@ -363,6 +368,17 @@ namespace AscNet.Common.Database
                     {
                         Name = "theatre6_pvp_season_score_player",
                         Sparse = true
+                    }),
+                new CreateIndexModel<Player>(
+                    // Multikey index for the cross-player defence outbox lookup, which is an ElemMatch on
+                    // Theatre6.Pvp.PendingDefenseOutcomes.DefenderId. The key is the stored BSON path
+                    // because it addresses an array element field, and nobody's request path should scan
+                    // every player document to find the outcomes addressed to them.
+                    Builders<Player>.IndexKeys.Ascending("theatre6.pvp.pending_defense_outs.defender_id"),
+                    new CreateIndexOptions
+                    {
+                        Name = "theatre6_pvp_pending_defense_defender",
+                        Sparse = true
                     })
             ]);
             Character.collection.Indexes.CreateOne(new CreateIndexModel<Character>(
@@ -386,7 +402,7 @@ namespace AscNet.Common.Database
         {
             try
             {
-                return collection.AsQueryable().FirstOrDefault(x => x.PlayerData.Id == id);
+                return collection.Find(x => x.PlayerData.Id == id).FirstOrDefault();
             }
             catch (Exception ex)
             {
@@ -628,7 +644,11 @@ namespace AscNet.Common.Database
 
         public void Save()
         {
-            collection.ReplaceOne(Builders<Player>.Filter.Eq(x => x.Id, Id), this);
+            ReplaceOneResult result = collection.ReplaceOne(Builders<Player>.Filter.Eq(x => x.Id, Id), this);
+            // The flag means "a durable write is still owed": an unacknowledged or
+            // no-match result wrote nothing, so it must not clear the retry state.
+            if (DrawState is not null && result.IsAcknowledged && result.MatchedCount > 0)
+                DrawState.HasUnsavedPityRounds = false;
         }
 
         public void SaveChecked()
@@ -641,6 +661,7 @@ namespace AscNet.Common.Database
                 string matchCount = result.IsAcknowledged ? result.MatchedCount.ToString() : "unacknowledged";
                 throw new MongoException($"Player save for id {PlayerData.Id} matched {matchCount} documents.");
             }
+            if (DrawState is not null) DrawState.HasUnsavedPityRounds = false;
         }
 
         [BsonId]
@@ -691,6 +712,9 @@ namespace AscNet.Common.Database
 
         [BsonElement("unlocked_chat_boards")]
         public List<ChatBoardUnlockState> UnlockedChatBoards { get; set; } = new();
+
+        [BsonElement("chat_board_reward_claims")]
+        public List<string> ChatBoardRewardClaims { get; set; } = new();
 
         [BsonElement("purchase_buy_times")]
         [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]

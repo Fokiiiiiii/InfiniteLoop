@@ -38,7 +38,9 @@ Id	Priority	Ignore	Desc	GuideType	ConditionId[1]	ConditionId[2]	ConditionId[3]	C
 50931	50931	0	Lv16 引导日常副本（原为单个日常副本）	1	84100112	770422			50931	UiMain		0	50931
 50932	50932	0	Complete 1-12 Guide: Memory Purchase	1	863070	863060	770422		50932	UiActivityBriefShop	BtnTong1422	0	50932
 53401	53401	0	Lv16 引导装备目标推荐	1	84100112	349	770422		53401	UiMain		0	53401
-53402	53402	0	Complete 1-12 Guide: Using Equipment Goal	1	84100112	770422			53402	UiEquipGuideDetail		705032	53402
+53402	53402	0	Complete 1-12 Guide: Using Equipment Goal	1	84100112	770422			53402	UiTeamRecommendRoleTargetDetail		705032	53402
+53403	53403	0	引导根据玩法一键养成	1	862848	84100112			53403	UiCharacterSystemV2P6	BtnRecommend	0	53403
+53404	53404	0	引导角色一键养成	1	84100112				53404	UiCharacterSystemV2P6	BtnOneClick	0	53404
 64731	64731	0	完成1-12 Lv15 引导进入生命树系统	1	200000				64731	UiMain		0	64731
 64732	64732	0	完成1-12 Lv15 引导生命树系统	1	770431	863156			64732	UiLifeTreeMain		0	64732
 80901	80901	0	Complete 1-12 Guide: New Story Interface	1	84100112				80901	UiNewFuben	PanelMainLineRoot	0	80901
@@ -773,7 +775,7 @@ Id	Priority	Ignore	Desc	GuideType	ConditionId[1]	ConditionId[2]	ConditionId[3]	C
 64704	64704	0	v4.5 肉鸽6占位引导4	1	862112	774800	200000		64704	UiTheatre6Main		0	64704
 64711	64711	0	v4.5 小游戏主界面	1	862112	774800			64711	UiMiniGamesCollectionMain		0	64711
 64712	64712	0	v4.5 小游戏-2048	1	862112	774800			64712	UiGame2048Game		0	64712
-64713	64713	0	v4.5 小游戏-鲨鲨破坏王	1	862112	774800			64713	UiFangKuaiFight		0	64713
+64713	64713	1	v4.5 小游戏-鲨鲨破坏王	1	862112	774800			64713	UiFangKuaiFight		0	64713
 64721	64721	0	v4.5 月卡补卡引导	1	70103	200000			64721	UiWelfare		0	64721
 64751	64751	0	v4.5 肉鸽6主界面1	1	862112	774800			64751	UiTheatre6Main		0	64751
 64752	64752	0	v4.5 肉鸽6主界面2	1	862112	774800	863158		64752	UiTheatre6Main		0	64752
@@ -837,3 +839,33 @@ Id	Priority	Ignore	Desc	GuideType	ConditionId[1]	ConditionId[2]	ConditionId[3]	C
 64923	64923	0	v4.7 七夕乐队	1	862112	774800	863178		64923	UiEnvelopeGuessingMain		0	64923
 64931	64931	0	v4.7 主线断章提醒（海外专用）	1	863179	863180	863181	863182	64931	UiNewFuben|UiActivityBriefBase		0	64931
 64932	64932	0	v4.7 主线断章提醒空引导（海外专用）	1	863179	863180	863181	863183	64932	UiMainLine2Chapter		0	64932
+65001	65001	0	v4.8 比安卡皮肤卡池引导	1	862112	774800			65001	UiGachaBianka402Main	PanelGachaGroup	0	65001
+65002	65002	0	v4.8 赛琳娜皮肤卡池引导	1	862112	774800			65002	UiGachaSelenaMain	PanelGachaGroup	0	65002
+65003	65003	0	v4.8 露西亚皮肤卡池引导	1	862112	774800			65003	UiGachaLuciaMain	PanelGachaGroup	0	65003
+65004	65004	0	v4.8 雷阿尔法皮肤卡池引导	1	862112	774800			65004	UiGachaAlphaMain	PanelGachaGroup	0	65004
+65011	65011	0	v4.8 超频演算主界面	1	862112	774800			65011	UiTransfiniteTowerMain		0	65011
+65012	65012	0	v4.8 超频演算教学	1	862112	774800			65012	UiTransfiniteTowerTeach		0	65012
+65021	65021	0	v4.8 超频演算主界面-基准测试	1	862112	774800			65021	UiTransfiniteTowerMain		0	65021
+65022	65022	0	v4.8 超频演算选人	1	862112	774800			65022	UiBattleRoleRoom	PanelFormationTips	0	65022
+65023	65023	1	v4.8 超频演算编队（废弃）	1	862112	774800			65023	UiBattleRoleRoom	ImgEnergy1	0	65023
+65024	65024	1	v4.8 超频演算数据回档	1	862112	774800			65024	UiTransfiniteTowerSettlement		0	65024
+65025	65025	0	v4.8 超频演算数据峰值演算	1	862112	774800	863190		65025	UiTransfiniteTowerStage		0	65025
+65026	65026	0	v4.8 超频演算数据演算词缀	1	862112	774800	863191		65026	UiTransfiniteTowerStage		0	65026
+65030	65030	0	v4.8 大巴扎主界面	1	862112	774800			65030	UiPunishaarMain		0	65030
+65031	65031	0	v4.8 大巴扎首次进商店	1	862112	774800			65031	UiPunishaarFightMain		0	65031
+65032	65032	0	v4.8 大巴扎战斗1-2	1	862112	774800	863184		65032	UiPunishaarFightMain		0	65032
+65033	65033	0	v4.8 大巴扎胜利结算	1	862112	774800			65033	UiPunishaarBattleSettlement	TitleWin	0	65033
+65034	65034	0	v4.8 大巴扎事件选择1-3	1	862112	774800	863185		65034	UiPunishaarEventSelection		0	65034
+65035	65035	0	v4.8 大巴扎商店升级1-6	1	862112	774800	863187		65035	UiPunishaarFightMain	PanelShop	0	65035
+65036	65036	0	v4.8 大巴扎商店辅助机卡1-4	1	862112	774800	863186		65036	UiPunishaarFightMain	PanelShop	0	65036
+65037	65037	0	v4.8 大巴扎自动释放2-2	1	862112	774800	863188		65037	UiPunishaarFightMain	BtnAuto	0	65037
+65038	65038	0	v4.8 大巴扎失败结算	1	862112	774800			65038	UiPunishaarBattleSettlement	TitleLose	0	65038
+65039	65039	0	v4.8 大巴扎商店配件卡4-15	1	862112	774800	863189		65039	UiPunishaarFightMain	PanelShop	0	65039
+65041	65041	0	v4.8 忽忽破坏王主界面	1	862112	774800			65041	UiFangKuaiMain		0	65041
+65042	65042	0	v4.8 忽忽破坏王5011战斗	1	862112	774800	863192		65042	UiFangKuaiFight		0	65042
+65043	65043	0	v4.8 忽忽破坏王5012详情	1	862112	774800	863193		65043	UiFangKuaiChapterDetail		0	65043
+65044	65044	0	v4.8 忽忽破坏王5012战斗	1	862112	774800	863194		65044	UiFangKuaiFight		0	65044
+65045	65045	0	v4.8 忽忽破坏王5013详情	1	862112	774800	863195		65045	UiFangKuaiChapterDetail		0	65045
+65046	65046	0	v4.8 忽忽破坏王5021详情	1	862112	774800	863196		65046	UiFangKuaiChapterDetail		0	65046
+65047	65047	0	v4.8 忽忽破坏王5023战斗	1	862112	774800	863197		65047	UiFangKuaiFight		0	65047
+65051	65051	0	v4.8 好感剧情送阿德莱德	1	862112	863265			65051	UiMain		0	65051

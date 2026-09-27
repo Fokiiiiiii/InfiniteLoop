@@ -13,9 +13,8 @@ namespace AscNet.Test;
 internal static partial class Program
 {
     /// <summary>
-    /// 4.7 AudioPlayer compatibility: login defaults, add/remove favorites, ordered background
-    /// add/remove, reset, caps/missing-id rejection, and persistence rollback (SaveChecked) after
-    /// mutation. Two distinct song inputs exercise ordering. Uses real MusicPlayer tables.
+    /// AudioPlayer compatibility: login defaults, favorites, backgrounds, reset, caps,
+    /// ownership rejection, and persistence rollback. Uses real MusicPlayer tables.
     /// </summary>
     private static void ValidateAudioPlayerCompatibility()
     {
@@ -102,14 +101,14 @@ internal static partial class Program
         }
 
 
-        // ---- favorites: add two distinct (ordered most-recent-first), remove one ----
+        // ---- favorites: add two distinct (oldest first on wire), remove one ----
         using (LoopbackSessionHarness h = new(CreateDrawCompatibilityCharacter(uid), CreateDrawCompatibilityPlayer(uid), CreateDrawCompatibilityInventory(uid, []), "audioplayer-fav-test"))
         {
             Invoke(addFav, h.Session, new AddAudioPlayerFavoriteSongRequest { SongId = songA });
             Invoke(addFav, h.Session, new AddAudioPlayerFavoriteSongRequest { SongId = songB });
             AssertEqual(2, h.Session.player.FavoriteSongs.Count, "two favorites persisted");
-            AssertEqual(songB, h.Session.player.FavoriteSongs[0], "most-recent favorite first");
-            AssertEqual(songA, h.Session.player.FavoriteSongs[1], "older favorite second");
+            AssertEqual(songA, h.Session.player.FavoriteSongs[0], "older favorite first on wire");
+            AssertEqual(songB, h.Session.player.FavoriteSongs[1], "recent favorite last on wire");
 
             // Duplicate add is idempotent (no second entry).
             Invoke(addFav, h.Session, new AddAudioPlayerFavoriteSongRequest { SongId = songB });
@@ -172,9 +171,9 @@ internal static partial class Program
             _ = Login(h.Session.player);
             Invoke(addBg, h.Session, new AddAudioPlayerBackgroundSongRequest { SongIds = new() { songA, songB } });
             AssertEqual(3, h.Session.player.BackgroundSongs.Count, "default + two added");
-            AssertEqual(songB, h.Session.player.BackgroundSongs[0], "recent background first");
-            AssertEqual(songA, h.Session.player.BackgroundSongs[1], "older background second");
-            AssertEqual(defaultId, h.Session.player.BackgroundSongs[2], "default background retained");
+            AssertEqual(defaultId, h.Session.player.BackgroundSongs[0], "default first on wire");
+            AssertEqual(songA, h.Session.player.BackgroundSongs[1], "older background next on wire");
+            AssertEqual(songB, h.Session.player.BackgroundSongs[2], "recent background last on wire");
 
             Invoke(addBg, h.Session, new AddAudioPlayerBackgroundSongRequest { SongIds = new() { songA, 999_999 } });
             AssertEqual(3, h.Session.player.BackgroundSongs.Count, "duplicate + invalid background skipped");

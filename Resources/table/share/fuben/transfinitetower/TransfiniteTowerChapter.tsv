@@ -1,0 +1,5 @@
+Id	Type	Name	UnLockTimeId	ConditionId	StageGroupId	IsRank	RankRewardIds[0]	RankRewardIds[1]
+1	1	Benchmark Test	50100	0	1005	0		
+2	2	Parallel Calculation - α	50100	1050363	1002	0		
+3	2	Parallel Calculation - β	50102	1050363	1003	0		
+4	3	Peak Calculation	50113	1050363	1001	1	69589	

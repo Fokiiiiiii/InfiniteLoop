@@ -88,7 +88,7 @@ fn prepare_pgrbase(client: &Path, package: &PatchPackage) -> Result<(PatchPackag
     };
     let game = read_client("PGR.exe")?;
     if !package.manifest.accepts_original("PGR.exe", Some(&format!("{:x}", Sha256::digest(&game)))) {
-        bail!("unsupported PGR.exe for PGRBase startup patch");
+        bail!("{}", crate::package::unsupported_client(&package.manifest.application_version, "PGR.exe"));
     }
     let unity = read_client("UnityPlayer.dll")?;
     if !build.unity_players.contains(&format!("{:x}", Sha256::digest(&unity))) {
@@ -131,9 +131,7 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
     for key in [ORIGINAL_KEYS[0], ORIGINAL_KEYS[1]] {
         let actual = file_hash(&client.join(key))?;
         if !package.manifest.accepts_original(key, actual.as_deref()) {
-            return Ok(PatchState::Unsupported(format!(
-                "{key} does not match supported application version"
-            )));
+            return Ok(PatchState::Unsupported(crate::package::unsupported_client(&package.manifest.application_version, key)));
         }
     }
 
@@ -149,13 +147,11 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
                 "unknown launcher state version".into(),
             ));
         }
-        if ORIGINAL_KEYS
-            .iter()
-            .any(|key| {
-                !package
-                    .manifest
-                    .accepts_original(key, state.originals.get(*key).map(String::as_str))
-            })
+        // PGR.exe/GameAssembly.dll are never modified or backed up, only validated on disk
+        // above; client updates may replace them, so only KRSDK's saved original must match.
+        if !package
+            .manifest
+            .accepts_original(ORIGINAL_KEYS[2], state.originals.get(ORIGINAL_KEYS[2]).map(String::as_str))
         {
             return Ok(PatchState::Unsupported(
                 "saved retail originals do not match this release".into(),
@@ -547,11 +543,8 @@ pub fn install(
     let (prepared_package, pgr_base) = prepare_pgrbase(&client, package)?;
     let package = &prepared_package;
     let observed = inspect_prepared(&client, package)?;
-    if matches!(
-        observed,
-        PatchState::Unsupported(_) | PatchState::RepairRequired(_)
-    ) {
-        bail!("refusing installation in state: {observed:?}");
+    if let PatchState::Unsupported(reason) | PatchState::RepairRequired(reason) = &observed {
+        bail!("refusing installation: {reason}");
     }
     if observed == PatchState::Current {
         return Ok(client.join(STATE_DIR).join(STATE_FILE));
@@ -579,6 +572,9 @@ pub fn install(
     if observed == PatchState::AdoptionRequired {
         let mut adopted = prior.context("verified legacy backup disappeared during adoption")?;
         adopted.release_version = package.manifest.version.clone();
+        for key in [ORIGINAL_KEYS[0], ORIGINAL_KEYS[1]] {
+            adopted.originals.insert(key.into(), sha256_file(&client.join(key))?);
+        }
         for file in &package.manifest.files {
             adopted
                 .files
@@ -592,13 +588,13 @@ pub fn install(
         progress("Adopted verified existing patch".into());
         return Ok(state_path);
     }
-    let originals = match &prior {
-        Some(state) => state.originals.clone(),
-        None => ORIGINAL_KEYS
-            .iter()
-            .map(|key| Ok(((*key).to_owned(), sha256_file(&client.join(key))?)))
-            .collect::<Result<BTreeMap<_, _>>>()?,
-    };
+    let mut originals = prior.as_ref().map(|state| state.originals.clone()).unwrap_or_default();
+    for key in ORIGINAL_KEYS {
+        // Saved KRSDK original is preserved; unmanaged client binaries track the verified disk copy.
+        if key != ORIGINAL_KEYS[2] || !originals.contains_key(key) {
+            originals.insert(key.into(), sha256_file(&client.join(key))?);
+        }
+    }
     let id = Uuid::new_v4().to_string();
     let backup_parent = state_root.join("backups");
     create_private_dir(&backup_parent)?;
@@ -853,7 +849,7 @@ fn remove_rollback_directory(path: &Path) {
 pub fn game_running() -> Result<bool> {
     #[cfg(windows)]
     {
-        let output = Command::new("tasklist.exe")
+        let output = crate::local::hide_console(&mut Command::new("tasklist.exe"))
             .args(["/FI", "IMAGENAME eq PGR.exe", "/FO", "CSV", "/NH"])
             .output()
             .context("querying running processes")?;
@@ -1340,13 +1336,9 @@ fn find_legacy(client: &Path, package: &PatchPackage) -> Result<Option<(PathBuf,
         if !legacy_client_matches(client, &manifest.client) {
             continue;
         }
-        if ORIGINAL_KEYS
-            .iter()
-            .any(|key| {
-                !package
-                    .manifest
-                    .accepts_original(key, manifest.pinned_client.get(*key).map(String::as_str))
-            })
+        if !package
+            .manifest
+            .accepts_original(ORIGINAL_KEYS[2], manifest.pinned_client.get(ORIGINAL_KEYS[2]).map(String::as_str))
         {
             continue;
         }
@@ -1850,6 +1842,29 @@ mod tests {
         );
         install(&client, &package_v2, &mut |_| {}).unwrap();
         assert_eq!(inspect(&client, &package_v2).unwrap(), PatchState::Current);
+        // A newer supported client replaces PGR.exe/GameAssembly.dll under an existing patch.
+        let hash = |bytes: &[u8]| format!("{:x}", sha2::Sha256::digest(bytes));
+        let mut package_v3 = package.clone();
+        package_v3.manifest.version = "3.0.0".into();
+        package_v3.manifest.originals.insert("PGR.exe".into(), vec![hash(b"exe-new")]);
+        package_v3.manifest.originals.insert("GameAssembly.dll".into(), vec![hash(b"assembly-new")]);
+        fs::write(client.join("PGR.exe"), b"exe-new").unwrap();
+        fs::write(client.join("GameAssembly.dll"), b"assembly-new").unwrap();
+        assert_eq!(inspect(&client, &package_v3).unwrap(), PatchState::UpdateAvailable);
+        install(&client, &package_v3, &mut |_| {}).unwrap();
+        let state = read_state(&client).unwrap().unwrap();
+        assert_eq!(state.originals["PGR.exe"], hash(b"exe-new"));
+        assert_eq!(state.originals["GameAssembly.dll"], hash(b"assembly-new"));
+        assert_eq!(state.originals["PGR_Data/Plugins/KRSDK.dll"], originals["PGR_Data/Plugins/KRSDK.dll"]);
+        // A saved KRSDK original outside the release allowlist is still refused.
+        let mut bad = state.clone();
+        bad.originals.insert("PGR_Data/Plugins/KRSDK.dll".into(), "00".repeat(32));
+        let state_path = client.join(STATE_DIR).join(STATE_FILE);
+        write_json_atomic(&state_path, &bad).unwrap();
+        assert!(matches!(inspect(&client, &package_v3).unwrap(), PatchState::Unsupported(_)));
+        write_json_atomic(&state_path, &state).unwrap();
+        fs::write(client.join("PGR.exe"), b"exe").unwrap();
+        fs::write(client.join("GameAssembly.dll"), assembly).unwrap();
         restore(&client, &mut |_| {}).unwrap();
         assert_eq!(fs::read(client.join("PGR.exe")).unwrap(), b"exe");
         assert_eq!(
