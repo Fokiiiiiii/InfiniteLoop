@@ -379,8 +379,9 @@ Basic local bridge with MongoDB managed by the runner:
 python3 run_steam.py --with-mongo
 ```
 
-For JP, start the bridge and leave it running. Then launch Punishing: Gray
-Raven from Steam so Steam performs its normal launch/authentication flow:
+For JP on Windows, run `start-jp-bridge.cmd` and leave its console open. Then
+launch Punishing: Gray Raven from Steam so Steam performs its normal
+launch/authentication flow. On other platforms, use:
 
 ```bash
 python3 run_steam.py --region jp --with-mongo --proxy-local --proxy-log "" --tcp-capture
