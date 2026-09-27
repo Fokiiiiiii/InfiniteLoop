@@ -2,12 +2,14 @@
 to additionally validate the real client call sites and timer transitions.
 Requires lupa, UnityPy and msgpack.
 """
+import json
 import os
 from pathlib import Path
+import tempfile
 import unittest
 
 from lupa.lua53 import LuaRuntime
-from Scripts.patch_local_store import CATALOG_CALLERS, patch_catalog_lua, patch_recharge_lua
+from Scripts.patch_local_store import CATALOG_CALLERS, apply, digest, patch_catalog_lua, patch_recharge_lua
 
 
 class PurchaseIconTests(unittest.TestCase):
@@ -125,6 +127,44 @@ class PatchTests(unittest.TestCase):
                     CardClass.UpdateTimer(Card, false, 1)
                     assert(not Card.ImgHave.gameObject.active and Card.ImgSellout.gameObject.active)
                 ''')
+
+
+class BundleIntegrityTests(unittest.TestCase):
+    """Must also pass under python -O: integrity checks may not rely on assert."""
+
+    def bundle(self, directory, installed):
+        output = Path(directory)
+        target = output / 'installed.bundle'
+        target.write_bytes(installed)
+        (output / 'original.bundle').write_bytes(b'original')
+        (output / 'patched.bundle').write_bytes(b'patched')
+        (output / 'manifest.json').write_text(json.dumps({'source': str(target),
+            'original_sha256': digest(b'original'), 'patched_sha256': digest(b'patched')}), encoding='utf-8')
+        return output, target
+
+    def test_tampered_rollback_payload_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, target = self.bundle(directory, b'patched')
+            (output / 'original.bundle').write_bytes(b'tampered')
+            with self.assertRaises(RuntimeError):
+                apply(output, restore=True)
+            self.assertEqual(b'patched', target.read_bytes())
+
+    def test_tampered_patch_payload_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, target = self.bundle(directory, b'original')
+            (output / 'patched.bundle').write_bytes(b'tampered')
+            with self.assertRaises(RuntimeError):
+                apply(output)
+            self.assertEqual(b'original', target.read_bytes())
+
+    def test_verified_apply_and_restore(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, target = self.bundle(directory, b'original')
+            apply(output)
+            self.assertEqual(b'patched', target.read_bytes())
+            apply(output, restore=True)
+            self.assertEqual(b'original', target.read_bytes())
 
 
 if __name__ == '__main__':

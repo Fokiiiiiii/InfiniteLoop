@@ -258,10 +258,66 @@ internal static partial class Program
         AssertEqual(rc + 28, Balance(Inventory.HongKa), "recovery never double credits");
         AssertEqual(end + 30, harness.Session.player.PurchaseDailyPasses[83028].EndDay, "monthly term survives reload");
         AssertEqual(0, Claim(83028).RewardList.Count, "daily claim survives reload");
+        ValidateRechargeCapacity();
         ValidateFullMonthlyCombo();
         ValidateTenDayPackage();
         ValidateBlackCardPoolPackagePurchases();
         Console.WriteLine("Store purchase/recharge compatibility checks passed.");
+    }
+
+    private static void ValidateRechargeCapacity()
+    {
+        const long uid = 468603;
+        long max = Inventory.GetMaxCount(TableReaderV2.Parse<ItemTable>().Single(item => item.Id == Inventory.HongKa));
+        Player player = CreateDrawCompatibilityPlayer(uid);
+        Inventory inventory = CreateDrawCompatibilityInventory(uid,
+            [new Item { Id = Inventory.HongKa, Count = max - 599 }]);
+        using LoopbackSessionHarness harness = new(CreateDrawCompatibilityCharacter(uid), player, inventory, "recharge-capacity");
+        harness.Session.stage = CreateLoginAccountCompatibilityStage(uid);
+        int packetId = 1;
+        PayInitiatedResponse Recharge(string key)
+        {
+            int sequence = packetId++;
+            InvokeRegisteredRequestHandler(nameof(PayInitiatedRequest), harness.Session, sequence,
+                new PayInitiatedRequest { Key = key });
+            return ReadResponsePayload<PayInitiatedResponse>(harness, sequence, nameof(PayInitiatedResponse), "recharge capacity", maxPacketsToRead: 32);
+        }
+        long Balance() => harness.Session.inventory.Items.Single(item => item.Id == Inventory.HongKa).Count;
+        void SetBalance(long count) => harness.Session.inventory.Items.Single(item => item.Id == Inventory.HongKa).Count = count;
+
+        PayInitiatedResponse full = Recharge("PayWin600");
+        AssertEqual(20027011, full.Code, "recharge beyond RC capacity is refused");
+        AssertEqual(false, full.LocalCompleted, "refused recharge is not locally completed");
+        AssertEqual(max - 599, Balance(), "refused recharge does not truncate-credit");
+        AssertEqual(0L, player.RechargeSequence, "refused recharge keeps sequence");
+        AssertEqual(true, harness.Session.player.PendingRecharge is null, "refused recharge creates no intent");
+
+        SetBalance(max - 600);
+        PayInitiatedResponse fits = Recharge("PayWin600");
+        AssertEqual(0, fits.Code, "recharge with exact room succeeds");
+        AssertEqual(600, fits.RewardList.Single().Count, "exact-room recharge reports full tier");
+        AssertEqual(max, Balance(), "exact-room recharge credits full tier");
+
+        SetBalance(max - 599);
+        string order = $"local:{uid}:{harness.Session.player.RechargeSequence}";
+        harness.Session.player.PendingRecharge = new() { Key = "PayWin600", Count = 600, Order = order };
+        AssertEqual(20027011, Recharge("PayWin600").Code, "unreceipted pending recharge waits for capacity");
+        AssertEqual(max - 599, Balance(), "deferred pending recharge does not truncate-credit");
+        AssertEqual(order, harness.Session.player.PendingRecharge?.Order, "deferred pending recharge is retained");
+        SetBalance(max - 600);
+        AssertEqual(0, Recharge("PayWin600").Code, "pending recharge resumes once room exists");
+        AssertEqual(max, Balance(), "resumed pending recharge credits full tier");
+
+        long sequence = harness.Session.player.RechargeSequence;
+        order = $"local:{uid}:{sequence}";
+        harness.Session.inventory.AppliedRewardClaims.Add(order);
+        harness.Session.character.AppliedRewardClaims.Add(order);
+        harness.Session.player.PendingRecharge = new() { Key = "PayWin600", Count = 600, Order = order };
+        PayInitiatedResponse receipted = Recharge("PayWin600");
+        AssertEqual(0, receipted.Code, "receipted recharge finalizes at full capacity");
+        AssertEqual(max, Balance(), "receipted recharge is not granted again");
+        AssertEqual(sequence + 1, harness.Session.player.RechargeSequence, "receipted recharge advances sequence");
+        AssertEqual(true, harness.Session.player.PendingRecharge is null, "receipted recharge clears intent");
     }
 
     private static void ValidateFullMonthlyCombo()

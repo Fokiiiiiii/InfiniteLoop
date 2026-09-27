@@ -297,26 +297,38 @@ internal partial class PayModule
                     && (session.player.PendingRecharge is null || session.player.PendingRecharge.Key == request.Key))
                 {
                     var pending = session.player.PendingRecharge;
-                    if (pending is null)
+                    // Inventory.Do clamps at MaxCount, so refuse before granting; a
+                    // receipted order already credited the cards and only finalizes.
+                    int count = pending?.Count ?? product.MoneyCard;
+                    if ((pending is null || !session.inventory.AppliedRewardClaims.Contains(pending.Order, StringComparer.Ordinal))
+                        && !HasItemCapacity(session, [new RewardGoodsTable { TemplateId = Inventory.HongKa, Count = count }]))
                     {
-                        pending = new() { Key = request.Key, Count = product.MoneyCard,
-                            Order = $"local:{session.player.PlayerData.Id}:{session.player.RechargeSequence}" };
-                        session.player.PendingRecharge = pending;
-                        try { session.player.SaveChecked(); }
-                        catch { session.player.PendingRecharge = null; throw; }
+                        session.log.Warn($"Local recharge deferred: {request.Key} exceeds Rainbow Card capacity");
+                        response.Code = 20027011;
                     }
-                    var result = RewardHandler.ApplyRewardsOnceAndPersist([new RewardGrant(pending.Order,
-                        [new RewardGoodsTable { TemplateId = Inventory.HongKa, Count = pending.Count }])], session);
-                    long sequence = session.player.RechargeSequence;
-                    session.player.RechargeSequence = checked(sequence + 1);
-                    session.player.PendingRecharge = null;
-                    try { session.player.SaveChecked(); }
-                    catch { session.player.RechargeSequence = sequence; session.player.PendingRecharge = pending; throw; }
-                    response.Code = 0;
-                    response.GameOrder = pending.Order;
-                    response.LocalCompleted = true;
-                    response.RewardList = result.RewardGoods;
-                    result.SendPushes(session);
+                    else
+                    {
+                        if (pending is null)
+                        {
+                            pending = new() { Key = request.Key, Count = product.MoneyCard,
+                                Order = $"local:{session.player.PlayerData.Id}:{session.player.RechargeSequence}" };
+                            session.player.PendingRecharge = pending;
+                            try { session.player.SaveChecked(); }
+                            catch { session.player.PendingRecharge = null; throw; }
+                        }
+                        var result = RewardHandler.ApplyRewardsOnceAndPersist([new RewardGrant(pending.Order,
+                            [new RewardGoodsTable { TemplateId = Inventory.HongKa, Count = pending.Count }])], session);
+                        long sequence = session.player.RechargeSequence;
+                        session.player.RechargeSequence = checked(sequence + 1);
+                        session.player.PendingRecharge = null;
+                        try { session.player.SaveChecked(); }
+                        catch { session.player.RechargeSequence = sequence; session.player.PendingRecharge = pending; throw; }
+                        response.Code = 0;
+                        response.GameOrder = pending.Order;
+                        response.LocalCompleted = true;
+                        response.RewardList = result.RewardGoods;
+                        result.SendPushes(session);
+                    }
                 }
             }
             catch (Exception error) { session.log.Error($"Local recharge failed: {error}"); response.Code = 2; }

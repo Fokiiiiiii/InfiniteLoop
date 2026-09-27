@@ -108,12 +108,16 @@ def prepare(game, output, catalog_patch=False):
     patched = env.file.save(packer='lz4')
     verified = UnityPy.load(patched)
     after = text_assets(verified)
-    assert before.keys() == after.keys()
-    assert {key for key in before if before[key] != after[key]} == set(changed)
+    # Safety checks must not use assert: python -O would strip them.
+    if before.keys() != after.keys():
+        raise RuntimeError('Patched bundle TextAsset set differs from the original')
+    if {key for key in before if before[key] != after[key]} != set(changed):
+        raise RuntimeError('Patched bundle changed unexpected TextAssets')
     for obj in verified.objects:
         if obj.path_id in changed:
             data = obj.read()
-            assert data.m_Script == scripts[data.m_Name]
+            if data.m_Script != scripts[data.m_Name]:
+                raise RuntimeError(f'{data.m_Name}: patched script did not round-trip')
     output.mkdir(parents=True, exist_ok=True)
     (output / 'original.bundle').write_bytes(original)
     (output / 'patched.bundle').write_bytes(patched)
@@ -157,11 +161,13 @@ def apply(output, restore=False):
     if digest(target.read_bytes()) != expected:
         raise RuntimeError('Installed bundle changed since preparation; refusing to overwrite')
     payload = (output / ('original.bundle' if restore else 'patched.bundle')).read_bytes()
-    assert digest(payload) == manifest['original_sha256' if restore else 'patched_sha256']
+    if digest(payload) != manifest['original_sha256' if restore else 'patched_sha256']:
+        raise RuntimeError('Prepared bundle does not match the manifest checksum; refusing to overwrite')
     temporary = target.with_suffix(target.suffix + '.ascnet-store.tmp')
     temporary.write_bytes(payload)
     temporary.replace(target)
-    assert digest(target.read_bytes()) == digest(payload)
+    if digest(target.read_bytes()) != digest(payload):
+        raise RuntimeError('Installed bundle checksum mismatch after write')
     print('Restored original client bundle' if restore else 'Applied verified local store client patch')
 
 
