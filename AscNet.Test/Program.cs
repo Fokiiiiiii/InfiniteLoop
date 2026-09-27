@@ -298,9 +298,149 @@ namespace AscNet.Test
                     ValidateCharacterEnhanceSkillTableBackedCompatibility();
                     return;
                 }
-                if (args.Contains("--version-47-memory-compat-only"))
+                if (args.Contains("--version-48-frames-only"))
                 {
-                    ValidateVersion47MemoryCompatibility();
+                    ValidateVersion48Frames();
+                    return;
+                }
+                if (args.Contains("--version-48-audio-only"))
+                {
+                    RunAudioPlayerUpgradeCompatibility();
+                    return;
+                }
+                if (args.Contains("--version-48-draw-cub-compat-only"))
+                {
+                    ValidateVersion48DrawCubCompatibility();
+                    ValidateItemBuyAssetCompatibility();
+                    return;
+                }
+                if (args.Contains("--version-48-equipment-cosmetics-only"))
+                {
+                    ValidateVersion48EquipmentCosmetics();
+                    ValidateFashionSuitRewardCompatibility();
+                    ValidateWeaponOverrunCompatibility();
+                    return;
+                }
+                if (args.Contains("--date-alive-task-progress-only"))
+                {
+                    ValidateDateALiveTaskProgressCompatibility();
+                    return;
+                }
+                if (args.Contains("--team-recommend-only"))
+                {
+                    ValidateTeamRecommendCompatibility();
+                    ValidateTeamRecommendGlobalStandings();
+                    return;
+                }
+                if (args.Contains("--fangkuai-only"))
+                {
+                    RunFangKuaiCompatibility();
+                    return;
+                }
+                if (args.Contains("--punishaar-only"))
+                {
+                    RunPunishaarCompatibility();
+                    return;
+                }
+                if (args.Contains("--stage-general-skill-ban-only"))
+                {
+                    ValidateStageGeneralSkillBanCompatibility();
+                    return;
+                }
+                if (args.Contains("--equipment-slot-notifications-only"))
+                {
+                    ValidateEquipmentSlotNotifications();
+                    return;
+                }
+                if (args.Contains("--non-fate-policy-only"))
+                {
+                    ValidateVersion48DrawCubCompatibility();
+                    ValidateItemBuyAssetCompatibility();
+                    ValidateEnvelopeCatchUpAndReissue();
+                    ValidateTeamRecommendGlobalStandings();
+                    ValidateMissingCalendarAscNetPolicy();
+                    ValidateCosmicDailyTasks();
+                    RunMineSweepingCompatibility();
+                    RunFangKuaiCompatibility();
+                    RunPunishaarCompatibility();
+                    ValidateEquipmentSlotNotifications();
+                    ValidateTransfiniteTowerBoundary();
+                    ValidateTransfiniteTowerRanking();
+                    ValidateTransfiniteTowerProgression();
+                    ValidateChatBoardRewardGrants();
+                    ValidateRequiemNirvatiaTagBuffChecks();
+                    return;
+                }
+                if (args.Contains("--transfinite-tower-boundary-only"))
+                {
+                    ValidateTransfiniteTowerBoundary();
+                    ValidateTransfiniteTowerRanking();
+                    ValidateTransfiniteTowerProgression();
+                    return;
+                }
+                if (args.Contains("--coating-gacha-48-only"))
+                {
+                    ValidateCoatingGacha48Compatibility();
+                    ValidateBackgroundRewardGrants();
+                    return;
+                }
+                if (args.Contains("--version-48-content-only"))
+                {
+                    ValidateVersion48MainLine43();
+                    ValidateVersion48BossTrialWindows();
+                    ValidateBossActivityCompatibility();
+                    ValidateRosterLife48Compatibility();
+                    ValidateVersion48GuideCompletion();
+                    ValidateVersion48EventPanelTasks();
+                    ValidateVersion48AffectionStoryTask();
+                    ValidateFestivalExperimentClearRelogin();
+                    ValidateVersion48TeachingTreasureClaims();
+                    ValidateCoatingGacha48Compatibility();
+                    ValidateBackgroundRewardGrants();
+                    return;
+                }
+                if (args.Contains("--version-48-compat-only"))
+                {
+                    ValidateVersion48Frames();
+                    RunAudioPlayerUpgradeCompatibility();
+                    ValidateVersion47CharacterCompatibility();
+                    ValidateStageGeneralSkillBanCompatibility();
+                    ValidateVersion48DrawCubCompatibility();
+                    ValidateItemBuyAssetCompatibility();
+                    ValidateDateALiveTaskProgressCompatibility();
+                    ValidateVersion48EquipmentCosmetics();
+                    ValidateFashionSuitRewardCompatibility();
+                    ValidateWeaponOverrunCompatibility();
+                    ValidateVersion47EventCompatibility();
+                    ValidateEnvelopeCatchUpAndReissue();
+                    ValidateVersion47ActivityCompatibility();
+                    ValidateVersion47SignInCompatibility();
+                    ValidatePassportCompatibility();
+                    ValidateTeamRecommendCompatibility();
+                    ValidateTeamRecommendGlobalStandings();
+                    ValidateMissingCalendarAscNetPolicy();
+                    ValidateCosmicDailyTasks();
+                    RunMineSweepingCompatibility();
+                    ValidateEquipmentSlotNotifications();
+                    RunFangKuaiCompatibility();
+                    RunPunishaarCompatibility();
+                    ValidateTransfiniteTowerBoundary();
+                    ValidateTransfiniteTowerRanking();
+                    ValidateTransfiniteTowerProgression();
+                    ValidateChatBoardRewardGrants();
+                    ValidateStudyCharacterCompatibility();
+                    ValidateStudyProgressionCompatibility();
+                    ValidateVersion48MainLine43();
+                    ValidateVersion48BossTrialWindows();
+                    ValidateBossActivityCompatibility();
+                    ValidateRosterLife48Compatibility();
+                    ValidateVersion48GuideCompletion();
+                    ValidateVersion48EventPanelTasks();
+                    ValidateVersion48AffectionStoryTask();
+                    ValidateFestivalExperimentClearRelogin();
+                    ValidateVersion48TeachingTreasureClaims();
+                    ValidateCoatingGacha48Compatibility();
+                    ValidateBackgroundRewardGrants();
                     return;
                 }
                 if (args.Contains("--version-47-character-compat-only"))
@@ -345,6 +485,11 @@ namespace AscNet.Test
                     RunAudioPlayerCompatibility();
                     ValidateGuildWarPopupActionCompatibility();
                     ValidateVersion47ConcertStartCompatibility();
+                    return;
+                }
+                if (args.Contains("--same-color-game-compat-only"))
+                {
+                    ValidateSameColorGameCompatibility();
                     return;
                 }
                 if (args.Contains("--version-46-activity-compat-only"))
@@ -584,6 +729,7 @@ namespace AscNet.Test
                 {
                     ValidateBossSingleCompatibility();
                     ValidateBossSingleIntensiveStageHydration();
+                    ValidateBossSingleCycleStageScoreSync();
                     return;
                 }
 
@@ -957,6 +1103,7 @@ namespace AscNet.Test
                 ValidateBossActivityCompatibility();
                 ValidateBossSingleCompatibility();
                 ValidateBossSingleIntensiveStageHydration();
+                ValidateBossSingleCycleStageScoreSync();
                 ValidateSimulatedBattlefieldCompatibility();
                 ValidateCurrentClientGuideTableCompatibility();
                 ValidateWheelchairManualFullCompatibility();
@@ -986,12 +1133,12 @@ namespace AscNet.Test
                 ValidateFightSettleAchievementCompatibility();
                 ValidatePr2QualityCompatibility();
                 ValidateInventoryEquipCompatibility();
-                ValidateVersion47MemoryCompatibility();
                 ValidateEquipDecomposeCompatibility();
                 ValidateEquipChipRecycleCompatibility();
                 ValidateDrawCompatibility();
                 ValidateDrawRules();
                 ValidateItemUseCompatibility();
+                ValidateItemBuyAssetCompatibility();
                 ValidateAutoUseGiftCompatibility();
                 ValidateItemSellCompatibility();
                 ValidateInventoryMaxCountCompatibility();
@@ -1013,6 +1160,36 @@ namespace AscNet.Test
                 ValidateLifeTreeFinishProcessRequestCompatibility();
                 ValidateSteamClientConfig();
                 RunAudioPlayerCompatibility();
+                RunAudioPlayerUpgradeCompatibility();
+                ValidateVersion48Frames();
+                ValidateVersion48DrawCubCompatibility();
+                ValidateDateALiveTaskProgressCompatibility();
+                ValidateVersion48EquipmentCosmetics();
+                ValidatePassportCompatibility();
+                ValidateStageGeneralSkillBanCompatibility();
+                ValidateTeamRecommendCompatibility();
+                ValidateTeamRecommendGlobalStandings();
+                ValidateEnvelopeCatchUpAndReissue();
+                ValidateMissingCalendarAscNetPolicy();
+                ValidateCosmicDailyTasks();
+                RunMineSweepingCompatibility();
+                ValidateEquipmentSlotNotifications();
+                RunFangKuaiCompatibility();
+                RunPunishaarCompatibility();
+                ValidateTransfiniteTowerBoundary();
+                ValidateTransfiniteTowerRanking();
+                ValidateTransfiniteTowerProgression();
+                ValidateChatBoardRewardGrants();
+                ValidateVersion48MainLine43();
+                ValidateVersion48BossTrialWindows();
+                ValidateRosterLife48Compatibility();
+                ValidateVersion48GuideCompletion();
+                ValidateVersion48EventPanelTasks();
+                ValidateVersion48AffectionStoryTask();
+                ValidateFestivalExperimentClearRelogin();
+                ValidateVersion48TeachingTreasureClaims();
+                ValidateCoatingGacha48Compatibility();
+                ValidateBackgroundRewardGrants();
                 ValidateGuildWarPopupActionCompatibility();
                 ValidateVersion47ConcertStartCompatibility();
                 ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
@@ -5058,6 +5235,16 @@ namespace AscNet.Test
             if (!startupPushes.Contains("NotifyWheelchairManualActivityUpdate"))
                 throw new InvalidDataException($"AccountModule.DoLogin startup pushes: expected retail startup tail NotifyWheelchairManualActivityUpdate; observed {DescribePushes(startupPushes)}.");
 
+            JObject versionConfig = JsonSnapshot.LoadObject("Configs/version_config.json");
+            string currentDocumentVersion = versionConfig.Properties()
+                .MaxBy(entry => Version.Parse(entry.Name))!.Value.Value<string>("DocumentVersion")!;
+            if (!startupPushesByName.TryGetValue("NotifyClientVersion", out Packet.Push? versionPush))
+                throw new InvalidDataException("AccountModule.DoLogin omitted NotifyClientVersion.");
+            JObject versionPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(versionPush.Content));
+            AssertEqual(currentDocumentVersion, versionPayload.Value<string>("Version"),
+                "NotifyClientVersion uses current document version");
+            AssertEqual(false, versionPayload.Value<bool>("KickOut"), "NotifyClientVersion does not eject older clients");
+
             AssertPushSubsequence(
                 startupPushes,
                 retailCriticalStartupOrderThroughPassport,
@@ -5163,11 +5350,16 @@ namespace AscNet.Test
                 calendarPayload,
                 "OpenActivityIds",
                 "AccountModule.DoLogin NotifyNewActivityCalendarData startup payload");
-            if (openCalendarActivityIds.Count == 0
-                || openCalendarActivityIds.Distinct().Count() != openCalendarActivityIds.Count
-                || openCalendarActivityIds.Any(activityId => activityId / 1000 is not (46 or 47))
-                || openCalendarActivityIds.Contains(45001))
-                throw new InvalidDataException("AccountModule.DoLogin NotifyNewActivityCalendarData.OpenActivityIds emitted stale, duplicate, or non-current activities.");
+            if (openCalendarActivityIds.Distinct().Count() != openCalendarActivityIds.Count)
+                throw new InvalidDataException("AccountModule.DoLogin emitted duplicate calendar activities.");
+            long[] expectedOpenCalendarIds = TableReaderV2.Parse<NewActivityCalendarActivityTable>()
+                .Where(activity => ActivityScheduleService.IsOpen(activity.MainTimeId,
+                    DateTimeOffset.FromUnixTimeSeconds(calendarNow)))
+                .OrderBy(activity => activity.ActivityId)
+                .Select(activity => (long)activity.ActivityId)
+                .ToArray();
+            AssertIntegerList(expectedOpenCalendarIds, openCalendarActivityIds.ToArray(),
+                "AccountModule.DoLogin calendar activities match current authored windows");
             Dictionary<int, NewActivityCalendarActivityTable> calendarRows = TableReaderV2.Parse<NewActivityCalendarActivityTable>()
                 .ToDictionary(activity => activity.ActivityId);
             foreach (long activityId in openCalendarActivityIds)
@@ -5245,9 +5437,31 @@ namespace AscNet.Test
             AssertEqual("Count", string.Join(',', activityDrawGroupCountPayload.Properties().Select(property => property.Name)), "AccountModule.DoLogin NotifyActivityDrawGroupCount exact key");
             int activityDrawListIndex = RequiredPushIndex(startupPushes, nameof(NotifyActivityDrawList), 0, "AccountModule.DoLogin activity draw list startup push");
             int activityDrawCountIndex = RequiredPushIndex(startupPushes, nameof(NotifyActivityDrawGroupCount), activityDrawListIndex + 1, "AccountModule.DoLogin activity draw count startup push");
-            int fashionIndex = RequiredPushIndex(startupPushes, nameof(NotifyFashionStoryData), activityDrawCountIndex + 1, "AccountModule.DoLogin Fashion startup push");
-            if (activityDrawCountIndex != activityDrawListIndex + 1 || fashionIndex <= activityDrawCountIndex)
-                throw new InvalidDataException("AccountModule.DoLogin activity draw pushes must be adjacent before Fashion.");
+            if (activityDrawCountIndex != activityDrawListIndex + 1)
+                throw new InvalidDataException("AccountModule.DoLogin activity draw pushes must be adjacent.");
+            int fashionIndex = FindPushIndex(startupPushes, nameof(NotifyFashionStoryData), 0);
+            bool fashionAuthorized = player.FashionStory?.AuthorizedActivityId is > 0;
+            AssertEqual(fashionAuthorized, fashionIndex >= 0,
+                "AccountModule.DoLogin emits FashionStory only for a currently authorized activity");
+            if (fashionIndex < 0 && player.FashionStory?.AuthorizedTimeIds.Count > 0)
+                throw new InvalidDataException("AccountModule.DoLogin retained expired FashionStory authorization.");
+            if (fashionIndex >= 0)
+            {
+                if (fashionIndex <= activityDrawCountIndex)
+                    throw new InvalidDataException("AccountModule.DoLogin FashionStory precedes activity draw pushes.");
+                JObject fashion = DeserializeStartupPushMap(startupPushesByName,
+                    nameof(NotifyFashionStoryData), "AccountModule.DoLogin authorized FashionStory");
+                int fashionActivityId = RequiredValue<int>(fashion, "ActivityId", JTokenType.Integer,
+                    "AccountModule.DoLogin authorized FashionStory");
+                AssertEqual(player.FashionStory!.AuthorizedActivityId, fashionActivityId,
+                    "AccountModule.DoLogin FashionStory reflects authorized activity");
+                AscNet.Table.V2.share.fuben.fashionstory.FashionStoryTable? authored =
+                    TableReaderV2.Parse<AscNet.Table.V2.share.fuben.fashionstory.FashionStoryTable>()
+                        .FirstOrDefault(activity => activity.Id == fashionActivityId);
+                if (authored?.TimeId is not int fashionTimeId
+                    || !ActivityScheduleService.IsOpen(fashionTimeId, DateTimeOffset.UtcNow))
+                    throw new InvalidDataException("AccountModule.DoLogin emitted an expired FashionStory activity.");
+            }
 
             AssertStartupPayloadMapContainsKeys(
                 startupPushesByName,
@@ -5277,15 +5491,10 @@ namespace AscNet.Test
                 nameof(NotifyFestivalData),
                 "AccountModule.DoLogin NotifyFestivalData startup payload");
             JArray festivalInfos = (JArray)RequiredToken(festivalPayload, "FestivalInfos", JTokenType.Array, "AccountModule.DoLogin NotifyFestivalData startup payload");
-            if (festivalInfos.Count == 0)
-                throw new InvalidDataException("AccountModule.DoLogin NotifyFestivalData.FestivalInfos: expected current event festival entries.");
-            AssertIntegerSetContainsAll(
-                ExpectedRetroFestivalInfoIds,
-                festivalInfos
-                    .OfType<JObject>()
-                    .Select(festivalInfo => festivalInfo.Value<long>("Id"))
-                    .ToArray(),
-                "AccountModule.DoLogin NotifyFestivalData.FestivalInfos Retro/Festival ids");
+            foreach (JObject festivalInfo in festivalInfos.OfType<JObject>())
+                foreach (JObject stageInfo in ((JArray)RequiredToken(festivalInfo, "StageInfos", JTokenType.Array, "AccountModule.DoLogin NotifyFestivalData.FestivalInfos")).OfType<JObject>())
+                    AssertEqual(true, harness.Session.stage.Stages.TryGetValue(stageInfo.Value<long>("Id"), out StageDatum? festivalStage) && festivalStage.Passed,
+                        $"AccountModule.DoLogin NotifyFestivalData lists only player-passed stage {stageInfo.Value<long>("Id")}");
 
             JObject game2048Payload = DeserializeStartupPushMap(
                 startupPushesByName,
@@ -5367,23 +5576,40 @@ namespace AscNet.Test
                 "AccountModule.DoLogin NotifyFubenBossSingleData startup payload",
                 "FubenBossSingleData",
                 "BossListDict");
-            AssertStartupPayloadMapContainsKeys(
-                startupPushesByName,
-                nameof(NotifyPassportData),
-                "AccountModule.DoLogin NotifyPassportData startup payload",
-                "ActivityId",
-                "Level",
-                "PassportInfos",
-                "LastTimeBaseInfo",
-                "IsGetSupplyReward",
-                "IsActivateRegressionTask",
-                "IsActivateNewbieTask");
-            int passportBaseIndex = RequiredPushIndex(startupPushes, nameof(NotifyPassportBaseInfo), 0,
-                "AccountModule.DoLogin Passport base info");
-            int passportDataIndex = RequiredPushIndex(startupPushes, nameof(NotifyPassportData), 0,
-                "AccountModule.DoLogin Passport data");
-            if (passportBaseIndex >= passportDataIndex)
-                throw new InvalidDataException($"AccountModule.DoLogin Passport order: observed {DescribePushes(startupPushes)}.");
+            AscNet.Table.V2.share.passport.PassportActivityTable? openPassport =
+                TableReaderV2.Parse<AscNet.Table.V2.share.passport.PassportActivityTable>()
+                    .Where(activity => activity.TimeId is > 0
+                        && ActivityScheduleService.IsOpen(activity.TimeId.Value, DateTimeOffset.UtcNow))
+                    .OrderByDescending(activity => activity.Id)
+                    .FirstOrDefault();
+            int passportBaseIndex = FindPushIndex(startupPushes, nameof(NotifyPassportBaseInfo), 0);
+            int passportDataIndex = FindPushIndex(startupPushes, nameof(NotifyPassportData), 0);
+            if (openPassport is null)
+            {
+                if (passportBaseIndex >= 0 || passportDataIndex >= 0)
+                    throw new InvalidDataException("AccountModule.DoLogin emitted expired Passport pushes.");
+            }
+            else
+            {
+                if (passportBaseIndex < 0 || passportDataIndex <= passportBaseIndex)
+                    throw new InvalidDataException($"AccountModule.DoLogin omitted or misordered active Passport pushes: {DescribePushes(startupPushes)}.");
+                AssertStartupPayloadMapContainsKeys(
+                    startupPushesByName,
+                    nameof(NotifyPassportData),
+                    "AccountModule.DoLogin active Passport startup payload",
+                    "ActivityId",
+                    "Level",
+                    "PassportInfos",
+                    "LastTimeBaseInfo",
+                    "IsGetSupplyReward",
+                    "IsActivateRegressionTask",
+                    "IsActivateNewbieTask");
+                AssertEqual(openPassport.Id,
+                    RequiredValue<int>(DeserializeStartupPushMap(startupPushesByName,
+                        nameof(NotifyPassportData), "AccountModule.DoLogin active Passport"), "ActivityId",
+                        JTokenType.Integer, "AccountModule.DoLogin active Passport"),
+                    "AccountModule.DoLogin Passport uses currently open authored season");
+            }
 
             AssertForbiddenStartupPushesAbsent(
                 startupPushes,
@@ -5863,10 +6089,14 @@ namespace AscNet.Test
                 nameof(ClientVersionResponse),
                 "ClientVersionRequest response");
 
+            JObject versions = JsonSnapshot.LoadObject("Configs/version_config.json");
+            JProperty current = versions.Properties().MaxBy(entry => Version.Parse(entry.Name))!;
+            string documentVersion = current.Value.Value<string>("DocumentVersion")!;
             AssertEqual(0, response.Code, "ClientVersionResponse Code");
-            if (string.IsNullOrWhiteSpace(response.Version))
-                throw new InvalidDataException("ClientVersionResponse Version: expected a non-empty version string.");
-            AssertEqual(false, response.KickOut, "ClientVersionResponse KickOut");
+            AssertEqual(documentVersion, response.Version, "ClientVersionResponse document version from current config");
+            if (response.Version == current.Name)
+                throw new InvalidDataException("ClientVersionResponse must return the document version, not the application version.");
+            AssertEqual(false, response.KickOut, "older-client request does not force restart");
         }
 
         private static void ValidateLoginAccountNoticeFixtures()
@@ -6700,26 +6930,14 @@ namespace AscNet.Test
                 nameof(GachaItemExchangeRequest),
                 harness.Session,
                 gachaItemExchangePacketId,
-                new GachaItemExchangeRequest { Id = 49, ItemId = 96001, Count = 2 });
+                new GachaItemExchangeRequest { Id = 49, ExchangeNum = 2, SelectIndex = 0 });
             GachaItemExchangeResponse gachaItemExchangeResponse = ReadResponsePayload<GachaItemExchangeResponse>(
                 harness,
                 gachaItemExchangePacketId,
                 nameof(GachaItemExchangeResponse),
-                "GachaItemExchangeRequest non-zero exchange response");
-            AssertEqual(0, gachaItemExchangeResponse.Code, "GachaItemExchangeResponse Code");
-            AssertEmptyList(gachaItemExchangeResponse.RewardGoodsList, "GachaItemExchangeResponse RewardGoodsList");
-
-            ValidateRequestHandlerRegistration(nameof(PassportRecvAllRewardRequest));
-            const int passportRewardPacketId = 13_008;
-            InvokeRegisteredRequestHandler(nameof(PassportRecvAllRewardRequest), harness.Session, passportRewardPacketId, new PassportRecvAllRewardRequest());
-            PassportRecvAllRewardResponse passportRewardResponse = ReadResponsePayload<PassportRecvAllRewardResponse>(
-                harness,
-                passportRewardPacketId,
-                nameof(PassportRecvAllRewardResponse),
-                "PassportRecvAllRewardRequest response");
-            AssertEqual(20137001, passportRewardResponse.Code, "PassportRecvAllRewardResponse closes without an active passport");
-            AssertEmptyList(passportRewardResponse.RewardList, "PassportRecvAllRewardResponse closed RewardList");
-            AssertEmptyList(passportRewardResponse.PassportInfos, "PassportRecvAllRewardResponse closed PassportInfos");
+                "GachaItemExchangeRequest undated gacha response");
+            AssertEqual(20061003, gachaItemExchangeResponse.Code, "undated Gacha 49 (TimeId 0) exchange is GachaNotOpen");
+            AssertEqual(0, gachaItemExchangeResponse.GainItemCount, "closed exchange grants nothing");
 
             const int mailDeletePacketId = 13_009;
             InvokeRegisteredRequestHandler(nameof(AscNet.Common.MsgPack.MailDeleteRequest), harness.Session, mailDeletePacketId, new AscNet.Common.MsgPack.MailDeleteRequest());
@@ -6766,42 +6984,10 @@ namespace AscNet.Test
             };
         }
 
-        private static void AssertDataDrivenRotationCatalog()
-        {
-            List<DrawPredictTable> predictions = TableReaderV2.Parse<DrawPredictTable>();
-            Type drawManagerType = RequiredAscNetGameServerType("AscNet.GameServer.Game.DrawManager");
-            DrawInfo[] templates = drawManagerType
-                .GetField("DrawTemplates", BindingFlags.Static | BindingFlags.NonPublic)?
-                .GetValue(null) as DrawInfo[]
-                ?? throw new MissingFieldException(drawManagerType.FullName, "DrawTemplates");
-            foreach (DrawPredictTable prediction in predictions.Where(row => row.Id is 7 or 8))
-            {
-                foreach (int groupId in new[] { 12, 13 })
-                {
-                    DrawInfo[] choices = templates.Where(draw => draw.GroupId == groupId
-                        && draw.StartTime == prediction.StartTime
-                        && draw.EndTime == prediction.EndTime).ToArray();
-                    AssertIntegerList(
-                        prediction.CharacterId.Select(Convert.ToInt64).Order().ToArray(),
-                        choices.Select(draw => (long)draw.ResourceIds.GetValueOrDefault(1)).Order().ToArray(),
-                        $"DrawPredict {prediction.Id} group {groupId} complete target choices");
-                    if (prediction.Id == 8)
-                    {
-                        AssertIntegerList(
-                            groupId == 12 ? new long[] { 1510, 1511, 1512 } : new long[] { 2504, 2505, 2506 },
-                            choices.OrderBy(draw => draw.ResourceIds.GetValueOrDefault(1)).Select(draw => (long)draw.Id).ToArray(),
-                            $"DrawPredict {prediction.Id} group {groupId} normal/fate target identities");
-                    }
-                }
-            }
-        }
-
-
         private static void ValidateDrawCompatibility()
         {
             using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForDailySignInCompatibility(out _, out _, out _);
             AssertConstructShardTableCompatibility();
-            AssertDataDrivenRotationCatalog();
             ValidateMemberTargetLocalPolicy();
 
             const long playerId = 880001;
@@ -7015,40 +7201,6 @@ namespace AscNet.Test
             Dictionary<int, List<CharacterGradeTable>> gradeRowsByCharacterId = TableReaderV2.Parse<CharacterGradeTable>()
                 .GroupBy(grade => grade.CharacterId)
                 .ToDictionary(group => group.Key, group => group.OrderBy(grade => grade.Grade).ToList());
-            Dictionary<int, string> expectedCurrentClientShardNames = new()
-            {
-                [562] = "Inver-Shard - Feral",
-                [563] = "Inver-Shard - Indomitus",
-                [564] = "Inver-Shard - Echo",
-                [565] = "Inver-Shard - Lost Lullaby",
-                [566] = "Inver-Shard - BLACK★ROCK SHOOTER",
-                [567] = "Inver-Shard - Epitaph",
-                [568] = "Inver-Shard - Shukra",
-                [569] = "Inver-Shard - Decryptor",
-                [570] = "Inver-Shard - Oblivion",
-                [571] = "Inver-Shard - Ardeo",
-                [572] = "Inver-Shard - Solacetune",
-                [573] = "Inver-Shard - Lucid Dreamer",
-                [574] = "Inver-Shard - Pyroath",
-                [575] = "Inver-Shard - Fulgor",
-                [576] = "Inver-Shard - Startrail",
-                [577] = "Inver-Shard - Parhelion",
-                [578] = "Inver-Shard - Daemonissa",
-                [579] = "Inver-Shard - Pianissimo",
-                [580] = "Inver-Shard - Daybreak",
-                [581] = "Inver-Shard - Geiravor",
-                [582] = "Inver-Shard - Vergil",
-                [583] = "Inver-Shard - Dante",
-                [584] = "Inver-Shard - Crepuscule",
-                [585] = "Inver-Shard - Secator",
-                [586] = "Inver-Shard - Aegis",
-                [587] = "Inver-Shard - Limpidity",
-                [588] = "Inver-Shard - Spectre",
-                [589] = "Inver-Shard - Arete",
-                [590] = "Inver-Shard - Dirge",
-                [591] = "Inver-Shard - Aeternion",
-                [592] = "Inver-Shard - Inverse Crown"
-            };
 
             int[] expectedCurrentClientPlayableCharacterIds =
             [
@@ -7122,17 +7274,6 @@ namespace AscNet.Test
                 fashionRowsById,
                 skillRowsByCharacterId,
                 breakthroughRowsByEquipId);
-
-            for (int shardItemId = 562; shardItemId <= 592; shardItemId++)
-            {
-                if (!expectedCurrentClientShardNames.TryGetValue(shardItemId, out string? expectedName))
-                    throw new InvalidDataException($"Current client construct shard Item.tsv ids: expected assertion coverage for shard item {shardItemId}.");
-                ItemTable shardItem = itemRowsById.TryGetValue(shardItemId, out ItemTable? shardItemRow)
-                    ? shardItemRow
-                    : throw new InvalidDataException($"Current client construct shard Item.tsv ids 562..592: missing item row {shardItemId}.");
-                AssertConstructShardItem(shardItem, $"Current client construct shard Item.tsv row {shardItemId}");
-                AssertEqual(expectedName, shardItem.Name, $"Current client construct shard Item.tsv row {shardItemId} Name");
-            }
 
             foreach (int characterId in expectedCurrentClientPlayableCharacterIds)
             {
@@ -14649,6 +14790,18 @@ namespace AscNet.Test
                     expectedOperateTypes,
                     partnerPush.OperateTypes.Select(value => (long)value).ToArray(),
                     $"{name} operation types");
+                NotifyEquipDataList equipPush = ReadPushPayload<NotifyEquipDataList>(
+                    harness, nameof(NotifyEquipDataList), $"{name} equipment slot snapshot");
+                TeamPrefabData applied = player.TeamPrefabs.Single(value => value.TeamId == teamId);
+                foreach ((int position, TeamPrefabEquipData? equipment) in applied.EquipData)
+                {
+                    if (equipment is null)
+                        continue;
+                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values)
+                        AssertEqual(applied.TeamData[position],
+                            equipPush.EquipDataList.Single(equip => equip.Id == preset.EquipId).CharacterId,
+                            $"{name} client receives preset equipment ownership before acknowledgement");
+                }
 
                 JObject response = ReadResponseMapPayload(
                     harness,
@@ -17754,6 +17907,30 @@ namespace AscNet.Test
                     ?? throw new MissingFieldException(databaseType.FullName, "collection");
             }
 
+            public static MongoCollectionOverride InstallForSameColorGameCompatibility(
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Character> characterCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.Inventory> inventoryCollection,
+                out RecordingMongoCollectionProxy<AscNet.Common.Database.SameColorGameRankEntry> rankCollection)
+            {
+                IMongoCollection<AscNet.Common.Database.Player> recordingPlayerCollection =
+                    CreateRecordingMongoCollection(out playerCollection);
+                IMongoCollection<AscNet.Common.Database.Character> recordingCharacterCollection =
+                    CreateRecordingMongoCollection(out characterCollection);
+                IMongoCollection<AscNet.Common.Database.Inventory> recordingInventoryCollection =
+                    CreateRecordingMongoCollection(out inventoryCollection);
+                IMongoCollection<AscNet.Common.Database.SameColorGameRankEntry> recordingRankCollection =
+                    CreateRecordingMongoCollection(out rankCollection);
+                return new MongoCollectionOverride(
+                [
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Player)), recordingPlayerCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Character)), recordingCharacterCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Inventory)), recordingInventoryCollection),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Stage)), CreateNoOpMongoCollection<AscNet.Common.Database.Stage>()),
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.SameColorGameRankEntry)), recordingRankCollection)
+                ]);
+            }
+
             private static IMongoCollection<TDocument> CreateNoOpMongoCollection<TDocument>()
             {
                 return DispatchProxy.Create<IMongoCollection<TDocument>, NoOpMongoCollectionProxy<TDocument>>();
@@ -17806,6 +17983,7 @@ namespace AscNet.Test
             public int ReplaceOneCalls { get; private set; }
             public TDocument? LastReplacement { get; private set; }
             public bool ThrowOnReplaceOne { get; set; }
+            public bool ThrowAfterReplaceOne { get; set; }
             public Action<TDocument>? BeforeReplaceOne { get; set; }
             public long ReplaceOneMatchedCount { get; set; } = 1;
             public byte[]? LastSuccessfulReplacementBson { get; private set; }
@@ -17859,6 +18037,11 @@ namespace AscNet.Test
                         throw new MongoException($"Injected {typeof(TDocument).Name} ReplaceOne failure.");
                     if (replacement is TDocument successful && ReplaceOneMatchedCount > 0)
                         LastSuccessfulReplacementBson = successful.ToBson();
+                    if (ThrowAfterReplaceOne)
+                    {
+                        ThrowAfterReplaceOne = false;
+                        throw new MongoException($"Injected committed {typeof(TDocument).Name} ReplaceOne acknowledgement loss.");
+                    }
                     return new ReplaceOneResult.Acknowledged(ReplaceOneMatchedCount, ReplaceOneMatchedCount, null);
                 }
 
@@ -24132,21 +24315,9 @@ namespace AscNet.Test
             using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForStoryDeployVersionGapCompatibility();
             const int luciaLotusCharacterId = 1_021_001;
 
-            JObject compatibility = JsonSnapshot.LoadObject("Configs/study_compatibility_4.6.0.json");
-            static JArray CompatibilityRows(JObject root, string name) =>
-                (JArray)RequiredToken(root, name, JTokenType.Array, "Study compatibility");
-            AssertEqual("4.6.0", compatibility.Value<string>("ClientVersion"), "Study compatibility client version");
-            AssertEqual(88, CompatibilityRows(compatibility, "PracticeGroups").Count, "Study compatibility PracticeGroup row count");
-            AssertEqual(250, CompatibilityRows(compatibility, "PracticeActivities").Count, "Study compatibility PracticeActivity row count");
-            AssertEqual(49, CompatibilityRows(compatibility, "TeachingActivities").Count, "Study compatibility TeachingActivity row count");
-            AssertEqual(142, CompatibilityRows(compatibility, "TeachingRobots").Count, "Study compatibility TeachingRobot row count");
-            AssertEqual(467, CompatibilityRows(compatibility, "Stages").Count, "Study compatibility Stage row count");
-            AssertEqual(141, CompatibilityRows(compatibility, "StageLevelControls").Count, "Study compatibility StageLevelControl row count");
-            AssertEqual(170, CompatibilityRows(compatibility, "Robots").Count, "Study compatibility Robot row count");
-            AssertEqual(82, CompatibilityRows(compatibility, "EnhanceSkills").Count, "Study compatibility EnhanceSkill row count");
-            AssertEqual(92, CompatibilityRows(compatibility, "EnhanceSkillGroups").Count, "Study compatibility EnhanceSkillGroup row count");
+            JObject compatibility = JsonSnapshot.LoadObject("Configs/study_compatibility_4.8.0.json");
+            JArray studyRobotRows = (JArray)RequiredToken(compatibility, "Robots", JTokenType.Array, "Study compatibility");
 
-            JArray studyRobotRows = CompatibilityRows(compatibility, "Robots");
             JObject StudyRobotRow(int robotId) =>
                 (JObject)studyRobotRows.Single(row => row.Value<int>("Id") == robotId);
 
@@ -24268,10 +24439,26 @@ namespace AscNet.Test
                 expectedRobotId: 2_273,
                 luciaLotusCharacterId,
                 "Study level-1 Pyroath effect practice stage 30100081");
-            // 4.6 authors no enhance groups for Pyroath, so the version-frozen robot grants none and
-            // its authored removal list is already satisfied.
+            // The current Pyroath robot removes its authored effect-practice enhance skills.
             AssertRobotDeployedEnhanceSkills(basePyroathFight, 2_273, [],
                 "Study level-1 Pyroath effect practice stage 30100081");
+
+            AssertStudyStageRobotDeployment(
+                30_100_229, [], [], 1_051_005, 172_431, luciaLotusCharacterId,
+                "4.8 Celica construct practice stage 30100229");
+            AssertStudyStageRobotDeployments(
+                30_100_230, [], [], [(1_131_004, 9_247), (1_021_006, 9_246)],
+                luciaLotusCharacterId, "4.8 Celica multi-frame practice stage 30100230");
+
+            foreach ((uint stageId, int characterId, int robotId, string frame) in new (uint, int, int, string)[]
+            {
+                (30_100_231, 1_071_005, 2_334, "Breakers Resurfaced"),
+                (30_100_236, 1_071_005, 2_335, "Breakers Resurfaced challenge"),
+                (30_100_237, 1_411_003, 2_337, "Against the Flow of Time"),
+                (30_100_243, 1_421_003, 2_340, "A Kindler's Watch")
+            })
+                AssertStudyStageRobotDeployment(stageId, [], [], characterId, robotId, luciaLotusCharacterId,
+                    $"4.8 {frame} trial stage {stageId}");
         }
 
         private static PreFightResponse AssertStudyStageRobotDeployment(
@@ -24562,6 +24749,45 @@ namespace AscNet.Test
                     teachingLoginPushes,
                     teachingStageId,
                     "Teaching Study stage clear resumed AccountModule.DoLogin");
+            }
+
+            using (LoopbackSessionHarness newFrameHarness = CreateStudyProgressHarness(playerId + 2, "study-progression-4.8-frame"))
+            {
+                int newFrameSaveCount = stageCollection.ReplaceOneCalls + 1;
+                (NotifyStageData stagePush, JObject? update, FightSettleResponse settleResponse) =
+                    CompleteStudyFight(newFrameHarness, 30_100_231, playerId + 2,
+                        preFightPacketId: 30_210, fightSettlePacketId: 30_211,
+                        expectTeachingUpdate: true, "4.8 Breakers Resurfaced first trial");
+                AssertAcceptedMissingStageSettle(settleResponse, 30_100_231, "4.8 trial settle and rewards");
+                AssertEqual(0, newFrameHarness.Session.inventory.Items.Count, "4.8 trial has no authored reward goods");
+                AssertPassedStudyStage(stagePush, newFrameHarness, 30_100_231, 30_100_232, "4.8 trial progression");
+                if (update is null)
+                    throw new InvalidDataException("4.8 trial clear did not send Teaching stage update.");
+                using LoopbackSessionHarness resumed = CreateStudyProgressHarness(playerId + 2, "study-progression-4.8-frame-resume");
+                resumed.Session.stage = RehydratePersistedStudyStage(stageCollection, newFrameSaveCount,
+                    30_100_231, "4.8 trial persistence");
+                Dictionary<string, Packet.Push> loginPushes = InvokeLoginAndReadStartupPushes(resumed, doLogin,
+                    "4.8 trial resumed login");
+                AssertTeachingLoginStage(loginPushes, 50, 30_100_231, "4.8 trial resumed login");
+            }
+
+            using (LoopbackSessionHarness celicaHarness = CreateStudyProgressHarness(playerId + 4, "study-progression-4.8-celica"))
+            {
+                (NotifyStageData stagePush, JObject? update, FightSettleResponse response) =
+                    CompleteStudyFight(celicaHarness, 30_100_229, playerId + 4,
+                        preFightPacketId: 30_212, fightSettlePacketId: 30_213,
+                        expectTeachingUpdate: false, "4.8 Celica construct practice");
+                AssertAcceptedMissingStageSettle(response, 30_100_229, "4.8 Celica first-clear reward");
+                AssertPassedStudyStage(stagePush, celicaHarness, 30_100_229, 0, "4.8 Celica terminal practice");
+                if (update is not null)
+                    throw new InvalidDataException("4.8 Celica practice must not send Teaching stage update.");
+                RewardGoods[] rewards = response.Settle.RewardGoodsList.ToArray();
+                AssertEqual(3, rewards.Length, "4.8 Celica authored first-clear reward count");
+                foreach ((int itemId, int count) in new[] { (3, 10), (12, 3), (1, 3000) })
+                {
+                    RewardGoods reward = rewards.Single(goods => goods.TemplateId == itemId);
+                    AssertEqual(count, reward.Count, $"4.8 Celica first-clear item {itemId}");
+                }
             }
 
             using (LoopbackSessionHarness practiceHarness = CreateStudyProgressHarness(playerId + 1, "study-progression-practice"))
@@ -28094,6 +28320,8 @@ namespace AscNet.Test
                 int stageId = AuxiliaryStageId(bestiary);
                 BossSingleStageTable stage = stages.Single(row => row.StageId == stageId);
                 int challengeCountBefore = player.SimulatedBattlefield.BossChallengeCount;
+                int cycleBestBefore = player.SimulatedBattlefield.BossTotalScore;
+                int cycleCurrentBefore = player.SimulatedBattlefield.BossCurrentTotalScore;
                 PreFightResponse preFight = StartFight(packetBase, stageId, stageType);
                 AssertEqual(0, preFight.Code, $"Pain Cage {(bestiary ? "bestiary" : "trial")} pre-fight code");
                 AssertEqual(stage.PassTimeLimit, preFight.FightData.PassTimeLimit,
@@ -28133,6 +28361,15 @@ namespace AscNet.Test
                     : player.SimulatedBattlefield.BossTrialScores;
                 AssertEqual(result.TotalScore, scores[stageId],
                     $"Pain Cage {(bestiary ? "bestiary" : "trial")} score persistence");
+                // The non-Trial settlement compares the new run against the generic stage datum
+                // (XUiFubenBossSingleSettlement:GetMyTotalHistory only special-cases Trial), so the codex save has
+                // to expose the mode best there or a lower run looks like a new record.
+                AssertEqual(result.TotalScore, harness.Session.stage.Stages[stageId].Score,
+                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear exposes the mode best to the settlement");
+                AssertEqual(cycleBestBefore, player.SimulatedBattlefield.BossTotalScore,
+                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear leaves the cycle best total unchanged");
+                AssertEqual(cycleCurrentBefore, player.SimulatedBattlefield.BossCurrentTotalScore,
+                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear leaves the cycle current total unchanged");
                 AssertEqual(challengeCountBefore, player.SimulatedBattlefield.BossChallengeCount,
                     $"Pain Cage {(bestiary ? "bestiary" : "trial")} does not consume normal attempts");
             }
@@ -28144,6 +28381,40 @@ namespace AscNet.Test
                 "Pain Cage partial remaining-time scores are below their caps");
             AssertEqual(true, auxiliaryTimeScores[0].Score != auxiliaryTimeScores[1].Score,
                 "Pain Cage remaining-time scores vary proportionally with distinct durations");
+
+            // A saved codex best followed by a lower run must keep the settlement history at the best, otherwise
+            // the client offers to discard the worse score as though it were a new record.
+            {
+                int codexStageId = AuxiliaryStageId(bestiary: true);
+                BossSingleStageTable codexStage = stages.Single(row => row.StageId == codexStageId);
+                int codexBest = player.SimulatedBattlefield.BossBestiaryScores[codexStageId];
+                PreFightResponse lowerCodexPreFight = StartFight(82_023, codexStageId, stageType: 4);
+                AssertEqual(0, lowerCodexPreFight.Code, "Pain Cage bestiary lower-run pre-fight code");
+                FightSettleResponse lowerCodexSettle = SettleFight(
+                    82_024,
+                    lowerCodexPreFight,
+                    codexStage,
+                    characterHp: 100,
+                    bossHp: 0,
+                    fightSeconds: 240);
+                BossSingleFightResult lowerCodexResult = RequiredBossResult(
+                    lowerCodexSettle,
+                    "Pain Cage bestiary lower-run result");
+                AssertEqual(true, lowerCodexResult.TotalScore < codexBest,
+                    "Pain Cage bestiary lower-run fixture scores below the saved best");
+                BossSingleSaveScoreResponse lowerCodexSave = SaveScore(
+                    82_025,
+                    codexStageId,
+                    "Pain Cage bestiary lower-run save",
+                    out List<string> lowerCodexPushes);
+                AssertEqual(0, lowerCodexSave.Code, "Pain Cage bestiary lower-run save code");
+                AssertEqual(true, lowerCodexPushes.Contains(nameof(NotifyStageData)),
+                    "Pain Cage bestiary lower-run pushes the stage datum");
+                AssertEqual(codexBest, player.SimulatedBattlefield.BossBestiaryScores[codexStageId],
+                    "Pain Cage bestiary lower run keeps the saved best");
+                AssertEqual(codexBest, harness.Session.stage.Stages[codexStageId].Score,
+                    "Pain Cage bestiary lower run keeps the settlement history at the saved best");
+            }
             List<BossSingleChallengeGradeTable> challengeGrades = TableReaderV2.Parse<BossSingleChallengeGradeTable>();
             List<BossSingleChallengeFeatureGroupTable> challengeGroups = TableReaderV2.Parse<BossSingleChallengeFeatureGroupTable>();
             int preIntensiveLevelType = player.SimulatedBattlefield.BossLevelType;
@@ -28597,10 +28868,10 @@ namespace AscNet.Test
             AssertEqual(0, normalSave.Code, "Pain Cage normal save-score code");
             AssertEqual(playerSavesBeforeNormalScore + 1, playerCollection.ReplaceOneCalls,
                 "Pain Cage normal save persists Player once");
-            AssertEqual(stageSavesBeforeNormalScore + 1, stageCollection.ReplaceOneCalls,
-                "Pain Cage normal save persists Stage once");
+            AssertEqual(stageSavesBeforeNormalScore + 2, stageCollection.ReplaceOneCalls,
+                "Pain Cage normal save heals the fixture-cleared stage datums and persists the committed Stage");
             int rankPushIndex = savePushes.IndexOf(nameof(NotifyBossSingleRankInfo));
-            int stagePushIndex = savePushes.IndexOf(nameof(NotifyStageData));
+            int stagePushIndex = savePushes.IndexOf(nameof(NotifyStageData), rankPushIndex + 1);
             int loginPushIndex = savePushes.IndexOf(nameof(NotifyFubenBossSingleData));
             if (rankPushIndex < 0 || stagePushIndex <= rankPushIndex || loginPushIndex <= stagePushIndex)
                 throw new InvalidDataException(
@@ -28711,8 +28982,14 @@ namespace AscNet.Test
                 "Pain Cage stage reset",
                 out List<string> resetPushes);
             AssertEqual(0, reset.Code, "Pain Cage reset code");
-            AssertEqual(true, resetPushes.SequenceEqual([nameof(NotifyFubenBossSingleData)]),
-                "Pain Cage reset push ordering");
+            int resetStageCodexBest = Math.Max(
+                player.SimulatedBattlefield.BossTrialScores.GetValueOrDefault(normalStage.StageId),
+                player.SimulatedBattlefield.BossBestiaryScores.GetValueOrDefault(normalStage.StageId));
+            AssertEqual(true,
+                resetPushes.SequenceEqual(resetStageCodexBest > 0
+                    ? [nameof(NotifyFubenBossSingleData)]
+                    : [nameof(NotifyFubenBossSingleData), nameof(NotifyStageData)]),
+                $"Pain Cage reset push ordering: got {string.Join(",", resetPushes)} (codex best {resetStageCodexBest})");
             AssertEqual(0, player.SimulatedBattlefield.BossCurrentTotalScore,
                 "Pain Cage reset removes current score");
             AssertEqual(normalResult.TotalScore, player.SimulatedBattlefield.BossTotalScore,
@@ -28734,10 +29011,24 @@ namespace AscNet.Test
                 MessagePackSerializer.Serialize(BuildLogin(player, null))));
             JObject resetLoginData = RequiredValue<JObject>(
                 resetLoginPayload, "FubenBossSingleData", JTokenType.Object, "Pain Cage reset login");
+            JArray resetProjectedRecords = RequiredValue<JArray>(
+                resetLoginData, "StageRecordList", JTokenType.Array, "Pain Cage reset login");
+            AssertEqual(resetProjectedRecords.OfType<JObject>().Count(),
+                resetProjectedRecords.OfType<JObject>().Select(value => RequiredValue<int>(
+                    value, "StageId", JTokenType.Integer, "Pain Cage reset login")).Distinct().Count(),
+                "Pain Cage reset login projects each stage once");
+            JObject? resetStageEntry = resetProjectedRecords.OfType<JObject>().SingleOrDefault(value =>
+                RequiredValue<int>(value, "StageId", JTokenType.Integer, "Pain Cage reset login")
+                    == normalStage.StageId);
+            AssertEqual(true, resetStageEntry is not null,
+                "Pain Cage reset login projects the reset stage");
+            AssertEqual(0,
+                RequiredValue<int>(resetStageEntry!, "Score", JTokenType.Integer, "Pain Cage reset login"),
+                "Pain Cage reset reports no current score for the reset stage");
             AssertEqual(0,
                 RequiredValue<JArray>(
-                    resetLoginData, "StageRecordList", JTokenType.Array, "Pain Cage reset login").Count,
-                "Pain Cage reset hides cleared stage record");
+                    resetStageEntry!, "Characters", JTokenType.Array, "Pain Cage reset login").Count,
+                "Pain Cage reset reports no current team for the reset stage");
             AssertEqual(1,
                 RequiredValue<JArray>(
                     resetLoginData, "HistoryList", JTokenType.Array, "Pain Cage reset login").Count,
@@ -28921,7 +29212,12 @@ namespace AscNet.Test
             int firstBossScore = lockedTotal / 2;
             int secondBossScore = lockedTotal / 3;
             int thirdBossScore = lockedTotal - firstBossScore - secondBossScore;
-            player.SimulatedBattlefield.BossStageRecords = selectedStageIds.Take(3)
+            // Keep the real normal-stage best out of the synthetic gate records: the weekly
+            // StableHash rotation can place it among the first three, and rollover would then
+            // archive the synthetic score over the settled one.
+            player.SimulatedBattlefield.BossStageRecords = selectedStageIds
+                .Where(stageId => stageId != normalStage.StageId)
+                .Take(3)
                 .Select((stageId, index) => new AscNet.Common.Database.BossSingleStageRecordState
                 {
                     StageId = stageId,
@@ -30084,13 +30380,13 @@ namespace AscNet.Test
             AssertEqual(nameof(NotifyEquipDataList), push.Name, "EquipPutOnRequestHandler pushed equip data list");
             NotifyEquipDataList notifyEquipDataList = MessagePackSerializer.Deserialize<NotifyEquipDataList>(push.Content);
             AssertIntegerList(
-                [firstPreviousEquip.Id, secondPreviousEquip.Id],
+                [firstPreviousEquip.Id, secondPreviousEquip.Id, targetEquip.Id],
                 notifyEquipDataList.EquipDataList.Select(equip => (long)equip.Id).ToArray(),
-                "EquipPutOnRequestHandler NotifyEquipDataList contains only unequipped previous weapons");
+                "EquipPutOnRequestHandler sends the complete affected slot");
             AssertIntegerList(
-                [0, 0],
+                [0, 0, characterId],
                 notifyEquipDataList.EquipDataList.Select(equip => (long)equip.CharacterId).ToArray(),
-                "EquipPutOnRequestHandler NotifyEquipDataList clears previous weapon character ids");
+                "EquipPutOnRequestHandler clears displaced weapons before assigning the replacement");
 
             Packet responsePacket = harness.ReadPacket("EquipPutOnRequestHandler response");
             AssertEqual(Packet.ContentType.Response, responsePacket.Type, "EquipPutOnRequestHandler second packet type");
@@ -30099,26 +30395,6 @@ namespace AscNet.Test
             EquipPutOnResponse equipPutOnResponse = MessagePackSerializer.Deserialize<EquipPutOnResponse>(response.Content);
             AssertEqual(0, equipPutOnResponse.Code, "EquipPutOnRequestHandler successful weapon swap response");
 
-            harness.Session.AppliedTeamPrefabId = 3;
-            InvokeRegisteredRequestHandler(
-                nameof(EquipTakeOffRequest),
-                harness.Session,
-                921,
-                new EquipTakeOffRequest { EquipIds = [(int)targetEquip.Id] });
-            AssertEqual(0, ReadResponsePayload<EquipTakeOffResponse>(
-                harness,
-                921,
-                nameof(EquipTakeOffResponse),
-                "EquipTakeOffRequestHandler response").Code,
-                "EquipTakeOffRequestHandler successful response");
-            AssertEqual(0, targetEquip.CharacterId, "EquipTakeOffRequestHandler removes assignment");
-            AssertEqual(true, harness.Session.AppliedTeamPrefabId is null,
-                "EquipTakeOffRequestHandler clears applied preset");
-            AssertEqual(2, characterCollection.ReplaceOneCalls,
-                "EquipTakeOffRequestHandler persists equipment assignments");
-            AssertEqual(0,
-                characterCollection.LastReplacement?.Equips.Single(equip => equip.Id == targetEquip.Id).CharacterId ?? -1,
-                "EquipTakeOffRequestHandler persisted target assignment");
         }
 
         private static void AssertEquipPutOnValidationAndLockPersistence(IReadOnlyList<EquipTable> currentEquipRows)
@@ -30276,6 +30552,7 @@ namespace AscNet.Test
                 {
                     character = character,
                     player = player ?? CreateDrawCompatibilityPlayer(character.Uid),
+                    stage = CreateLoginAccountCompatibilityStage(character.Uid),
                     inventory = inventory ?? CreateDrawCompatibilityInventory(character.Uid, [])
                 };
                 if (startClientLoop)

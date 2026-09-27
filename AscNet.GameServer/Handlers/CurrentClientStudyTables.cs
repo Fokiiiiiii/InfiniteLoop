@@ -8,22 +8,8 @@ namespace AscNet.GameServer.Handlers;
 
 internal static class CurrentClientStudyTables
 {
-    internal const string ClientVersion = "4.6.0";
-    internal const int PracticeChapterCount = 8;
-    internal const int PracticeGroupCount = 88;
-    internal const int PracticeActivityCount = 250;
-    internal const int TeachingActivityCount = 49;
-    internal const int TeachingRobotCount = 142;
-    internal const int StudyStageCount = 467;
-    internal const int StageLevelControlCount = 141;
-    internal const int RobotCount = 170;
-    internal const int EnhanceSkillCount = 82;
-    internal const int EnhanceSkillGroupCount = 92;
-    private const int ProgressionEdgeCount = 255;
-    private const int ProgressionChainCount = 212;
-
-    private const string SourceRevision = "bb3c34765c9d9c1c542079d536a17e82b27f3245";
-    private const string ResourcePath = "Configs/study_compatibility_4.6.0.json";
+    internal const string ClientVersion = "4.8.0";
+    private const string ResourcePath = "Configs/study_compatibility_4.8.0.json";
     private static readonly Lazy<Catalog> Data = new(Load, LazyThreadSafetyMode.ExecutionAndPublication);
     internal static bool TryGetStage(long stageId, out StageTable stage)
     {
@@ -65,7 +51,7 @@ internal static class CurrentClientStudyTables
         return Data.Value.Robots.TryGetValue(robotId, out robot!);
     }
 
-    /// Frozen 4.6 enhance-skill inputs of the imported Study robots, matching their frozen Robot rows.
+    /// Installed-client enhance-skill inputs from the same 4.8 tables as the imported Study robots.
     internal static EnhanceSkillSource EnhanceSkills => Data.Value.EnhanceSkills;
 
     internal static bool TryGetPracticeChapterId(long stageId, out int chapterId)
@@ -111,45 +97,39 @@ internal static class CurrentClientStudyTables
         if (!string.Equals(clientVersion, ClientVersion, StringComparison.Ordinal))
             throw new InvalidDataException($"{ResourcePath}: expected client version {ClientVersion}, got {clientVersion}.");
 
-        string sourceRevision = root.Value<string>("SourceRevision")
-            ?? throw new InvalidDataException($"{ResourcePath}: SourceRevision is required.");
-        if (!string.Equals(sourceRevision, SourceRevision, StringComparison.Ordinal))
-            throw new InvalidDataException($"{ResourcePath}: expected source revision {SourceRevision}, got {sourceRevision}.");
-
         JObject sourcePaths = RequireObject(root, "SourcePaths");
         JObject sourceHashes = RequireObject(root, "SourceHashes");
+        JObject provenance = RequireObject(root, "SourceProvenance");
         foreach (string source in new[] { "Stage", "StageLevelControl", "Robot", "PracticeChapter", "PracticeGroup", "PracticeActivity", "TeachingActivity", "TeachingRobot", "EnhanceSkill", "EnhanceSkillGroup" })
         {
             string? path = sourcePaths.Value<string>(source);
-            if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("en/bytes/", StringComparison.Ordinal) || !path.EndsWith(".json", StringComparison.Ordinal))
-                throw new InvalidDataException($"{ResourcePath}: SourcePaths.{source} must identify an EN JSON source.");
+            if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("share/", StringComparison.Ordinal) || !path.EndsWith(".json", StringComparison.Ordinal))
+                throw new InvalidDataException($"{ResourcePath}: SourcePaths.{source} must identify an installed Share table.");
             string? hash = sourceHashes.Value<string>(source);
             if (hash is null || hash.Length != 40 || hash.Any(character => !Uri.IsHexDigit(character)))
                 throw new InvalidDataException($"{ResourcePath}: SourceHashes.{source} must be a SHA-1 hash.");
+            JObject tableSource = RequireObject(provenance, source);
+            string? tableHash = tableSource.Value<string>("TableSha1");
+            string? indexHash = tableSource.Value<string>("IndexSha1");
+            if (tableHash?.Length != 40 || indexHash?.Length != 40
+                || tableHash.Any(character => !Uri.IsHexDigit(character))
+                || indexHash.Any(character => !Uri.IsHexDigit(character))
+                || string.IsNullOrWhiteSpace(tableSource.Value<string>("Bundle"))
+                || string.IsNullOrWhiteSpace(tableSource.Value<string>("Scope")))
+                throw new InvalidDataException($"{ResourcePath}: SourceProvenance.{source} lacks installed-table identity.");
         }
 
         JObject expectedCounts = RequireObject(root, "ExpectedCounts");
-        ValidateDeclaredCount(expectedCounts, "PracticeChapters", PracticeChapterCount);
-        ValidateDeclaredCount(expectedCounts, "PracticeGroups", PracticeGroupCount);
-        ValidateDeclaredCount(expectedCounts, "PracticeActivities", PracticeActivityCount);
-        ValidateDeclaredCount(expectedCounts, "TeachingActivities", TeachingActivityCount);
-        ValidateDeclaredCount(expectedCounts, "TeachingRobots", TeachingRobotCount);
-        ValidateDeclaredCount(expectedCounts, "StudyStages", StudyStageCount);
-        ValidateDeclaredCount(expectedCounts, "StageLevelControls", StageLevelControlCount);
-        ValidateDeclaredCount(expectedCounts, "Robots", RobotCount);
-        ValidateDeclaredCount(expectedCounts, "EnhanceSkills", EnhanceSkillCount);
-        ValidateDeclaredCount(expectedCounts, "EnhanceSkillGroups", EnhanceSkillGroupCount);
-
-        JArray practiceChapters = RequireArray(root, "PracticeChapters", PracticeChapterCount);
-        JArray practiceGroups = RequireArray(root, "PracticeGroups", PracticeGroupCount);
-        JArray practiceActivities = RequireArray(root, "PracticeActivities", PracticeActivityCount);
-        JArray teachingActivities = RequireArray(root, "TeachingActivities", TeachingActivityCount);
-        JArray teachingRobots = RequireArray(root, "TeachingRobots", TeachingRobotCount);
-        JArray stageRows = RequireArray(root, "Stages", StudyStageCount);
-        JArray stageLevelControlRows = RequireArray(root, "StageLevelControls", StageLevelControlCount);
-        JArray robotRows = RequireArray(root, "Robots", RobotCount);
-        JArray enhanceSkillRows = RequireArray(root, "EnhanceSkills", EnhanceSkillCount);
-        JArray enhanceSkillGroupRows = RequireArray(root, "EnhanceSkillGroups", EnhanceSkillGroupCount);
+        JArray practiceChapters = RequireArray(root, "PracticeChapters", ExpectedCount(expectedCounts, "PracticeChapters"));
+        JArray practiceGroups = RequireArray(root, "PracticeGroups", ExpectedCount(expectedCounts, "PracticeGroups"));
+        JArray practiceActivities = RequireArray(root, "PracticeActivities", ExpectedCount(expectedCounts, "PracticeActivities"));
+        JArray teachingActivities = RequireArray(root, "TeachingActivities", ExpectedCount(expectedCounts, "TeachingActivities"));
+        JArray teachingRobots = RequireArray(root, "TeachingRobots", ExpectedCount(expectedCounts, "TeachingRobots"));
+        JArray stageRows = RequireArray(root, "Stages", ExpectedCount(expectedCounts, "StudyStages"));
+        JArray stageLevelControlRows = RequireArray(root, "StageLevelControls", ExpectedCount(expectedCounts, "StageLevelControls"));
+        JArray robotRows = RequireArray(root, "Robots", ExpectedCount(expectedCounts, "Robots"));
+        JArray enhanceSkillRows = RequireArray(root, "EnhanceSkills", ExpectedCount(expectedCounts, "EnhanceSkills"));
+        JArray enhanceSkillGroupRows = RequireArray(root, "EnhanceSkillGroups", ExpectedCount(expectedCounts, "EnhanceSkillGroups"));
 
         HashSet<int> studyStageIds = new();
         foreach (JObject row in practiceGroups.OfType<JObject>())
@@ -165,8 +145,8 @@ internal static class CurrentClientStudyTables
             AddPositiveIds(studyStageIds, row["ChallengeStage"]);
             AddPositiveIds(studyStageIds, row["LinkStageId"]);
         }
-        if (studyStageIds.Count != StudyStageCount)
-            throw new InvalidDataException($"{ResourcePath}: Practice/Teaching sources resolve {studyStageIds.Count} Study stages; expected {StudyStageCount}.");
+        if (studyStageIds.Count != stageRows.Count)
+            throw new InvalidDataException($"{ResourcePath}: Practice/Teaching sources resolve {studyStageIds.Count} Study stages; imported {stageRows.Count}.");
 
         Dictionary<int, int[]> practiceGroupStageIds = new();
         foreach (JObject row in practiceGroups.OfType<JObject>())
@@ -247,8 +227,8 @@ internal static class CurrentClientStudyTables
 
         Dictionary<int, RobotTable> robots = ToUniqueDictionary<RobotTable>(robotRows, row => row.Id, "Robots");
         HashSet<int> referencedRobotIds = configuredRobotIds.Values.SelectMany(ids => ids).ToHashSet();
-        if (referencedRobotIds.Count != RobotCount || !referencedRobotIds.SetEquals(robots.Keys))
-            throw new InvalidDataException($"{ResourcePath}: configured Study robots must exactly match the {RobotCount} imported Robot rows.");
+        if (referencedRobotIds.Count != robotRows.Count || !referencedRobotIds.SetEquals(robots.Keys))
+            throw new InvalidDataException($"{ResourcePath}: configured Study robots must exactly match the imported Robot rows.");
         if (robots.Values.Any(robot => robot.CharacterId <= 0))
             throw new InvalidDataException($"{ResourcePath}: every imported Robot must define a CharacterId.");
 
@@ -326,8 +306,8 @@ internal static class CurrentClientStudyTables
             }
         }
 
-        if (preEdges.Count != ProgressionEdgeCount || !preEdges.SetEquals(nextEdges))
-            throw new InvalidDataException($"{ResourcePath}: Study PreStageId/NextStageId graph must contain exactly {ProgressionEdgeCount} reciprocal edges.");
+        if (!preEdges.SetEquals(nextEdges))
+            throw new InvalidDataException($"{ResourcePath}: Study PreStageId/NextStageId graph must be reciprocal.");
         Dictionary<int, int> inDegree = studyStageIds.ToDictionary(stageId => stageId, _ => 0);
         Dictionary<int, int> outDegree = studyStageIds.ToDictionary(stageId => stageId, _ => 0);
         foreach ((int from, int to) in preEdges)
@@ -335,8 +315,8 @@ internal static class CurrentClientStudyTables
             if (++outDegree[from] > 1 || ++inDegree[to] > 1)
                 throw new InvalidDataException($"{ResourcePath}: Study progression graph must be a collection of linear chains.");
         }
-        if (inDegree.Values.Count(degree => degree == 0) != ProgressionChainCount || outDegree.Values.Count(degree => degree == 0) != ProgressionChainCount)
-            throw new InvalidDataException($"{ResourcePath}: Study progression graph must contain {ProgressionChainCount} roots and terminals.");
+        if (inDegree.Values.Count(degree => degree == 0) != outDegree.Values.Count(degree => degree == 0))
+            throw new InvalidDataException($"{ResourcePath}: Study progression graph roots and terminals must match.");
         Dictionary<int, int> successorByStageId = preEdges.ToDictionary(edge => edge.From, edge => edge.To);
         HashSet<int> traversedStageIds = new();
         foreach (int rootStageId in inDegree.Where(pair => pair.Value == 0).Select(pair => pair.Key))
@@ -391,12 +371,13 @@ internal static class CurrentClientStudyTables
             property.Value = property.Value.Value<bool>() ? 1 : 0;
     }
 
-    private static void ValidateDeclaredCount(JObject counts, string name, int expected)
+    private static int ExpectedCount(JObject counts, string name)
     {
-        int actual = counts.Value<int?>(name)
+        int count = counts.Value<int?>(name)
             ?? throw new InvalidDataException($"{ResourcePath}: ExpectedCounts.{name} is required.");
-        if (actual != expected)
-            throw new InvalidDataException($"{ResourcePath}: ExpectedCounts.{name} is {actual}; expected {expected}.");
+        if (count <= 0)
+            throw new InvalidDataException($"{ResourcePath}: ExpectedCounts.{name} must be positive.");
+        return count;
     }
 
     private static JObject RequireObject(JObject root, string name)

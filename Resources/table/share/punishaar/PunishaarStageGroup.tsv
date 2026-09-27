@@ -1,0 +1,10 @@
+StageId	PreStageId	TimeId	GroupId	Type	Name	Desc	BeginStoryId	RemedyShop	RemedyGold	EnableCardAutoMode
+100101	0	50201	1001	1	Wanderer's Guide to Circuit Calculus	Everything you need to master this board game—in one guide!	HD05601BA	100	10	0
+100102	100101	50201	1001	1	Outskirts	Anyway, it's set at the edge of the base.		200	10	1
+100103	100102	50201	1001	1	Refresh & Co.	Keep spamming refresh. I'm sure they'll show up eventually.		300	10	1
+100104	100103	50201	1001	1	Sanctum of Prayer	You might just find the answer you're hoping for here.		400	10	1
+100105	100104	50203	1001	1	Bureau of Fate	Plan. Position. Prevail.		500	10	1
+100106	100105	50203	1001	1	Recruitment Drive	Keep the recruits coming. Whatever happens, make sure the front line stays staffed!		600	10	1
+100107	100106	50203	1001	1	Lost, Still Looking	Still waiting for the right person to come along? So am I. Hang in there.		600	10	1
+100108	100107	50204	1001	1	The Empty Seat	Someone will fill the empty seat someday. The only question is who.		600	10	1
+100109	100108	50204	1001	2	Simulation's End	Carrying on in the name of victory.		900	10	1

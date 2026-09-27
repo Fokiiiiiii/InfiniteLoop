@@ -1229,12 +1229,29 @@ namespace AscNet.GameServer.Handlers
                     return IsSameEquipSlot(equippedTable, toEquipTable);
                 })
                 .ToList();
+            // EquipTakeOffRequest already refuses to remove a weapon on its own, and the client rebuilds a
+            // weapon slot from this push alone: it clears the previous owner's slot from the selected
+            // equip's old character and never reinstalls what the request leaves behind. So a worn weapon
+            // may only move to another character that hands back the weapon it displaces. Reject before
+            // any assignment is saved, even when the previous owner still holds a spare weapon.
+            if (toEquipTable.Site == 0
+                && toEquip.CharacterId > 0
+                && toEquip.CharacterId != request.CharacterId
+                && !previousEquips.Any(equip =>
+                    equipTables.FirstOrDefault(table => table.Id == equip.TemplateId)?.Site == 0))
+            {
+                // EquipManagerGetCharEquipBySiteNotFound
+                session.SendResponse(new EquipPutOnResponse() { Code = 20021012 }, packet.Id);
+                return;
+            }
+
             bool changed = toEquip.CharacterId != request.CharacterId || previousEquips.Count > 0;
+            int previousCharacterId = toEquip.CharacterId;
 
 
             foreach (EquipData previousEquip in previousEquips)
             {
-                previousEquip.CharacterId = 0;
+                previousEquip.CharacterId = toEquipTable.Site == 0 ? previousCharacterId : 0;
             }
 
             toEquip.CharacterId = request.CharacterId;
@@ -1243,12 +1260,11 @@ namespace AscNet.GameServer.Handlers
             session.AppliedTeamPrefabId = null;
 
 
-            if (previousEquips.Count > 0)
-            {
-                NotifyEquipDataList notifyEquipData = new();
-                notifyEquipData.EquipDataList.AddRange(previousEquips);
-                session.SendPush(notifyEquipData);
-            }
+            // The client rebuilds each affected slot solely from this push, before the response callback.
+            NotifyEquipDataList notifyEquipData = new();
+            notifyEquipData.EquipDataList.AddRange(previousEquips);
+            notifyEquipData.EquipDataList.Add(toEquip);
+            session.SendPush(notifyEquipData);
 
             session.SendResponse(new EquipPutOnResponse(), packet.Id);
         }
@@ -1258,6 +1274,13 @@ namespace AscNet.GameServer.Handlers
         {
             EquipTakeOffRequest request = packet.Deserialize<EquipTakeOffRequest>();
 
+            List<EquipData> affectedEquips = session.character.Equips
+                .Where(equip => request.EquipIds.Contains((int)equip.Id)).ToList();
+            if (affectedEquips.Any(equip => Character.ResolveEquipTemplate(equip.TemplateId)?.Site == 0))
+            {
+                session.SendResponse(new EquipTakeOffResponse { Code = 20021012 }, packet.Id);
+                return;
+            }
             bool changed = false;
             foreach (int equipId in request.EquipIds)
             {
@@ -1272,6 +1295,7 @@ namespace AscNet.GameServer.Handlers
                 session.character.Save();
                 session.AppliedTeamPrefabId = null;
             }
+            session.SendPush(new NotifyEquipDataList { EquipDataList = affectedEquips });
 
 
             session.SendResponse(new EquipTakeOffResponse(), packet.Id);
@@ -1357,6 +1381,11 @@ namespace AscNet.GameServer.Handlers
             }
 
             HashSet<uint> selectedIds = group.ChipIdList.Select(value => (uint)value).ToHashSet();
+            List<EquipData> affectedEquips = session.character.Equips
+                .Where(equip => selectedIds.Contains(equip.Id)
+                    || (equip.CharacterId == request.CharacterId
+                        && Character.ResolveEquipTemplate(equip.TemplateId)?.Site > 0))
+                .ToList();
             foreach (EquipData equip in session.character.Equips)
             {
                 EquipTable? row = Character.ResolveEquipTemplate(equip.TemplateId);
@@ -1367,6 +1396,7 @@ namespace AscNet.GameServer.Handlers
             }
             session.character.Save();
             session.AppliedTeamPrefabId = null;
+            session.SendPush(new NotifyEquipDataList { EquipDataList = affectedEquips });
 
             session.SendResponse(new EquipPutOnChipGroupResponse(), packet.Id);
         }

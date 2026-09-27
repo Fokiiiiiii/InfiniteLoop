@@ -1560,7 +1560,9 @@ internal static partial class Theatre6Module
             // 136004 [count]: choices made in stages, accumulated by the shared ledger.
             // 136006 [count]: stage missions completed, accumulated by the shared ledger.
             // 136005 [count, battle kind]: battles completed in stages, same ledger.
-            case 136004 or 136005 or 136006:
+            // 136012 [Theatre6Character id, count]: stage battles completed with that character
+            // (4.8 tasks 140351-140353, Phantom Clash excluded), same ledger.
+            case 136004 or 136005 or 136006 or 136012:
                 return m.GetTaskConditionProgress(condition.Id);
             // 136009 [mode, difficulty]: difficulty cleared at least once.
             case 136009 when p.Count >= 2:
@@ -1640,15 +1642,17 @@ internal static partial class Theatre6Module
     /// <summary>
     /// Producers report the authored mission counters. "Choice", "Task" and "Battle" advance the
     /// stage choice/mission/battle totals; "PvpBattle" advances completed Phantom Clash matches.
+    /// A stage "Battle" must name the run's Theatre6Character id: it also feeds 136012.
     /// </summary>
-    internal static void RecordMetaProgress(Mutation mutation, string trigger, int value = 1, int parameter = 0)
+    internal static void RecordMetaProgress(Mutation mutation, string trigger, int value, int parameter, int characterId)
     {
-        Require(value > 0 && parameter >= 0, CodeInvalidRequest);
+        Require(value > 0 && parameter >= 0 && characterId >= 0 && (trigger != "Battle" || characterId > 0), CodeInvalidRequest);
         (int conditionType, int expectedParameter) = trigger switch
         {
             "Choice" => (136004, 0),
             "Task" => (136006, 0),
             // Authored stage battles carry kind 3 (params [count, 3]); any other kind is ignored.
+            // The same stage battle also feeds 136012 for the run's archive character.
             "Battle" => (136005, 3),
             // Authored Phantom Clash matches exclude promotion challenges (params [2, 2, count]).
             "PvpBattle" => (136010, 2),
@@ -1658,7 +1662,8 @@ internal static partial class Theatre6Module
             return;
         DateTimeOffset now = DateTimeOffset.UtcNow;
         bool changed = false;
-        foreach (TaskCondition condition in MetaTaskConditions.Value.Values.Where(row => row.Type == conditionType))
+        foreach (TaskCondition condition in MetaTaskConditions.Value.Values.Where(row => row.Type == conditionType
+            || (conditionType == 136005 && row.Type == 136012 && characterId > 0 && row.Params.Count >= 2 && row.Params[0] == characterId)))
         {
             if (!MetaTasks.Value.Values.Any(task => task.Condition == condition.Id && IsMetaTaskOpen(mutation, task, now)))
                 continue;

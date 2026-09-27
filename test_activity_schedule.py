@@ -68,5 +68,36 @@ class Theatre6MissionWindowTests(unittest.TestCase):
         self.assertEqual(windows[48602][:2], interval("2027/3/2 5:00", 172800))
 
 
+class InstalledBattleCalendarTests(unittest.TestCase):
+    def test_panel_and_tips_follow_installed_promotion_windows(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root)
+            tables = {
+                "client/fuben/FubenClientConfig.json": [{"Key": "MainPanelTimeId", "Values": ["44"]}],
+                "client/activitybrief/SpecialActivity.json": [
+                    {"Id": 1, "TimeId": 45, "SkipId": 7, "OnlyRedPoint": 0}],
+                "client/fuben/FubenActivityTimeTips.json": [
+                    {"Id": 1, "TimeId": 46, "Desc": "In Progress: Example"}],
+                "share/fuben/FubenActivity.json": [{"Id": 1, "TimeId": 47, "Name": "Example"}],
+            }
+            for relative, rows in tables.items():
+                path = source / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(rows))
+            login = source / "LoginNotice.json"
+            login.write_text(json.dumps({"BeginTime": 900, "EndTime": 1000}))
+            notices = [{"Title": "Example Update Note", "EndTime": 5000}]
+            catalog = [{"TimeId": "47", "SkipId": "7"}]
+            for start, end in ((1100, 2500), (3000, 4000)):
+                schedules = {47: (start, end, "GameNotice:update-note-html:example.html")}
+                schedules.update(activity_schedule._special_activity_windows(
+                    source, catalog, schedules, notices, login))
+                panel = activity_schedule._main_panel_window(source, schedules, notices, login)
+                tips = activity_schedule._fuben_activity_time_tip_windows(source, schedules, panel)
+                self.assertEqual((start, end), schedules[45][:2])
+                self.assertEqual((start, end), panel[44][:2])
+                self.assertEqual((start, end), tips[46][:2])
+
+
 if __name__ == "__main__":
     unittest.main()

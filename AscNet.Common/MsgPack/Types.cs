@@ -761,6 +761,21 @@ namespace AscNet.Common.MsgPack
 
 
     [global::MessagePack.MessagePackObject(true)]
+    public class NotifyChatBoardInfo
+    {
+        [global::MessagePack.MessagePackObject(true)]
+        public class NotifyChatBoardInfoChatBoard
+        {
+            public long Id { get; set; }
+            public long GetTime { get; set; }
+            public long EndTime { get; set; }
+        }
+
+        public NotifyChatBoardInfoChatBoard ChatBoard { get; set; } = new();
+    }
+
+
+    [global::MessagePack.MessagePackObject(true)]
     public class NotifySocialData
     {
         [global::MessagePack.MessagePackObject(true)]
@@ -1402,6 +1417,20 @@ public sealed class NotifyBfrtProgressInfo
         public int Code { get; set; }
         public List<int> BackgroundSongs { get; set; } = new();
     }
+    [MessagePack.MessagePackObject(true)]
+    public class MoveAudioPlayerBackgroundSongRequest
+    {
+        public int Index { get; set; }
+        public int MoveType { get; set; }
+        public int SongId { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class MoveAudioPlayerBackgroundSongResponse
+    {
+        public int Code { get; set; }
+    }
+
     [MessagePack.MessagePackObject(true)]
     public class NotifySignInData
     {
@@ -2153,6 +2182,19 @@ public sealed class NotifyBfrtProgressInfo
     public class NotifyTeachingActivityInfo
     {
         public List<dynamic> ActivityInfo { get; set; } = new();
+    }
+
+    [global::MessagePack.MessagePackObject(true)]
+    public class TeachingTreasureRewardRequest
+    {
+        public int TreasureId { get; set; }
+    }
+
+    [global::MessagePack.MessagePackObject(true)]
+    public class TeachingTreasureRewardResponse
+    {
+        public int Code { get; set; }
+        public List<RewardGoods> RewardGoodsList { get; set; } = new();
     }
 
 
@@ -3337,6 +3379,7 @@ public sealed class NotifyBfrtProgressInfo
             public dynamic? RpgSettleResult { get; set; }
             public dynamic? MonsterCombatResult { get; set; }
             public dynamic? TransfiniteBattleResult { get; set; }
+            public TransfiniteTowerFightResult? TransfiniteTowerFightResult { get; set; }
             public dynamic? TeachingActivityFightResult { get; set; }
             public dynamic? PracticeFightResult { get; set; }
             public dynamic? KotodamaSettleResult { get; set; }
@@ -3864,6 +3907,54 @@ public sealed class NotifyBfrtProgressInfo
         public List<int> OpenedCharacterIds { get; set; } = new();
         public Dictionary<int, int> InstrumentBindings { get; set; } = new();
         public List<int> AvgWatchedCharacterIds { get; set; } = new();
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeRecordAvgRequest
+    {
+        public int CharacterId { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeRecordAvgResponse
+    {
+        public int Code { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeOpenRequest
+    {
+        public int Id { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeOpenResponse
+    {
+        public int Code { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeSelectOpenRequest
+    {
+        public int CharacterId { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeSelectOpenResponse
+    {
+        public int Code { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeBindRequest
+    {
+        public Dictionary<int, int>? Bindings { get; set; }
+    }
+
+    [MessagePack.MessagePackObject(true)]
+    public class EnvelopeBindResponse
+    {
+        public int Code { get; set; }
     }
 
     [MessagePack.MessagePackObject(true)]

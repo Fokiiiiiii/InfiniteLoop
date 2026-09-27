@@ -1,4 +1,9 @@
+import base64
+import json
 import os
+from pathlib import Path
+import re
+import threading
 from urllib.parse import urlparse, urlunparse
 from mitmproxy import http
 from mitmproxy import ctx
@@ -13,42 +18,66 @@ from region_profile import (
 )
 
 PINNED_HOST_PATTERNS = (
-    r".*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz).*",
-    r".*qcloud-sg-datareceiver\.kurogame\.xyz.*",
-    r".*mp-gb-sdklog\.kurogames\.net.*",
-    r".*events\.appsflyer\.com.*",
-    r".*anticheatexpert\.com:443",
+    r"^(?:[^.]+\.)*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz):443$",
+    r"^(?:[^.]+\.)*qcloud-sg-datareceiver\.kurogame\.xyz:443$",
+    r"^(?:[^.]+\.)*mp-gb-sdklog\.kurogames\.net:443$",
+    r"^(?:[^.]+\.)*events\.appsflyer\.com:443$",
+    r"^(?:[^.]+\.)*anticheatexpert\.com:443$",
     # PGR performs a client-side external-IP check and rejects the local
     # MITM certificate. Keep this diagnostic HTTPS request as a raw tunnel.
-    r"ipv4\.icanhazip\.com:443",
-    r"sdkapi\.kurogame-service\.(com|xyz):443",
-    r"pgr\.kurogame\.net:443",
+    r"^ipv4\.icanhazip\.com:443$",
+    r"^sdkapi\.kurogame-service\.(com|xyz):443$",
+    r"^pgr\.kurogame\.net:443$",
 )
 
-# Observed JP Steam game-server endpoint. The SDK gate is already rewritten
-# to local AscNet, but this endpoint can still be selected from a cached or
-# native client route. Redirect only this exact game TCP destination; leave
-# all other TCP and pinned HTTPS traffic untouched.
-OBSERVED_GAME_TCP_ENDPOINTS = {
-    ("8.209.200.222", 2333),
-}
+# The JP config's :2333 URL is an HTTP Login/Login endpoint, not the game
+# socket. The local login response supplies this raw TCP endpoint to the client.
 LOCAL_GAME_TCP_ENDPOINT = ("127.0.0.1", 2335)
+GAME_TCP_CAPTURE_ENDPOINTS = {LOCAL_GAME_TCP_ENDPOINT}
+GAME_TCP_HOST_FILTERS = [
+    "^" + host.replace(".", r"\.") + ":" + str(port) + "$"
+    for host, port in sorted(GAME_TCP_CAPTURE_ENDPOINTS)
+]
+_TCP_CAPTURE_LOCK = threading.Lock()
 
 def load(loader):
     # ctx.options.web_open_browser = False
     # We change the connection strategy to lazy so that next_layer happens before we actually connect upstream.
     ctx.options.connection_strategy = "lazy"
     ctx.options.upstream_cert = False
-    ctx.options.ssl_insecure = True
+    ctx.options.ssl_insecure = False
     ctx.options.ignore_hosts = list(PINNED_HOST_PATTERNS)
     if _local_capture_enabled():
         # Keep the regular pass-through list. Pinned KRSDK/service HTTPS
         # traffic must remain a raw tunnel instead of being MITM'd locally.
         ctx.options.rawtcp = True
+        # Limit generic TCP handling to the known JP game socket endpoints.
+        ctx.options.tcp_hosts = list(GAME_TCP_HOST_FILTERS)
+        # Only send regional config/route hosts and the JP game socket through
+        # mitmproxy. Unrelated process traffic stays on its original path.
+        ctx.options.allow_hosts = _local_capture_allow_hosts()
+        # This path is TCP-only. Do not attempt HTTP/3 or generic UDP capture.
+        ctx.options.http3 = False
+        ctx.options.udp_hosts = []
 
 
 def _local_capture_enabled():
     return os.environ.get("ASCNET_LOCAL_CAPTURE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _local_capture_allow_hosts():
+    profile = get_region_profile(os.environ.get("ASCNET_REGION", "global"))
+    regional_hosts = profile.route_hosts + profile.config_hosts + profile.notice_hosts
+    patterns = [
+        "^" + re.escape(host).replace(r"\*", ".*") + r":\d+$"
+        for host in regional_hosts
+    ]
+    _, sdk_host, sdk_port = _ascnet_target()
+    patterns.extend(
+        "^" + re.escape(host) + ":" + str(port) + "$"
+        for host, port in (LOCAL_GAME_TCP_ENDPOINT, (sdk_host, sdk_port))
+    )
+    return list(dict.fromkeys(patterns))
 
 
 def _normalise_connect_host(host):
@@ -228,9 +257,8 @@ def _rewrite_authoritative_config_body(body, target_origin):
                 channel_server_list = cols[2]
         out.append("\t".join(cols))
 
-    # The JP 4.7.0 client looks up version-qualified keys. Upstream config
-    # does not provide them, so mirror the rewritten routes without changing
-    # any other upstream metadata.
+    # JP clients also look up version-qualified keys. When upstream config
+    # omits them, mirror the rewritten routes without changing other metadata.
     if application_version:
         if server_list is not None and not any(
             line.startswith(f"ServerListStr_{application_version}\t") for line in out
@@ -249,22 +277,34 @@ def _rewrite_tw_config_body(body, target_origin):
 
 
 def next_layer(nextlayer: layer.NextLayer):
-    # Only mark hosts we intend to rewrite. HTTPS proxying is intentionally
-    # avoided for pinned KRSDK/service hosts by the runner/environment.
+    # Only mark hosts we intend to rewrite. ignore_hosts keeps known pinned
+    # HTTPS connections on their original end-to-end TLS path.
     sni = nextlayer.context.client.sni
     if _is_ascnet_host(sni):
         ctx.log.info("ascnet candidate sni:" + sni)
 
 
-def tcp_start(flow) -> None:
-    """Route the observed JP game TCP endpoint into the local game server."""
-    address = flow.server_conn.address
-    if address in OBSERVED_GAME_TCP_ENDPOINTS:
-        flow.server_conn.address = LOCAL_GAME_TCP_ENDPOINT
-        ctx.log.info(
-            "game tcp redirect %s:%s -> %s:%s",
-            address[0], address[1], LOCAL_GAME_TCP_ENDPOINT[0], LOCAL_GAME_TCP_ENDPOINT[1],
-        )
+def tcp_message(flow) -> None:
+    """Optionally record raw chunks from the JP game TCP socket as JSONL."""
+    path = os.environ.get("ASCNET_TCP_CAPTURE_PATH", "").strip()
+    if not path or flow.server_conn.address not in GAME_TCP_CAPTURE_ENDPOINTS:
+        return
+
+    message = flow.messages[-1]
+    row = {
+        "timestamp": message.timestamp,
+        "flow_id": flow.id,
+        "direction": "client_to_server" if message.from_client else "server_to_client",
+        "server": list(flow.server_conn.address),
+        "chunk_bytes": len(message.content),
+        "data_base64": base64.b64encode(message.content).decode("ascii"),
+    }
+    destination = Path(path).expanduser()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+    with _TCP_CAPTURE_LOCK:
+        with destination.open("a", encoding="utf-8") as capture:
+            capture.write(line)
 
 
 def http_connect(flow: http.HTTPFlow) -> None:

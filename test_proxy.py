@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from types import ModuleType, SimpleNamespace
@@ -77,18 +78,67 @@ class ProxyRoutingTests(unittest.TestCase):
 
         proxy.load(None)
 
-        self.assertIn(r".*anticheatexpert\.com:443", mitmproxy.ctx.options.ignore_hosts)
+        self.assertIn(r"^(?:[^.]+\.)*anticheatexpert\.com:443$", mitmproxy.ctx.options.ignore_hosts)
 
     def test_local_capture_preserves_pinned_https_passthrough(self):
         mitmproxy.ctx.options = SimpleNamespace()
 
-        with patch.dict(os.environ, {"ASCNET_LOCAL_CAPTURE": "1"}, clear=False):
+        with patch.dict(os.environ, {"ASCNET_LOCAL_CAPTURE": "1", "ASCNET_REGION": "jp"}, clear=False):
             proxy.load(None)
 
-        self.assertIn(r".*sdk-prod-cdn-aws\.kurogame-service\.(com|xyz).*", mitmproxy.ctx.options.ignore_hosts)
-        self.assertIn(r".*anticheatexpert\.com:443", mitmproxy.ctx.options.ignore_hosts)
-        self.assertIn(r"sdkapi\.kurogame-service\.(com|xyz):443", mitmproxy.ctx.options.ignore_hosts)
+        for host in (
+            "sdk-prod-cdn-aws.kurogame-service.com:443",
+            "qcloud-sg-datareceiver.kurogame.xyz:443",
+            "mp-gb-sdklog.kurogames.net:443",
+            "events.appsflyer.com:443",
+            "anticheatexpert.com:443",
+            "ipv4.icanhazip.com:443",
+            "sdkapi.kurogame-service.com:443",
+            "pgr.kurogame.net:443",
+        ):
+            self.assertTrue(any(re.fullmatch(pattern, host) for pattern in mitmproxy.ctx.options.ignore_hosts), host)
+        self.assertFalse(any(re.fullmatch(pattern, "sdkapi.kurogame-service.com:80") for pattern in mitmproxy.ctx.options.ignore_hosts))
         self.assertTrue(mitmproxy.ctx.options.rawtcp)
+        self.assertEqual(proxy.GAME_TCP_HOST_FILTERS, mitmproxy.ctx.options.tcp_hosts)
+        self.assertTrue(any(re.fullmatch(pattern, "prod-jpcdn-tx.kurogame.net:443") for pattern in mitmproxy.ctx.options.allow_hosts))
+        self.assertTrue(any(re.fullmatch(pattern, "127.0.0.1:2335") for pattern in mitmproxy.ctx.options.allow_hosts))
+        self.assertTrue(any(re.fullmatch(pattern, "127.0.0.1:8080") for pattern in mitmproxy.ctx.options.allow_hosts))
+        self.assertFalse(any(re.fullmatch(pattern, "8.209.200.222:2333") for pattern in mitmproxy.ctx.options.allow_hosts))
+        self.assertFalse(any(re.fullmatch(pattern, "telemetry.example.org:443") for pattern in mitmproxy.ctx.options.allow_hosts))
+        self.assertFalse(mitmproxy.ctx.options.http3)
+        self.assertEqual([], mitmproxy.ctx.options.udp_hosts)
+        self.assertFalse(mitmproxy.ctx.options.ssl_insecure)
+
+    def test_tcp_filter_targets_only_the_local_game_socket_not_http_login(self):
+        self.assertEqual([r"^127\.0\.0\.1:2335$"], proxy.GAME_TCP_HOST_FILTERS)
+        self.assertEqual({("127.0.0.1", 2335)}, proxy.GAME_TCP_CAPTURE_ENDPOINTS)
+
+    def test_tcp_capture_records_only_game_endpoint_chunks(self):
+        endpoint = proxy.LOCAL_GAME_TCP_ENDPOINT
+        flow = SimpleNamespace(
+            id="test-flow",
+            server_conn=SimpleNamespace(address=endpoint),
+            messages=[SimpleNamespace(from_client=True, content=b"\x01\x02frame", timestamp=123.5)],
+        )
+        other = SimpleNamespace(
+            id="other-flow",
+            server_conn=SimpleNamespace(address=("203.0.113.1", 443)),
+            messages=[SimpleNamespace(from_client=True, content=b"not-captured", timestamp=124.0)],
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            capture_path = Path(root) / "tcp" / "jp.jsonl"
+            with patch.dict(os.environ, {"ASCNET_TCP_CAPTURE_PATH": str(capture_path)}, clear=False):
+                proxy.tcp_message(flow)
+                proxy.tcp_message(other)
+            import json
+            import base64
+            row = json.loads(capture_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("client_to_server", row["direction"])
+        self.assertEqual(list(endpoint), row["server"])
+        self.assertEqual(7, row["chunk_bytes"])
+        self.assertEqual(b"\x01\x02frame", base64.b64decode(row["data_base64"]))
 
 
     def test_notice_html_stays_on_upstream_cdn(self):

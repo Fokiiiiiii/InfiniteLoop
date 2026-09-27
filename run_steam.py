@@ -27,13 +27,11 @@ from typing import BinaryIO, Iterable
 from region_profile import ConfigMode, ConfigSmokeTarget, get_region_profile, region_names
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_KRSDK_CACHE_DIR = Path.home() / "Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix/drive_c/users/Sikarugir/AppData/Roaming/KR_G143/A1855"
-LOCAL_KRSDK_OAUTH_CODE = "ascnet-local-oauth-code"
 CONFIG_SMOKE_TARGETS = [
     (target.label, target.path, target.channel_assertion)
     for target in get_region_profile("global").config_smoke_targets
 ]
-CURRENT_DOCUMENT_VERSION = "4.6.7"
+CURRENT_DOCUMENT_VERSION = "4.8.10"
 LOCAL_SDK_HTTP = None
 
 
@@ -46,7 +44,7 @@ def local_sdk_open(request: str | urllib.request.Request, timeout: float):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run AscNet on an unprivileged local SDK port and bridge Steam/Kuro HTTP(S) traffic through mitmproxy.",
+        description="Start AscNet and mitmproxy; JP mode waits for the user to launch PGR from Steam and does not modify client files.",
     )
     parser.add_argument(
         "--region",
@@ -60,12 +58,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--proxy-local",
         action="store_true",
-        help="Use mitmproxy's process-scoped OS redirector; HTTP routing uses the bridge, pinned HTTPS is tunneled, and game TCP follows the rewritten ServerList.",
+        help="Use mitmproxy's process-scoped OS redirector without editing the game install or KRSDK cache; JP routes only the observed game TCP socket to AscNet.",
     )
     parser.add_argument(
         "--proxy-local-process",
         default=os.environ.get("ASCNET_PROXY_LOCAL_PROCESS", "PGR.exe,KRSDKExternal.exe"),
         help="Comma-separated process names or PIDs captured by --proxy-local. Default: %(default)s",
+    )
+    parser.add_argument(
+        "--tcp-capture",
+        action="store_true",
+        help="Capture raw chunks only for the JP game TCP socket to .runtime/jp-game-tcp.jsonl.",
     )
     parser.add_argument("--dotnet", default=os.environ.get("DOTNET"), help="dotnet executable. Defaults to DOTNET, PATH, then /Users/reiserfs/.dotnet/dotnet")
     parser.add_argument("--mitm", default=os.environ.get("MITMPROXY"), help="mitmproxy/mitmdump executable. Defaults to MITMPROXY, mitmdump, then mitmproxy")
@@ -90,16 +93,8 @@ def parse_args() -> argparse.Namespace:
         help="Local AscNet account password used when --ascnet-username must be created. Defaults to ASCNET_PASSWORD or test.",
     )
     parser.add_argument("--no-ensure-account", action="store_true", help="Do not create/check a local account or implicitly map unknown Steam/KRSDK users to one.")
-    parser.add_argument(
-        "--krsdk-cache-dir",
-        default=os.environ.get("ASCNET_KRSDK_CACHE_DIR", str(DEFAULT_KRSDK_CACHE_DIR)),
-        help="KRSDK cache directory to repair and optionally seed. Empty disables cache maintenance. Default: %(default)s",
-    )
-    parser.add_argument("--seed-krsdk-cache", action="store_true", help="Opt in to writing a local AscNet account into KRSDKUserCache.json/KRSDKUserLauncherCache.json. Usually not needed for Steam; live KRSDK login plus gate fallback is safer.")
-    parser.add_argument("--no-seed-krsdk-cache", action="store_true", help="Legacy guard: do not write KRSDKUserCache.json/KRSDKUserLauncherCache.json.")
-    parser.add_argument("--no-repair-krsdk-cache", action="store_true", help="Do not remove stale AscNet-local KRSDK cache entries created by older runner versions.")
     parser.add_argument("--no-proxy", action="store_true", help="Only run AscNet; do not start mitmproxy.")
-    parser.add_argument("--no-smoke", action="store_true", help="Skip the Steam config smoke check before starting mitmproxy/launch command.")
+    parser.add_argument("--no-smoke", action="store_true", help="Skip the Steam config smoke check before starting the bridge.")
     parser.add_argument("--smoke-timeout", type=float, default=30.0, help="Seconds to wait for AscNet config smoke. Default: %(default)s")
     parser.add_argument("--proxy-log", default=".runtime/proxy-flows.log", help="Write redacted HTTP flow diagnostics here. Empty disables. Default: %(default)s")
     parser.add_argument(
@@ -107,12 +102,12 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("ASCNET_PROTOCOL_GAP_LOG"),
         help="JSONL protocol compatibility probe path. JP defaults to .runtime/protocol-gap-jp.jsonl; empty disables.",
     )
-    parser.add_argument("--proxy-https", action="store_true", help="Also set HTTPS_PROXY for diagnostics. May break pinned KRSDK HTTPS hosts.")
+    parser.add_argument("--proxy-https", action="store_true", help="Set HTTPS_PROXY in environment-proxy mode only; do not use with --proxy-local.")
     parser.add_argument("--stop-when-launch-exits", action="store_true", help="Stop AscNet/proxy when --launch-cmd exits. Default keeps the bridge alive for launchers that spawn and detach.")
     parser.add_argument(
         "--launch-cmd",
         nargs=argparse.REMAINDER,
-        help="Optional command to start after AscNet/proxy are ready. Use '--launch-cmd <cmd> <args...>'. Proxy env vars are injected.",
+        help="Optional command to start after services. JP local-capture mode requires launching the game manually from Steam.",
     )
     return parser.parse_args()
 
@@ -290,13 +285,15 @@ def smoke_authoritative_config_target(base_url: str, timeout: float, target: Con
         try:
             with local_sdk_open(url, timeout=2.0) as response:
                 body = response.read().decode("utf-8", errors="replace")
-            expected_document_version = target.document_version or CURRENT_DOCUMENT_VERSION
             required = [
                 f"ApplicationVersion\tstring\t{target.application_version}",
-                f"DocumentVersion\tstring\t{expected_document_version}",
-                f"LaunchModuleVersion\tstring\t{expected_document_version}",
                 target.channel_assertion,
             ]
+            if target.document_version is not None:
+                required.extend((
+                    f"DocumentVersion\tstring\t{target.document_version}",
+                    f"LaunchModuleVersion\tstring\t{target.document_version}",
+                ))
             missing = [needle for needle in required if needle not in body]
             values = {}
             for line in body.splitlines():
@@ -307,10 +304,21 @@ def smoke_authoritative_config_target(base_url: str, timeout: float, target: Con
                 key for key in ("ServerListStr", "ChannelServerListStr")
                 if not values.get(key)
             ]
+            if target.document_version is None:
+                missing_values.extend(
+                    key for key in ("DocumentVersion", "LaunchModuleVersion")
+                    if not values.get(key)
+                )
             if missing or missing_values:
                 detail = missing + [f"{key} value" for key in missing_values]
                 raise RuntimeError(f"{target.label} upstream smoke response is missing: " + ", ".join(detail))
-            print(f"Smoke OK [{target.label}] upstream: {url}", flush=True)
+            versions = ""
+            if target.document_version is None:
+                versions = (
+                    f" (DocumentVersion {values['DocumentVersion']}; "
+                    f"LaunchModuleVersion {values['LaunchModuleVersion']})"
+                )
+            print(f"Smoke OK [{target.label}] upstream{versions}: {url}", flush=True)
             return
         except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
             last_error = exc
@@ -374,17 +382,6 @@ def response_account(payload: dict[str, object]) -> dict[str, object] | None:
     return account if isinstance(account, dict) else None
 
 
-def account_value(account: dict[str, object], *names: str) -> object:
-    lowered = {key.lower(): value for key, value in account.items()}
-    for name in names:
-        if name in account:
-            return account[name]
-        lowered_value = lowered.get(name.lower())
-        if lowered_value is not None:
-            return lowered_value
-    raise RuntimeError(f"AscNet account response is missing {names[0]}.")
-
-
 def ensure_ascnet_account(sdk_url: str, username: str, password: str, timeout: float) -> dict[str, object]:
     base = sdk_url.rstrip("/")
     credentials = {"username": username, "password": password}
@@ -405,140 +402,6 @@ def ensure_ascnet_account(sdk_url: str, username: str, password: str, timeout: f
             f"Could not ensure AscNet account '{username}'. Start MongoDB with --with-mongo, "
             f"or pass --no-ensure-account for config-only testing. Details: {exc}"
         )
-
-
-def read_json_file(path: Path, fallback: object) -> object:
-    if not path.exists() or path.stat().st_size == 0:
-        return fallback
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return fallback
-
-
-def backup_once(path: Path) -> None:
-    if not path.exists():
-        return
-    backup = path.with_suffix(path.suffix + ".bak")
-    if not backup.exists():
-        shutil.copy2(path, backup)
-
-
-
-def is_local_krsdk_account(item: object) -> bool:
-    if not isinstance(item, dict):
-        return False
-    email = str(item.get("email") or "")
-    oauth_code = str(item.get("oauthCode") or "")
-    return email.endswith("@ascnet.local") or oauth_code == LOCAL_KRSDK_OAUTH_CODE
-
-
-def repair_krsdk_login_cache(cache_dir: Path) -> None:
-    user_cache_path = cache_dir / "KRSDKUserCache.json"
-    launcher_cache_path = cache_dir / "KRSDKUserLauncherCache.json"
-    removed_user_entries = 0
-    removed_launcher_entries = 0
-
-    user_cache = read_json_file(user_cache_path, {})
-    if isinstance(user_cache, dict):
-        account_list = user_cache.get("account_list")
-        if isinstance(account_list, list):
-            kept_accounts = [item for item in account_list if not is_local_krsdk_account(item)]
-            removed_user_entries = len(account_list) - len(kept_accounts)
-            if removed_user_entries:
-                removed_cuids = {
-                    str(item.get("cuid"))
-                    for item in account_list
-                    if is_local_krsdk_account(item) and isinstance(item, dict) and item.get("cuid") is not None
-                }
-                last_login_cuid = str(user_cache.get("last_login_cuid") or "")
-                user_cache["account_list"] = kept_accounts
-                if not last_login_cuid or last_login_cuid in removed_cuids:
-                    user_cache["last_login_cuid"] = next(
-                        (
-                            str(item.get("cuid"))
-                            for item in kept_accounts
-                            if isinstance(item, dict) and item.get("cuid") is not None
-                        ),
-                        "",
-                    )
-                backup_once(user_cache_path)
-                user_cache_path.write_text(json.dumps(user_cache, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-
-    launcher_cache = read_json_file(launcher_cache_path, [])
-    if isinstance(launcher_cache, list):
-        kept_launcher_accounts = [item for item in launcher_cache if not is_local_krsdk_account(item)]
-        removed_launcher_entries = len(launcher_cache) - len(kept_launcher_accounts)
-        if removed_launcher_entries:
-            backup_once(launcher_cache_path)
-            launcher_cache_path.write_text(json.dumps(kept_launcher_accounts, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-
-    if removed_user_entries or removed_launcher_entries:
-        print(
-            "Removed stale AscNet-local KRSDK cache entries: "
-            f"{removed_user_entries} user cache, {removed_launcher_entries} launcher cache.",
-            flush=True,
-        )
-
-def seed_krsdk_login_cache(cache_dir: Path, account: dict[str, object]) -> None:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    uid = int(account_value(account, "Uid", "uid"))
-    cuid = str(uid)
-    username = str(account_value(account, "Username", "username"))
-    token = str(account_value(account, "Token", "token"))
-    email = f"{username}@ascnet.local"
-
-    user_item = {
-        "id": uid,
-        "cuid": cuid,
-        "username": username,
-        "loginType": 23,
-        "code": "0",
-        "email": email,
-        "autoToken": token,
-        "token": token,
-        "bindDevStat": 0,
-        "idStat": 0,
-        "firstLgn": 0,
-        "bindDevMsg": "",
-        "realNameMethod": 0,
-        "thirdNickName": username,
-        "bindDevSwitch": 0,
-        "realNameUrl": "",
-        "realNameKey": "",
-    }
-    user_cache_path = cache_dir / "KRSDKUserCache.json"
-    user_cache = read_json_file(user_cache_path, {})
-    if not isinstance(user_cache, dict):
-        user_cache = {}
-    account_list = user_cache.get("account_list")
-    if not isinstance(account_list, list):
-        account_list = []
-    account_list = [item for item in account_list if not isinstance(item, dict) or str(item.get("cuid")) != cuid]
-    account_list.insert(0, user_item)
-    user_cache["account_list"] = account_list
-    user_cache["last_login_cuid"] = cuid
-    backup_once(user_cache_path)
-    user_cache_path.write_text(json.dumps(user_cache, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-
-    launcher_item = {
-        "cuid": cuid,
-        "email": email,
-        "id": uid,
-        "loginType": 23,
-        "oauthCode": LOCAL_KRSDK_OAUTH_CODE,
-        "thirdNickName": username,
-        "username": username,
-    }
-    launcher_cache_path = cache_dir / "KRSDKUserLauncherCache.json"
-    launcher_cache = read_json_file(launcher_cache_path, [])
-    if not isinstance(launcher_cache, list):
-        launcher_cache = []
-    launcher_cache = [item for item in launcher_cache if not isinstance(item, dict) or str(item.get("cuid")) != cuid]
-    launcher_cache.insert(0, launcher_item)
-    backup_once(launcher_cache_path)
-    launcher_cache_path.write_text(json.dumps(launcher_cache, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"KRSDK local login cache seeded: {cache_dir}", flush=True)
 
 
 def proxy_env(
@@ -585,7 +448,7 @@ def proxy_env(
         env["ASCNET_PROTOCOL_GAP_LOG"] = str(probe_path)
     else:
         env.pop("ASCNET_PROTOCOL_GAP_LOG", None)
-    if proxy_https:
+    if proxy_https and not local_capture:
         env["https_proxy"] = proxy_url
         env["HTTPS_PROXY"] = proxy_url
     return env
@@ -624,6 +487,16 @@ def terminate(processes: Iterable[subprocess.Popen[bytes]]) -> None:
 def main() -> int:
     args = parse_args()
     profile = get_region_profile(args.region)
+    if args.proxy_local and args.proxy_https:
+        raise SystemExit("--proxy-https cannot be combined with --proxy-local; local capture handles selected processes directly")
+    if profile.name == "jp" and not args.no_proxy and not args.proxy_local:
+        raise SystemExit("JP Steam launch requires --proxy-local so traffic is routed by process without client changes")
+    if profile.name == "jp" and args.launch_cmd:
+        raise SystemExit("JP mode starts the server and proxy only; launch Punishing: Gray Raven from Steam after the bridge is ready")
+    if args.tcp_capture and (args.no_proxy or not args.proxy_local):
+        raise SystemExit("--tcp-capture requires --proxy-local and an enabled mitmproxy")
+    if args.tcp_capture and profile.name != "jp":
+        raise SystemExit("--tcp-capture currently targets the observed JP game TCP endpoint; use --region jp")
     if profile.requires_discovery and not args.no_smoke:
         raise SystemExit(profile.discovery_error())
     args.sdk_url = normalise_local_sdk_url(args.sdk_url)
@@ -652,6 +525,9 @@ def main() -> int:
         protocol_gap_log,
         args.proxy_local,
     )
+    if args.tcp_capture:
+        capture_path = ROOT / ".runtime/jp-game-tcp.jsonl"
+        child_env["ASCNET_TCP_CAPTURE_PATH"] = str(capture_path.resolve())
     for diagnostic_name in (
         "ASCNET_REGION",
         "ASCNET_REGION_CONFIG_MODE",
@@ -709,10 +585,6 @@ def main() -> int:
     elif not can_connect(args.mongo_host, args.mongo_port):
         print(f"MongoDB not reachable on {args.mongo_host}:{args.mongo_port}; config endpoints work, but login/player APIs will fail until MongoDB is running.", flush=True)
 
-    cache_dir = Path(args.krsdk_cache_dir).expanduser() if args.krsdk_cache_dir else None
-    if cache_dir and not args.no_repair_krsdk_cache and not args.seed_krsdk_cache:
-        repair_krsdk_login_cache(cache_dir)
-
     try:
         build_ascnet(dotnet, env)
         ascnet = popen(ascnet_run_command(dotnet, args.sdk_url), env=env)
@@ -730,12 +602,6 @@ def main() -> int:
         if not args.no_ensure_account:
             account = ensure_ascnet_account(args.sdk_url, args.ascnet_username, args.ascnet_password, args.smoke_timeout)
 
-        if args.seed_krsdk_cache and not args.no_seed_krsdk_cache and cache_dir:
-            if account is None:
-                print("Skipping KRSDK cache seeding because --no-ensure-account was used.", flush=True)
-            else:
-                seed_krsdk_login_cache(cache_dir, account)
-
         if mitm:
             if args.proxy_local:
                 proxy_command = [mitm, "--mode", f"local:{args.proxy_local_process}", "-s", "proxy.py"]
@@ -744,7 +610,8 @@ def main() -> int:
             proxy = popen(proxy_command, env=child_env)
             processes.append(proxy)
             if args.proxy_local:
-                print(f"Local process redirect: {args.proxy_local_process}; HTTP route rewrite enabled; pinned HTTPS tunneled; game TCP follows ServerList to local AscNet; flow log={args.proxy_log or '<disabled>'}", flush=True)
+                tcp_capture = child_env.get("ASCNET_TCP_CAPTURE_PATH", "disabled")
+                print(f"Local process redirect: {args.proxy_local_process}; HTTP route rewrite enabled; known pinned HTTPS tunneled; JP raw game TCP endpoint=127.0.0.1:2335; TCP capture={tcp_capture}; HTTP flow log={args.proxy_log or '<disabled>'}", flush=True)
             else:
                 print(f"Proxy env: http_proxy=http://{args.proxy_host}:{args.proxy_port}; ASCNET_PROXY_TARGET={child_env['ASCNET_PROXY_TARGET']}; flow log={args.proxy_log or '<disabled>'}", flush=True)
 

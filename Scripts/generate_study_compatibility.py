@@ -1,44 +1,31 @@
 #!/usr/bin/env python3
-"""Generate the current Study compatibility catalog from authoritative EN tables."""
+"""Generate the current Study catalog from decoded installed-client Share tables."""
 from __future__ import annotations
 
 import argparse
 import copy
 import hashlib
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = REPO_ROOT.parent / "PGR_Data"
-DEFAULT_OUTPUT = REPO_ROOT / "Resources" / "Configs" / "study_compatibility_4.6.0.json"
-SOURCE_REVISION = "bb3c34765c9d9c1c542079d536a17e82b27f3245"
-SOURCE_DATE = "2026-07-17"  # Author date of SOURCE_REVISION; never wall-clock time.
-CLIENT_VERSION = "4.6.0"
+DEFAULT_SOURCE = REPO_ROOT / ".runtime" / "upgrade-4.8" / "tables"
+DEFAULT_OUTPUT = REPO_ROOT / "Resources" / "Configs" / "study_compatibility_4.8.0.json"
+CLIENT_VERSION = "4.8.0"
 SOURCES = {
-    "Stage": "en/bytes/share/fuben/Stage.json",
-    "StageLevelControl": "en/bytes/share/fuben/StageLevelControl.json",
-    "Robot": "en/bytes/share/robot/Robot.json",
-    "PracticeChapter": "en/bytes/share/fuben/practice/PracticeChapter.json",
-    "PracticeGroup": "en/bytes/share/fuben/practice/PracticeGroup.json",
-    "PracticeActivity": "en/bytes/share/fuben/practice/PracticeActivity.json",
-    "TeachingActivity": "en/bytes/share/fuben/teaching/TeachingActivity.json",
-    "TeachingRobot": "en/bytes/share/fuben/teaching/TeachingRobot.json",
-    "EnhanceSkill": "en/bytes/share/character/enhanceskill/EnhanceSkill.json",
-    "EnhanceSkillGroup": "en/bytes/share/character/enhanceskill/EnhanceSkillGroup.json",
+    "Stage": "share/fuben/Stage.json",
+    "StageLevelControl": "share/fuben/StageLevelControl.json",
+    "Robot": "share/robot/Robot.json",
+    "PracticeChapter": "share/fuben/practice/PracticeChapter.json",
+    "PracticeGroup": "share/fuben/practice/PracticeGroup.json",
+    "PracticeActivity": "share/fuben/practice/PracticeActivity.json",
+    "TeachingActivity": "share/fuben/teaching/TeachingActivity.json",
+    "TeachingRobot": "share/fuben/teaching/TeachingRobot.json",
+    "EnhanceSkill": "share/character/enhanceskill/EnhanceSkill.json",
+    "EnhanceSkillGroup": "share/character/enhanceskill/EnhanceSkillGroup.json",
 }
-
-def require_clean_sources(source: Path) -> None:
-    result = subprocess.run(
-        ["git", "-C", str(source), "diff", "--quiet", "--no-ext-diff", SOURCE_REVISION, "--", *SOURCES.values()],
-        check=False,
-    )
-    if result.returncode == 1:
-        raise ValueError(f"{source}: Study inputs differ from pinned revision {SOURCE_REVISION}")
-    if result.returncode != 0:
-        raise subprocess.CalledProcessError(result.returncode, result.args)
 
 
 def positive_ids(value: Any) -> list[int]:
@@ -49,26 +36,31 @@ def positive_ids(value: Any) -> list[int]:
     return [item for item in value if item > 0]
 
 
-def load_sources(source: Path) -> tuple[dict[str, list[dict[str, Any]]], dict[str, str]]:
-    revision = subprocess.run(
-        ["git", "-C", str(source), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    if revision != SOURCE_REVISION:
-        raise ValueError(f"{source}: expected revision {SOURCE_REVISION}, got {revision}")
-    require_clean_sources(source)
-
+def load_sources(source: Path) -> tuple[dict[str, list[dict[str, Any]]], dict[str, str], dict[str, dict[str, str]]]:
+    manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
     tables: dict[str, list[dict[str, Any]]] = {}
     hashes: dict[str, str] = {}
+    provenance: dict[str, dict[str, str]] = {}
     for name, relative_path in SOURCES.items():
         path = source / relative_path
         raw = path.read_bytes()
         root = json.loads(raw)
         if not isinstance(root, list) or any(not isinstance(row, dict) for row in root):
             raise ValueError(f"{path}: expected an array of objects")
+        table_key = str(Path(relative_path).with_suffix(".tab")).lower()
+        entry = manifest.get(table_key)
+        if entry is None:
+            entry = json.loads(path.with_suffix(".provenance.json").read_text(encoding="utf-8"))
+        table_hash = hashlib.sha1((source / Path(relative_path).with_suffix(".tab")).read_bytes()).hexdigest()
+        if table_hash != entry["sha1"]:
+            raise ValueError(f"{table_key}: decoded table does not match installed-client manifest")
         tables[name] = root
         hashes[name] = hashlib.sha1(raw).hexdigest()
-    return tables, hashes
+        provenance[name] = {
+            "TableSha1": table_hash, "Bundle": entry["bundle"],
+            "IndexSha1": entry["index_sha1"], "Scope": entry["scope"],
+        }
+    return tables, hashes, provenance
 
 
 def unique_by(rows: list[dict[str, Any]], field: str, source: str) -> dict[int, dict[str, Any]]:
@@ -81,7 +73,7 @@ def unique_by(rows: list[dict[str, Any]], field: str, source: str) -> dict[int, 
     return result
 
 
-def build_catalog(tables: dict[str, list[dict[str, Any]]], hashes: dict[str, str]) -> dict[str, Any]:
+def build_catalog(tables: dict[str, list[dict[str, Any]]], hashes: dict[str, str], provenance: dict[str, dict[str, str]]) -> dict[str, Any]:
     study_stage_ids: set[int] = set()
     for row in tables["PracticeGroup"]:
         study_stage_ids.update(positive_ids(row.get("StageIds")))
@@ -186,10 +178,9 @@ def build_catalog(tables: dict[str, list[dict[str, Any]]], hashes: dict[str, str
     }
     return {
         "ClientVersion": CLIENT_VERSION,
-        "GeneratedDate": SOURCE_DATE,
-        "SourceRevision": SOURCE_REVISION,
         "SourcePaths": SOURCES,
         "SourceHashes": hashes,
+        "SourceProvenance": provenance,
         "ExpectedCounts": counts,
         "PracticeGroups": tables["PracticeGroup"],
         "PracticeChapters": tables["PracticeChapter"],
@@ -218,8 +209,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    tables, hashes = load_sources(args.source.resolve())
-    catalog = build_catalog(tables, hashes)
+    tables, hashes, provenance = load_sources(args.source.resolve())
+    catalog = build_catalog(tables, hashes, provenance)
     generated = render(catalog)
     if args.check:
         if not args.output.exists() or args.output.read_text(encoding="utf-8") != generated:

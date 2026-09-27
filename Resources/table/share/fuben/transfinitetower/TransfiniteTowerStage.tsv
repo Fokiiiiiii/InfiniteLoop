@@ -1,0 +1,39 @@
+Id	StageGroupId	StageId	IsReset	SubTitle	ImgBoss	Model	Order	NavigatorMode	NavigatorCount	CharacterGroupId	FightEventIds[0]	FightEventIds[1]	BuffDetailIds[0]	BuffDetailIds[1]	IsChangeBg
+1	1001	30163456	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85670.png	Mb1EmperorMd010001UI	1	2	1	103	2340134		90025		0
+2	1001	30163464	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/RoleMonster/RoleMonster87752.png	Mb1ScorpionMd010001UI	2	2	1	103	2340134		90025		0
+3	1001	30163453	1	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole01.png	Mb1ElpisMd010001UI	3	2	1	103	2340134		90025		0
+4	1001	30163454	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole06.png	Mb1RegulatorMd010001UI	4	2	1	103	2340134		90025		0
+5	1001	30163455	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85620.png	Mb1BruceloongMd010001UI	5	2	1	103	2340134		90025		0
+6	1001	30163485	1	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster81530.png	Mb1GodzillaMd010001UI	6	3	0	104	2340134		90025		1
+7	1001	30163457	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster87590.png	Mb1TitanMd010001UI	7	3	0	104	2340134		90025		1
+8	1001	30163458	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster010001.png	Mb1JusticeMd010001UI	8	3	0	104	2340134		90025		1
+9	1001	30163459	1	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster87901.png	Mb1MonzanoMd010001UI	9	3	0	104	2340134		90025		1
+10	1001	30163460	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster80400.png	Mb1ChainsawkillerMd010001UI	10	3	0	104	2340134		90025		1
+11	1001	30163461	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole05.png	Mb1EphialtesMd010001UI	11	3	0	104	2340134		90025		1
+12	1001	30163462	1	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85570.png	Mb1LilithMd010001UI	12	3	0	104	2340134		90025		1
+13	1001	30163463	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonstersSolo02.png	Mb1MelinoeMd010001UI	13	3	0	104	2340134		90025		1
+14	1001	30163452	0	Warning: Hypertune Core offline. The real test begins.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85751.png	Mb1KeeleyMd010001UI	14	3	0	104	2340134		90025		1
+15	1001	30163465	0	All simulation data has been consolidated. Beginning final compilation.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85350.png	Mb1MercyMd010001SameColor	15	3	0	104	2340134		90025		1
+16	1002	30163486	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster81530.png	Mb1GodzillaMd010001UI	1	1	1	101	2340135				0
+17	1002	30163467	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster85751.png	Mb1KeeleyMd010001UI	2	1	1	101	2340135				0
+18	1002	30163468	1	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole01.png	Mb1ElpisMd010001UI	3	1	1	101	2340135				0
+19	1002	30163469	0	Validation checkpoint reached. Enemy data now operating at full capacity.	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole02.png	Mb1YuukaMd010001UI	4	1	1	101	2340135				0
+20	1002	30163470	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonstersSolo02.png	Mb1MelinoeMd010001UI	5	1	1	101	2340135				0
+21	1002	30163471	1	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole03.png	Mb1AzazelMd010001UI	6	1	1	101	2340135				0
+22	1002	30163472	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster87590.png	Mb1TitanMd010001UI	7	1	1	101	2340135				0
+23	1002	30163473	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/RoleMonster/RoleMonster010001.png	Mb1JusticeMd010001UI	8	1	1	101	2340133	2340135	90025		0
+24	1003	30163474	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonstersSolo09.png	Mb1MargaretMd010001UI	1	1	1	102	2340135				0
+25	1003	30163475	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster80400.png	Mb1ChainsawkillerMd010001UI	2	1	1	102	2340135				0
+26	1003	30163476	1	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster85350.png	Mb1MercyMd010001SameColor	3	1	1	102	2340135				0
+27	1003	30163477	0	Validation checkpoint reached. Enemy data now operating at full capacity.	Assets/Product/Texture/Image/RoleMonster/RoleMonster85570.png	Mb1LilithMd010001UI	4	1	1	102	2340135				0
+28	1003	30163478	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/RoleMonster85620.png	Mb1BruceloongMd010001UI	5	1	1	102	2340135				0
+29	1003	30163479	1	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/UiTransfiniteTower/UiTransfiniteTowerRole04.png	Mb1NiggurathMd010001UI	6	1	1	102	2340135				0
+30	1003	30163480	0	High-threat enemy data detected. Variable source unknown. Calculating threat level...	Assets/Product/Texture/Image/RoleMonster/Monster80680.png	Mb1ZakaiMd010001UI	7	1	1	102	2340135				0
+31	1003	30163481	0	Validation checkpoint reached. Variable amplification applied to enemy data.	Assets/Product/Texture/Image/RoleMonster/RoleMonster80330.png	Mb1LloydMd010001UI	8	1	1	102	2340133	2340135	90025		0
+32	1004	30163495	0				1	1	1	105					0
+33	1004	30163496	0				2	1	1	105					0
+34	1004	30163497	0				3	1	1	105					0
+35	1004	30163498	0				4	1	1	105					0
+36	1005	30163482	0	Simulation environment online. Baseline calibration in progress. Follow the prompts to verify each simulation unit.	Assets/Product/Texture/Image/RoleMonster/RoleMonster93070.png	Me1ShengtangMd010001UI	1	1	1	1001					0
+37	1005	30163483	0	Simulation environment online. Baseline calibration in progress. Follow the prompts to verify each simulation unit.	Assets/Product/Texture/Image/RoleMonster/RoleMonster93681.png	Me1PerfectrobotMd010001UI	2	1	1	1002					0
+38	1005	30163484	0	Simulation environment online. Baseline calibration in progress. Follow the prompts to verify each simulation unit.	Assets/Product/Texture/Image/RoleMonster/RoleMonster87691.png	Mb1VonnegutMd010001UI	3	1	1	1003					0

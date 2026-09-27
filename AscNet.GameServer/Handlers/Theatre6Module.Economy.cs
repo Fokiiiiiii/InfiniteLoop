@@ -215,6 +215,7 @@ internal static partial class Theatre6Module
                 update.ReplaceSkills ??= new List<Theatre6SkillData>();
                 update.ReplaceSkills.Add(CloneSkill(existing));
                 FinishSkillUpdate(m, run, update, pushUpdate);
+                TriggerEffects(m, run, BuffTriggerSkillLevelUp, amount: 1);
                 return update;
             }
         }

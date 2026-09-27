@@ -816,7 +816,7 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 8014	91	996	BP Mission	Upgrade 3 members to Lv.15 (Recommended: Lucia: Crimson Weave)	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8014	3	702013	8014	Target													
 8015	91	995	BP Mission	Pass F.O.S. Rating Committee - General Course C2 (Unlocked at Lv.30)	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8015	1	702014	8015	Target													
 8016	91	998	BP Mission	Complete any 3 Main Story Normal stages (Chapter 9 recommended)	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8016	3	702015	8016	Target													
-8017	91	1000	BP Mission	Complete Crimson Weave equipment goal: Signature Booster – Advanced	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8017	1	702016	8017	Target													
+8017	91	1000	BP Mission	Crimson Weave - Signature acceleration advanced gear reaches 50% completion	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8017	1	702016	8017	Target													
 8018	91	999	BP Mission	Crimson Weave's 6★ weapon Nightblaze reaches Lv.30	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8018	1	702017	8018	Target													
 8019	91	998	BP Mission	Conduct Dormitory Chores once	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8019	1	702018	8019	Target													
 8020	91	997	BP Mission	Join or create a guild	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	8020	1	702019	8020	Target													
@@ -1193,7 +1193,7 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 50077	5	8920	Another Story IV	Collect 18 stars in Hidden Story Chapter 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50077	18	50077	30032	Clear													
 50078	5	8910	Fight for the Earth VI	Collect 36 stars in Normal Story Chapter 6	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50078	36	50078	30031	Clear													
 50079	5	8900	Another Story V	Collect 18 stars in Hidden Story Chapter 5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50079	18	50079	30032	Clear													
-50080	5	8900	Equipment Enhancement	Equipment Goal progress of any member reaches 100%	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50080	1	50080	30033	Target													
+50080	5	8900	Equipment Enhancement	Equipment Goal progress of any member reaches 50%	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50080	1	50080	30033	Target													
 50081	5	8890	Once in a Blue Moon	Clear Event Record - Once in a Blue Moon	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50081	1	16309	20166	Clear								84602307					
 50082	5	10801	Harmony Capture	Reach Commandant Level 80	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	50082	80	50082		Target													
 11001	11	10000	Beneath the Snow	Clear Snowmark		11001	1	11001	11001	Clear													
@@ -2382,9 +2382,12 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 12552	11	10000	Summer's Rhythm (1)	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv406.png	12139	1	69229		Event													
 12553	11	9900	Summer's Rhythm (2)	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv406.png	12140	200	69230	2016	Event													
 12554	11	9800	Summer's Rhythm (3)	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv406.png	12141	100	69231	20038	Event													
-12555	11	10000	Scarlet Arrival	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV308.png	12139	1	69346		Event						45011							
-12556	11	9900	Scarlet Arrival	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV308.png	12140	200	69347	2016	Event						45011							
-12557	11	9800	Scarlet Arrival	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV308.png	12141	100	69348	20038	Event						45011							
+12555	11	10000	Scarlet Arrival	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407.png	12139	1	69346		Event						45011							
+12556	11	9900	Scarlet Arrival	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407.png	12140	200	69347	2016	Event						45011							
+12557	11	9800	Scarlet Arrival	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407.png	12141	100	69348	20038	Event						45011							
+12558	11	10000	Cosmic Wonders	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV305.png	12139	1	69470	0	Event	0	0	0	0	0	0		0	0			0	0
+12559	11	9900	Cosmic Wonders	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV305.png	12140	200	69471	2016	Event	0	0	0	0	0	0		0	0			0	0
+12560	11	9800	Cosmic Wonders	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV305.png	12141	100	69472	20038	Event	0	0	0	0	0	0		0	0			0	0
 120001	11	9700	Machine Precursor I	Clear [Machine Precursor] 1 time	Assets/Product/Texture/Image/IconTask/TaskIconAcitive1.png	12245	1	12775	20017	Clear													
 120002	11	9600	Machine Precursor II	Clear [Machine Precursor] 5 times	Assets/Product/Texture/Image/IconTask/TaskIconAcitive1.png	12246	5	12776	20017	Clear													
 120003	11	9500	Extremis Collaboration	Clear [Extremis Collaboration] 1 time	Assets/Product/Texture/Image/IconTask/TaskIconAcitive1.png	12247	1	12782	84020	Clear													
@@ -4024,9 +4027,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80074	51	7800	Event - Space Odyssey	Clear Blue Icy Planet: Challenge - 2	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80074	1	800037	89015	Event													
 80075	51	7700	Event - Nemesis Brawl	Clear Chapter - Storm Hunting Ground	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80075	1	800038	89016	Event													
 80076	51	7600	Event - Babel Tower: Infernal Forest Challenge	Reach Infernal Forest Strategic Lv.120	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80076	120	800039	20015	Event													
-80077	51	8300	Special Supplies - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80077	3	800027		Event													
-80078	51	8200	Special Supplies - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80078	7	800028		Event													
-80079	51	8100	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80079	15	800029		Event													
+80077	51	8300	Special Supply - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80077	3	800027		Event													
+80078	51	8200	Special Supply - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80078	7	800028		Event													
+80079	51	8100	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80079	15	800029		Event													
 80080	51	8000	Special Supply - Wolf Pup's Hunt	Clear Wolf Pup's Hunt stages 25 times	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80080	25	800030	20017	Event													
 80081	51	7800	Event - Devour Wave Escape	Clear Data Contamination in Hard Mode	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80081	1	800037	82080	Event													
 80082	51	7700	Event - Limit Break	Obtain 30 points in total	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80082	30	800038	81104	Event													
@@ -4037,16 +4040,16 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80087	51	7800	Event - Ice Queen Lulu	The restaurant reaches Lv.5	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80087	5	800037	89008	Event													
 80088	51	7700	Event - Babel Tower: Seamless Stars Challenge	Reach Seamless Stars Strategic Lv.120	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80088	120	800038	20015	Event													
 80089	51	7600	Event - Midsummer Rewind	Participate 7 times in total	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80089	7	800039	89025	Event													
-80090	51	8300	Special Supplies - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80090	3	800027		Event													
-80091	51	8200	Special Supplies - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80091	7	800028		Event													
-80092	51	8100	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80092	15	800029		Event													
+80090	51	8300	Special Supply - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80090	3	800027		Event													
+80091	51	8200	Special Supply - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80091	7	800028		Event													
+80092	51	8100	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80092	15	800029		Event													
 80093	51	8000	Special Supply - Sinking Shadows	Clear Sinking Shadows stages 25 times	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80093	25	800030	20017	Event													
 80094	51	7800	Event - Chessboard Realms	Quantity of Node Data gained reaches	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80094	5200	800037	89028	Event													
 80095	51	7700	Event - Inner World	Clear the ending stage of Mountain Cleaver	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80095	1	800038	85013	Event													
 80096	51	7600	Event - Brandishing Tunes	Clear Song 3 times	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80096	3	800039	84010	Event													
-80097	51	8300	Special Supplies - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80097	3	800027		Event													
-80098	51	8200	Special Supplies - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80098	7	800028		Event													
-80099	51	8100	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80099	15	800029		Event													
+80097	51	8300	Special Supply - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80097	3	800027		Event													
+80098	51	8200	Special Supply - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80098	7	800028		Event													
+80099	51	8100	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80099	15	800029		Event													
 80100	51	8000	Special Supply - Games of Chess	Clear Games of Chess stages 25 times	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80100	25	800030	20017	Event													
 80101	51	7800	Event - Simulacrum Submersion I	Challenge Depth reaches 50km	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80101	50	800037	88003	Event													
 80102	51	7700	Event - Simulacrum Submersion II	Challenge Depth reaches 80km	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80102	80	800038	88003	Event													
@@ -4063,9 +4066,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80113	51	7800	Event - Nexus Trek	Clear CRA-VII	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80113	1	800037	89058	Event													
 80114	51	7700	Event - Limit Break	Obtain 26 points in total	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80114	26	800038	81104	Event													
 80115	51	7600	Event - Circuit Connect	Total Damage Points reaches	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80115	1200000	800039	82010	Event													
-80116	51	8300	Special Supplies - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80116	3	800027		Event													
-80117	51	8200	Special Supplies - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80117	7	800028		Event													
-80118	51	8100	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80118	15	800029		Event													
+80116	51	8300	Special Supply - Total Logins I	Log in for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80116	3	800027		Event													
+80117	51	8200	Special Supply - Total Logins II	Log in for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80117	7	800028		Event													
+80118	51	8100	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80118	15	800029		Event													
 80119	51	8000	Special Supply - Illumined Truth	Clear Illumined Truth stages 25 times	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80119	25	800030	20017	Event													
 80120	51	7800	Event - Crafting Lulu	Store Level reaches Lv.7	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80120	7	800037	89008	Event													
 80121	51	7700	Event - Crouching Cat, Hidden Rat	Obtain "Fight for Cheese" x150	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80121	150	800038	89057	Event													
@@ -4080,9 +4083,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80130	51	7800	Event - Surviving Samsara	Clear Chapter 1 for the first time.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80130	1	800037	89073	Event													
 80131	51	7700	Event - Hydrangea Gala	Play Sunset Visit I: Same once.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80131	1	800038	89074	Event													
 80132	51	7600	Event - After School	Play EB - 6 once.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80132	1	800039	89072	Event													
-80133	51	8300	Special Supplies - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80133	3	800027		Event													
-80134	51	8200	Special Supplies - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80134	7	800028		Event													
-80135	51	8100	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80135	15	800029		Event													
+80133	51	8300	Special Supply - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80133	3	800027		Event													
+80134	51	8200	Special Supply - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80134	7	800028		Event													
+80135	51	8100	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80135	15	800029		Event													
 80136	51	8000	Special Supply - Simulated Battlefield	Consume a total of 750 Serum in the Simulated Battlefield.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80136	750	800030	20017	Event													
 80137	51	10000	Event - Stellar Witching Hour	Clear 30 Dimension Domain stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80137	30	800037	88003	Event													
 80138	51	9900	Event - Cosmic Odyssey	Obtain 1000 Starry Whispers	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80138	1000	800038	89075	Event													
@@ -4093,9 +4096,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80143	51	10000	Event - Corrupted Battlefront: Pioneers of Peril	Clear [Deep Realm Endgame II] in Normal Mode once	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80143	1	800037	90011	Event													
 80144	51	9900	Event - Constellation of Chess	Complete Opening: Challenge I - Lilith's Trial II	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80144	1	800038	90014	Event													
 80145	51	9800	Event - Arcade Anima	Complete the stage [To Flame]	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80145	1	800039	11802	Event													
-80146	51	9700	Special Supplies - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80133	3	800027		Event													
-80147	51	9600	Special Supplies - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80134	7	800028		Event													
-80148	51	9500	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80135	15	800029		Event													
+80146	51	9700	Special Supply - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80133	3	800027		Event													
+80147	51	9600	Special Supply - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80134	7	800028		Event													
+80148	51	9500	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80135	15	800029		Event													
 80149	51	9400	Special Supply - Simulated Battlefield	Consume a total of 750 Serum in the Simulated Battlefield.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80136	750	800030	20017	Event													
 80150	51	10000	Event - Crouching Cat, Hidden Rat	Prestige Level reaches 30	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80150	30	800037	89057	Event													
 80151	51	9900	Event - Trial of Simulacrums	Clear Trial of Simulacrums - "Echo" on any difficulty	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80151	1	800038	89061	Event													
@@ -4103,9 +4106,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80153	51	10000	Event - Permanent Rift I	Clear Flickering Embers	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80153	1	800037	89091														
 80154	51	9900	Event - Permanent Rift II	Clear Snowy Race	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80154	1	800038	89091														
 80155	51	9800	Event - Lazy Delivery	Clear Daily Sales DS-6	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80155	1	800039	90020														
-80156	51	9700	Special Supplies - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80156	3	800027															
-80157	51	9600	Special Supplies - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80157	7	800028															
-80158	51	9500	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80158	15	800029															
+80156	51	9700	Special Supply - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80156	3	800027															
+80157	51	9600	Special Supply - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80157	7	800028															
+80158	51	9500	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80158	15	800029															
 80159	51	9400	Special Supply - Simulated Battlefield	Consume a total of 750 Serum in the Simulated Battlefield.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80159	750	800030	20017														
 80160	51	10000	Event - Game of Thorns	Clear Chapter 2	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80160	1	800037	89028	Event													
 80161	51	9900	Event - Armored Up	Clear Chapter 1	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80161	1	800038	89073	Event													
@@ -4119,9 +4122,9 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80169	51	10000	Threading Arts	Obtain 8 stars in Fabric Dyeing chapters	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80169	8	800037	89062	Event													
 80170	51	9900	Tactical Override	Clear [Vera: Geiravor] Chapter Stage II	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80170	1	800038	89094	Event													
 80171	51	9800	Wishing Upon a Star	Win 3 [Wishing Upon a Star] games	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80171	3	800039	90018	Event													
-80172	51	9700	Special Supplies - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80172	3	800027															
-80173	51	9600	Special Supplies - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80173	7	800028															
-80174	51	9500	Special Supplies - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80174	15	800029															
+80172	51	9700	Special Supply - Total Logins I	Login for a total of 3 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80172	3	800027															
+80173	51	9600	Special Supply - Total Logins II	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80173	7	800028															
+80174	51	9500	Special Supply - Total Logins III	Log in for a total of 15 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80174	15	800029															
 80175	51	9400	Special Supply - Simulated Battlefield	Consume a total of 750 Serum in the Simulated Battlefield.	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80175	750	800030	20017														
 80176	51	10000	Path of Buried Wishes	Clear 15 Arena stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80176	15	800037	80201	Event													
 80177	51	9900	Cat Grab	Used a total of 15 Modifications to complete the game	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80177	15	800038	20177	Event													
@@ -4171,6 +4174,11 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 80248	51	10000	Blazing Rhapsody	Reach Wave 11 when clearing Stage 04	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80248	1	800037	1300635	Event													
 80249	51	9900	Rapid Pursuit	Clear [Ezette] on Nightmare difficulty or higher once	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80249	1	800038	89093	Event													
 80250	51	9800	Waves in Wrath	Clear [Raincloud]	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80250	1	800039	11724	Event													
+80251	51	10000	Circuit Calculus	Clear 7 battle nodes in [Circuit Calculus] Stage 9	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80251	7	800037	90074	Event	0	0	0	0	0	0		0	0			0	0
+80252	51	9900	Overclock Simulation	Clear Parallel Calculation - β-8	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80252	1	800038	90077	Event	0	0	0	0	0	0		0	0			0	0
+80253	51	9800	Wreck-It Huhu	Obtain in [Twilight Zone Cruise] chapters	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80253	120000	800039	89049	Event	0	0	0	0	0	0		0	0			0	0
+80254	51	9500	Special Supply - Total Logins	Login for a total of 7 days	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80254	7	800027	0	Event	0	0	0	0	0	0		0	0			0	0
+80255	51	9400	Special Supply - Simulated Battlefield	Consume a total of 1500 Serum in the Simulated Battlefield	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	80255	1500	800030	20017	Event	0	0	0	0	0	0		0	0			0	0
 1000001	56	8700	Corrupted Battlefront I	Clear Normal Stage 1-1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	1000001	1	346002		Event													
 1000002	56	8600	Corrupted Battlefront II	Clear Normal Stage 1-5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	1000002	1	346003		Event													
 1000003	56	8500	Corrupted Battlefront III	Clear Normal Stage 1-10	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	1000003	1	346004		Event													
@@ -5489,6 +5497,22 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 4517	4	25126	Sworn Voyage VI	Upgrade Effulgence to Lv.60	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	4517	1	34350	3435	Train				4516					3				
 4518	4	25125	Sworn Voyage VII	Upgrade Effulgence to Lv.70	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	4518	1	34360	3436	Train				4517					3				
 4519	4	25124	Sworn Voyage VIII	Upgrade Effulgence to Lv.80	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	4519	1	34370	3437	Train				4518					3				
+4520	4	25131	Thorned Shadow I	Upgrade Kurumi Tokisaki to Lv.10	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4520	1	34300	3430	Train	0	0	0	0	0	0		0	3			0	0
+4521	4	25130	Thorned Shadow II	Upgrade Kurumi Tokisaki to Lv.20	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4521	1	34310	3431	Train	0	0	0	4496	0	0		0	3			0	0
+4522	4	25129	Thorned Shadow III	Upgrade Kurumi Tokisaki to Lv.30	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4522	1	34320	3432	Train	0	0	0	4497	0	0		0	3			0	0
+4523	4	25128	Thorned Shadow IV	Upgrade Kurumi Tokisaki to Lv.40	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4523	1	34330	3433	Train	0	0	0	4498	0	0		0	3			0	0
+4524	4	25127	Thorned Shadow V	Upgrade Kurumi Tokisaki to Lv.50	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4524	1	34340	3434	Train	0	0	0	4499	0	0		0	3			0	0
+4525	4	25126	Thorned Shadow VI	Upgrade Kurumi Tokisaki to Lv.60	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4525	1	34350	3435	Train	0	0	0	4500	0	0		0	3			0	0
+4526	4	25125	Thorned Shadow VII	Upgrade Kurumi Tokisaki to Lv.70	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4526	1	34360	3436	Train	0	0	0	4501	0	0		0	3			0	0
+4527	4	25124	Thorned Shadow VIII	Upgrade Kurumi Tokisaki to Lv.80	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	4527	1	34370	3437	Train	0	0	0	4502	0	0		0	3			0	0
+4528	4	25131	Nether Currents I	Upgrade Anabasis to Lv.10	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4528	1	34300	3430	Train	0	0	0	0	0	0		0	3			0	0
+4529	4	25130	Nether Currents II	Upgrade Anabasis to Lv.20	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4529	1	34310	3431	Train	0	0	0	4528	0	0		0	3			0	0
+4530	4	25129	Nether Currents III	Upgrade Anabasis to Lv.30	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4530	1	34320	3432	Train	0	0	0	4529	0	0		0	3			0	0
+4531	4	25128	Nether Currents IV	Upgrade Anabasis to Lv.40	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4531	1	34330	3433	Train	0	0	0	4530	0	0		0	3			0	0
+4532	4	25127	Nether Currents V	Upgrade Anabasis to Lv.50	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4532	1	34340	3434	Train	0	0	0	4531	0	0		0	3			0	0
+4533	4	25126	Nether Currents VI	Upgrade Anabasis to Lv.60	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4533	1	34350	3435	Train	0	0	0	4532	0	0		0	3			0	0
+4534	4	25125	Nether Currents VII	Upgrade Anabasis to Lv.70	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4534	1	34360	3436	Train	0	0	0	4533	0	0		0	3			0	0
+4535	4	25124	Nether Currents VIII	Upgrade Anabasis to Lv.80	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	4535	1	34370	3437	Train	0	0	0	4534	0	0		0	3			0	0
 3130	4	26099	I Have No Friends I	Own 1 SS-rank members	Assets/Product/Texture/Image/IconTask/TaskIconExem.png	3130	1	31300	3130	Train									3				
 3131	4	26098	I Have No Friends II	Own 3 SS-rank members	Assets/Product/Texture/Image/IconTask/TaskIconExem.png	3131	3	31310	3131	Train				3130					3				
 3132	4	26097	I Have No Friends III	Own 5 SS-rank members	Assets/Product/Texture/Image/IconTask/TaskIconExem.png	3132	5	31320	3132	Train				3131					3				
@@ -5683,6 +5707,10 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 21058212	4	25660	The True Power of Lacrimosa II	Evolve Lacrimosa to SSS	Assets/Product/Texture/Image/IconTask/TaskIconR3Helentine.png	21058212	1	37182	3300	Train									3				
 21058311	4	25661	The True Power of Effulgence I	Evolve Effulgence to SS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	21058311	1	37083	3300	Train									3				
 21058312	4	25660	The True Power of Effulgence II	Evolve Effulgence to SSS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	21058312	1	37183	3300	Train									3				
+21058411	4	25661	The True Power of Kurumi Tokisaki I	Evolve Kurumi Tokisaki to SS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	21058411	1	37084	3300	Train	0	0	0	0	0	0		0	3			0	0
+21058412	4	25660	The True Power of Kurumi Tokisaki II	Evolve Kurumi Tokisaki to SSS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	21058412	1	37184	3300	Train	0	0	0	0	0	0		0	3			0	0
+21058511	4	25661	The True Power of Anabasis I	Evolve Anabasis to SS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	21058511	1	37085	3300	Train	0	0	0	0	0	0		0	3			0	0
+21058512	4	25660	The True Power of Anabasis II	Evolve Anabasis to SSS-Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	21058512	1	37185	3300	Train	0	0	0	0	0	0		0	3			0	0
 3500	4	25599	Medal of Honor I	Promote members a total of 5 times	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3500	5	35000	3500	Train									3				
 3501	4	25598	Medal of Honor II	Promote members a total of 10 times	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3501	10	35010	3501	Train				3500					3				
 3502	4	25597	Medal of Honor III	Promote members a total of 20 times	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3502	20	35020	3502	Train				3501					3				
@@ -5776,6 +5804,8 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 21078101	4	25419	Inverse Crown: Ultima Awaken	Awaken Inverse Crown's Ultima Rank	Assets/Product/Texture/Image/IconTask/TaskIconR7Luxiya.png	21078101	1	37281	19080	Train									3				
 21078201	4	25418	Lacrimosa: Ultima Awaken	Awaken Lacrimosa's Ultima Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Helentine.png	21078201	1	37282	19081	Train									3				
 21078301	4	25417	Effulgence: Ultima Awaken	Awaken Effulgence's Ultima Rank	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	21078301	1	37283	19082	Train									3				
+21078401	4	25416	Kurumi Tokisaki: Ultima Awaken	Awaken Kurumi Tokisaki's Ultima Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	21078401	1	37281	19080	Train	0	0	0	0	0	0		0	3			0	0
+21078501	4	25415	Anabasis: Ultima Awaken	Awaken Anabasis' Ultima Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	21078501	1	37285	19084	Train	0	0	0	0	0	0		0	3			0	0
 21080101	4	25000	Palefire: Infinitas Awaken	Awaken Palefire's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconLi2.png	21080101	1	37500	19000	Train									3				
 21080201	4	24999	Lotus: Infinitas Awaken	Awaken Lotus's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconLuxiya1.png	21080201	1	37500	19001	Train									3				
 21080301	4	24998	Eclipse: Infinitas Awaken	Awaken Eclipse's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconLifu1.png	21080301	1	37500	19002	Train									3				
@@ -5859,6 +5889,8 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 21088101	4	24921	Inverse Crown: Infinitas Awaken	Awaken Inverse Crown's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconR7Luxiya.png	21088101	1	37500	19080	Train									3				
 21088201	4	24920	Lacrimosa: Infinitas Awaken	Awaken Lacrimosa's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Helentine.png	21088201	1	37500	19081	Train									3				
 21088301	4	24919	Effulgence: Infinitas Awaken	Awaken Effulgence's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	21088301	1	37500	19082	Train									3				
+21088401	4	24921	Kurumi Tokisaki: Infinitas Awaken	Awaken Kurumi Tokisaki's Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	21088401	1	37500	19080	Train	0	0	0	0	0	0		0	3			0	0
+21088501	4	24917	Anabasis: Infinitas Awaken	Awaken Anabasis' Infinitas Rank	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	21088501	1	37500	19084	Train	0	0	0	0	0	0		0	3			0	0
 3170	4	25299	Right Tool for the Job I	Own 5★ weapons * 2	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	3170	2	31700	3170	Train									3				
 3171	4	25298	Right Tool for the Job II	Own 5★ weapons * 4	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	3171	4	31710	3171	Train				3170					3				
 3172	4	25297	Right Tool for the Job III	Own 5★ weapons * 6	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	3172	6	31720	3172	Train				3171					3				
@@ -6090,6 +6122,14 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 23014102	4	24726	Patrick Deployed II	Upgrade Patrick to Lv.15	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet43.png	23014102	1	374212	20110	Train				23014101					3				
 23014103	4	24725	Patrick Deployed III	Upgrade Patrick to Lv.25	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet43.png	23014103	1	374213	20110	Train				23014102					3				
 23014104	4	24724	Patrick Deployed IV	Upgrade Patrick to Lv.30	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet43.png	23014104	1	374214	20110	Train				23014103					3				
+23014201	4	24727	Zafkiel Deployed I	Upgrade Zafkiel to Lv.10	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23014201	1	374211	20110	Train	0	0	0	0	0	0		0	3			0	0
+23014202	4	24726	Zafkiel Deployed II	Upgrade Zafkiel to Lv.15	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23014202	1	374212	20110	Train	0	0	0	23014201	0	0		0	3			0	0
+23014203	4	24725	Zafkiel Deployed III	Upgrade Zafkiel to Lv.25	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23014203	1	374213	20110	Train	0	0	0	23014202	0	0		0	3			0	0
+23014204	4	24724	Zafkiel Deployed IV	Upgrade Zafkiel to Lv.30	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23014204	1	374214	20110	Train	0	0	0	23014203	0	0		0	3			0	0
+23014301	4	24727	Kelpie Deployed I	Upgrade Kelpie to Lv.10	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23014301	1	374211	20110	Train	0	0	0	0	0	0		0	3			0	0
+23014302	4	24726	Kelpie Deployed II	Upgrade Kelpie to Lv.15	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23014302	1	374212	20110	Train	0	0	0	23014301	0	0		0	3			0	0
+23014303	4	24725	Kelpie Deployed III	Upgrade Kelpie to Lv.25	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23014303	1	374213	20110	Train	0	0	0	23014302	0	0		0	3			0	0
+23014304	4	24724	Kelpie Deployed IV	Upgrade Kelpie to Lv.30	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23014304	1	374214	20110	Train	0	0	0	23014303	0	0		0	3			0	0
 23020001	4	24599	Not a P0kemon I	Own 1 SS-Rank CUB	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	23020001	1	37601	20110	Train									3				
 23020002	4	24598	Not a P0kemon II	Own 3 SS-Rank CUBs	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	23020002	3	37602	20110	Train				23020001					3				
 23020003	4	24597	Not a P0kemon III	Own 5 SS-Rank CUBs	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskEquip.png	23020003	5	37603	20110	Train				23020002					3				
@@ -6190,6 +6230,10 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 23044002	4	24420	Leave That Grand Duke to Me II	Evolve Grand Duke to SSS	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet41.png	23044002	1	37540	20110	Train									3				
 23044101	4	24419	Leave That Patrick to Me I	Evolve Patrick to SS	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet43.png	23044101	1	37419	20110	Train									3				
 23044102	4	24418	Leave That Patrick to Me II	Evolve Patrick to SSS	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet43.png	23044102	1	37541	20110	Train									3				
+23044201	4	24423	Leave That Zafkiel to Me I	Evolve Zafkiel to SS-Rank	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23044201	1	37419	20110	Train	0	0	0	0	0	0		0	3			0	0
+23044202	4	24422	Leave That Zafkiel to Me II	Evolve Zafkiel to SSS-Rank	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet42.png	23044202	1	37542	20110	Train	0	0	0	0	0	0		0	3			0	0
+23044301	4	24415	Leave That Kelpie to Me I	Evolve Kelpie to SS-Rank	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23044301	1	37419	20110	Train	0	0	0	0	0	0		0	3			0	0
+23044302	4	24414	Leave That Kelpie to Me II	Evolve Kelpie to SSS-Rank	Assets/Product/Texture/Image/UIAchievemen/UIAchievementTaskPet44.png	23044302	1	37543	20110	Train	0	0	0	0	0	0		0	3			0	0
 23050001	4	24199	It's a CUB Attack I	Total CUB Skill Level reaches Lv.10	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	23050001	10	37801	20110	Train									3				
 23050002	4	24198	It's a CUB Attack II	Total CUB Skill Level reaches Lv.20	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	23050002	20	37802	20110	Train				23050001					3				
 23050003	4	24197	It's a CUB Attack III	Total CUB Skill Level reaches Lv.50	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	23050003	50	37803	20110	Train				23050002					3				
@@ -6329,6 +6373,8 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 31098101	4	19521	Inverse Crown's Gift	Inverse Crown's Affection reaches Lv.8	Assets/Product/Texture/Image/IconTask/TaskIconR7Luxiya.png	31098101	1	37381	3653	Challenge									2				
 31098201	4	19520	Lacrimosa's Gift	Lacrimosa reaches Affection 8	Assets/Product/Texture/Image/IconTask/TaskIconR3Helentine.png	31098201	1	37382	3653	Challenge									2				
 31098301	4	19519	Effulgence's Gift	Effulgence reaches Affection 8	Assets/Product/Texture/Image/IconTask/TaskIconR5Kalienina.png	31098301	1	37383	3653	Challenge									2				
+31098401	4	19520	Kurumi Tokisaki's Gift	Kurumi Tokisaki's Affection reaches Lv.8	Assets/Product/Texture/Image/IconTask/TaskIconR3Kurumi.png	31098401	1	37384	3653	Challenge	0	0	0	0	0	0		0	2			0	0
+31098501	4	19517	Anabasis' Gift	Anabasis reaches Affection 8	Assets/Product/Texture/Image/IconTask/TaskIconR3Adelaide.png	31098501	1	37385	3653	Challenge	0	0	0	0	0	0		0	2			0	0
 3660	4	19099	Flock of Ravens	Commandant reaches Lv.10	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3660	10	36600	3660	Challenge									2				
 3661	4	19098	Blue Sky	Commandant reaches Lv.20	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3661	20	36610	3661	Challenge				3660					2				
 3662	4	19097	Ship of the Line	Commandant reaches Lv.30	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	3662	30	36620	3662	Challenge				3661					2				
@@ -9533,6 +9579,11 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 99044	11	10000	Helentine Affection Story 3	Complete Story 6 during the event		99068	1	703152		Limited Event													
 99045	94	10000	Karenina Affection 1	Clear Story 3		99069	1	64880		Event													
 99046	94	9900	Karenina Affection 2	Clear Story 7		99070	1	64881		Event													
+99047	94	10000	Kurumi Tokisaki Big Affection 1	Clear Story 3		99069	1	64880	0	Event	0	0	0	0	0	0		0	0			0	0
+99048	94	9900	Kurumi Tokisaki Big Affection 2	Clear Story 7		99070	1	64881	0	Event	0	0	0	0	0	0		0	0			0	0
+99049	94	10000	Adelyde Big Affection 1	Clear Story 3		99071	1	64880	0	Event	0	0	0	0	0	0		0	0			0	0
+99050	94	9900	Adelyde Big Affection 2	Clear Story 7		99072	1	64881	0	Event	0	0	0	0	0	0		0	0			0	0
+99051	11	10000	Adelyde Big Affection 3	Complete Story 7 during the event		99072	1	703162	0	Event	0	0	0	0	0	0		0	0			0	0
 100100	86	10000	Team-Building Chronicles 1	Clear Team-Building Log 1	Assets/Product/Texture/Image/UiLineArithmetic3/UiLineArithmetic3TaskBg02.png	100100	1	68005		Event						44005							
 100101	86	9900	Camping Life 1	Obtain 9 stars in Team-Building Log chapters	Assets/Product/Texture/Image/UiLineArithmetic3/UiLineArithmetic3TaskBg02.png	100101	9	68006		Event						44005							
 100102	86	9800	Team-Building Chronicles 2	Clear Team-Building Log 5	Assets/Product/Texture/Image/UiLineArithmetic3/UiLineArithmetic3TaskBg02.png	100102	1	68007		Event						44005							
@@ -10430,6 +10481,7 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 131007	111	9994	Phylotree Dossier	Unlock Dossier - Lucia: Inverse Crown [2]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	131007	1	69083	20374	Phylotree													
 131008	111	9993	Phylotree Dossier	Unlock Dossier — Helentine: Lacrimosa	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	131008	1	69080	20376	Phylotree													
 131009	111	9992	Phylotree Dossier	Unlock Dossier - Karenina: Effulgence	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	131009	1	69080	20390	Phylotree													
+131010	111	9991	Phylotree Dossier	Unlock Dossier - Adelyde: Anabasis	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	131010	1	69080	20406	Phylotree	0	0	0	0	0	0		0	0			0	0
 91127	11	9000	Permanent Material	Use a total of 240 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91127	240	66373	20017	Event													
 91128	11	8900	Permanent Material	Use a total of 840 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91128	840	66374	20017	Event													
 91129	11	8800	Permanent Material	Use a total of 1710 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91129	1710	66375	20017	Event													
@@ -10452,6 +10504,8 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 120497	102	9100	Dante Pool 1	Dante Pool 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120497	1	66472		Event	495												
 120498	102	9200	Vergil Pool 2	Vergil Pool 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120498	1	66471		Event	494												
 120499	102	9300	Dante Pool 2	Dante Pool 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120499	1	66472		Event	495												
+120500	114	9000	Kurumi Pool 1	Kurumi Pool 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140318	1	69435	0	Event	748	0	0	0	0	0		0	0			0	0
+120501	114	9100	Kurumi Pool 2	Kurumi Pool 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140319	1	69435	0	Event	748	0	0	0	0	0		0	0			0	0
 99368	49	10000	Modification Stage	No description		99368	3	66480		Event						35005							
 99369	49	9900	Modification Stage	No description		99369	6	66481		Event						35005							
 99370	49	9800	Modification Stage	No description		99370	9	66482		Event						35005							
@@ -10934,6 +10988,11 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 91184	11	8800	Permanent Material	Use a total of 1710 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91184	1710	67003	20017	Event													
 91185	11	8700	Permanent Material	Use a total of 2820 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91185	2820	67004	20017	Event													
 91186	11	8600	Permanent Material	Use a total of 4050 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91186	4050	67005	20017	Event													
+91187	11	9000	Permanent Material	Use a total of 240 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91187	240	67001	20017	Event	0	0	0	0	0	0		0	0			0	0
+91188	11	8900	Permanent Material	Use a total of 840 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91188	840	67002	20017	Event	0	0	0	0	0	0		0	0			0	0
+91189	11	8800	Permanent Material	Use a total of 1710 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91189	1710	67003	20017	Event	0	0	0	0	0	0		0	0			0	0
+91190	11	8700	Permanent Material	Use a total of 2820 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91190	2820	67004	20017	Event	0	0	0	0	0	0		0	0			0	0
+91191	11	8600	Permanent Material	Use a total of 4050 Serum in material stages	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV212.png	91191	4050	67005	20017	Event	0	0	0	0	0	0		0	0			0	0
 120531	11	10000	Simulated Battlefield	Clear [Simulated Battlefield] 1 time	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV306.png	120531	1	5003661	20017	Event													
 120532	11	9900	Simulated Battlefield	Clear [Simulated Battlefield] 5 times	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV306.png	120532	5	5003662	20017	Event													
 120533	11	9800	The Godfall Revelation I	Clear a Tutorial Stage once in Path of Revelation mode.	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLineV306.png	120533	1	15215	89092	Event													
@@ -11095,9 +11154,14 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 120689	11	8900	Adaptation Fitting: Grand Duke	Complete [Adaptation Fitting: Grand Duke]	Assets/Product/Texture/Image/IconTask/TaskIconActivePartnerTryv406.png	120689	1	15218	7107	Event													
 120690	11	8800	Azure Embrace	Clear the trial stage of Coating: [Azure Embrace]	Assets/Product/Texture/Image/IconTask/TaskIconActiveHelentineEffectCoatingv406.png	120690	1	15215	10035	Event						46002							
 120691	11	8800	Shimmering Tide	Clear the trial stage of Coating: [Shimmering Tide]	Assets/Product/Texture/Image/IconTask/TaskIconActiveSelenaEffectCoatingv406.png	120691	1	15215	10035	Event						46003							
-120697	11	10000	Ripples of the Past I	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV307.png	120697	1	69422		Event													
-120698	11	9900	Ripples of the Past II	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV307.png	120698	200	69423	2016	Event													
-120699	11	9800	Ripples of the Past III	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanV307.png	120699	100	69424	20038	Event													
+120692	11	9200	Against the Flow of Time I	Complete Character Challenge Stage [Time Engraved] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120692	1	15217	20235	Event	0	0	0	0	0	0		774501	0			0	0
+120693	11	9100	Against the Flow of Time II	Complete Character Challenge Stage [Time Engraved] Stage 2	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120693	1	15217	20235	Event	0	0	0	0	0	0		774501	0			0	0
+120694	11	9000	Against the Flow of Time III	Complete Character Challenge Stage [Time Engraved] Stage 3	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120694	1	15218	20235	Event	0	0	0	0	0	0		774501	0			0	0
+120695	11	8900	Adaptation Fitting: Zafkiel	Complete [Adaptation Fitting: Zafkiel]	Assets/Product/Texture/Image/IconTask/TaskIconActivePartnerTryv408.png	120695	1	15216	7107	Event	0	0	0	0	0	0		8006	0			0	0
+120696	11	8800	Ember Ceremony	Clear the trial stage of Coating: [Azure Embrace]	Assets/Product/Texture/Image/IconTask/TaskIconActiveJetavieEffectCoatingv408.png	120696	1	15215	10035	Event	0	0	0	0	0	0		770400	0			0	0
+120697	11	10000	Ripples of the Past I	Log in to the game for the 1st time today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407a.png	120697	1	69422		Event													
+120698	11	9900	Ripples of the Past II	Use a total of 200 Serum today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407a.png	120698	200	69423	2016	Event													
+120699	11	9800	Ripples of the Past III	Total Activity has reached 100 points today	Assets/Product/Texture/Image/IconTask/TaskIconActiveYureguanv407a.png	120699	100	69424	20038	Event													
 120700	11	10000	Simulated Battlefield	Clear [Simulated Battlefield] 1 time	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev407.png	120700	1	15215	20017	Event													
 120701	11	9900	Simulated Battlefield	Clear [Simulated Battlefield] 5 times	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev407.png	120701	5	15215	20017	Event													
 120702	11	9800	Blazing Rhapsody	Clear Stage 01	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev407.png	120702	1	15216	1300635	Event													
@@ -11116,6 +11180,54 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 120715	11	8300	Nightfall Finale	Clear [The Guilty] once	Assets/Product/Texture/Image/IconTask/TaskIconActivecibeizheEffectCoatingv400.png	120715	1	15215	90072	Event													
 120716	11	8800	Drift Into Summer	Clear the trial stage of Coating [Drift Into Summer]	Assets/Product/Texture/Image/IconTask/TaskIconActiveTeddyEffectCoatingv407.png	120716	1	15215	10035	Event						47012							
 120717	11	8900	Graffiti Code	Clear the trial stage of Coating [Graffiti Code]	Assets/Product/Texture/Image/IconTask/TaskIconActiveLunaEffectCoatingv407.png	120717	1	15215	10035	Event													
+120718	11	10000	Photic Drift	Play Photic Drift - 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120718	1	69481	0		0	0	0	0	0	48009		0	0			0	0
+120719	11	9900	Photic Drift	Play Photic Drift - 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120719	1	69482	0		0	0	0	0	0	48009		0	0			0	0
+120720	11	9800	Photic Drift	Play Photic Drift - 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120720	1	69483	0		0	0	0	0	0	48009		0	0			0	0
+120721	11	9700	Photic Drift	Play Photic Drift - 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120721	1	69484	0		0	0	0	0	0	48009		0	0			0	0
+120722	11	9600	Photic Drift	Accumulate target score in [Photic Drift] chapters	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120722	100000	69485	0		0	0	0	0	0	48009		0	0			0	0
+120723	11	9500	Twilight Cruise	Play Twilight Cruise - 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120723	1	69486	0		0	0	0	0	0	48009		0	0			0	0
+120724	11	9400	Twilight Cruise	Play Twilight Cruise - 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120724	1	69487	0		0	0	0	0	0	48009		0	0			0	0
+120725	11	9300	Twilight Cruise	Play Twilight Cruise - 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120725	1	69488	0		0	0	0	0	0	48009		0	0			0	0
+120726	11	9200	Twilight Cruise	Play Twilight Cruise - 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120726	1	69489	0		0	0	0	0	0	48009		0	0			0	0
+120727	11	9100	Twilight Cruise	Accumulate target score in [Twilight Cruise] chapters	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120727	120000	69490	0		0	0	0	0	0	48009		0	0			0	0
+120728	11	9000	Aphotic Descent	Play Aphotic Descent - 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120728	1	69491	0		0	0	0	0	0	48009		0	0			0	0
+120729	11	8900	Aphotic Descent	Play Aphotic Descent - 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120729	1	69492	0		0	0	0	0	0	48009		0	0			0	0
+120730	11	8800	Aphotic Descent	Play Aphotic Descent - 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120730	1	69493	0		0	0	0	0	0	48009		0	0			0	0
+120731	11	8700	Aphotic Descent	Play Aphotic Descent - 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120731	1	69494	0		0	0	0	0	0	48009		0	0			0	0
+120732	11	8600	Aphotic Descent	Accumulate target score in [Aphotic Descent] chapters	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120732	140000	69495	0		0	0	0	0	0	48009		0	0			0	0
+120733	11	10000	Simulated Battlefield	Clear [Simulated Battlefield] 1 time	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120733	1	15215	20017	Event	0	0	0	0	0	0		0	0			0	0
+120734	11	9900	Simulated Battlefield	Clear [Simulated Battlefield] 5 times	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120734	5	15215	20017	Event	0	0	0	0	0	0		0	0			0	0
+120735	11	9800	Dream of Stagnant Cycle	Clear [Shatter the Nightmare]	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120735	1	15216	90073	Event	0	0	0	0	0	0	2026/11/3 23:59	0	0		2026/9/24 5:00	0	0
+120736	11	9700	Circuit Calculus	Clear [Circuit Calculus] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120736	1	15216	90074	Event	0	0	0	0	0	0		0	0			0	0
+120737	11	9600	Overclock Simulation	Clear Benchmark Test - 3	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120737	1	15216	90077	Event	0	0	0	0	0	0		0	0			0	0
+120738	11	9500	Shrouded Requiem	Complete 2 battles as Nirvatia	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120738	2	15216	89102	Event	0	0	0	0	0	0		0	0			0	0
+120739	11	9400	Wreck-It Huhu	Play Sunlit Zone Drift - 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120739	1	15216	89049	Event	0	0	0	0	0	0		0	0			0	0
+120740	11	9300	Wrathful Monsoon	Clear [Updraft]	Assets/Product/Texture/Image/IconTask/TaskIconActiveMainLinev408.png	120740	1	15219	11724	Event	0	0	0	0	0	0		0	0			0	0
+120741	11	9200	A Kindler's Watch I	Complete Character Challenge Stage [Crimson Gambit] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv4081.png	120741	1	15217	20235	Event	0	0	0	0	0	0		0	0			0	0
+120742	11	9100	A Kindler's Watch II	Complete Character Challenge Stage [Crimson Gambit] Stage 2	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv4081.png	120742	1	15217	20235	Event	0	0	0	0	0	0		0	0			0	0
+120743	11	9000	A Kindler's Watch III	Complete Character Challenge Stage [Crimson Gambit] Stage 3	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv4081.png	120743	1	15217	20235	Event	0	0	0	0	0	0		0	0			0	0
+120744	11	8900	Adaptation Fitting: Kelpie	Complete [Adaptation Fitting: Kelpie]	Assets/Product/Texture/Image/IconTask/TaskIconActivePartnerTryv4081.png	120744	1	15218	7107	Event	0	0	0	0	0	0		0	0			0	0
+120745	11	8800	Against the Flow of Time I	Complete Character Challenge Stage [Time Engraved] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120745	1	15217	20395	Event	0	0	0	0	0	0		0	0			0	0
+120746	11	8700	Against the Flow of Time II	Complete Character Challenge Stage [Time Engraved] Stage 2	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120746	1	15217	20395	Event	0	0	0	0	0	0		0	0			0	0
+120747	11	8600	Against the Flow of Time III	Complete Character Challenge Stage [Time Engraved] Stage 3	Assets/Product/Texture/Image/IconTask/TaskIconActiveCharacterTryv408.png	120747	1	15217	20395	Event	0	0	0	0	0	0		0	0			0	0
+120748	11	8500	Adaptation Fitting: Zafkiel	Complete [Adaptation Fitting: Zafkiel]	Assets/Product/Texture/Image/IconTask/TaskIconActivePartnerTryv408.png	120748	1	15218	7107	Event	0	0	0	0	0	0		0	0			0	0
+120749	11	8400	Voidbound Ruin	Clear the trial stage of Coating: [Calamity's End]	Assets/Product/Texture/Image/IconTask/TaskIconActiveAdelaideEffectCoatingv408.png	120749	1	15216	10035	Event	0	0	0	0	0	48004		0	0			0	0
+120750	11	8300	Fading Reverie	Clear the trial stage of Coating: [Fading Reverie]	Assets/Product/Texture/Image/IconTask/TaskIconActiveNirvatiaEffectCoatingv408.png	120750	1	15216	10035	Event	0	0	0	0	0	48012		0	0			0	0
+120751	11	8200	Ember Ceremony	Clear the trial stage of Coating: [Ember Ceremony]	Assets/Product/Texture/Image/IconTask/TaskIconActiveJetavieEffectCoatingv408.png	120751	1	15216	10035	Event	0	0	0	0	0	48003		0	0			0	0
+120752	11	8100	Night Sonata	Clear [Echo and Phantom]	Assets/Product/Texture/Image/IconTask/TaskIconActiveBiankaEffectCoatingv402.png	120752	1	15215	20396	Event	0	0	0	0	0	0		0	0			0	0
+120753	11	8000	Threads of Destiny	Clear [Vow]	Assets/Product/Texture/Image/IconTask/TaskIconActiveSailinnaEffectCoatingV306.png	120753	1	15215	20397	Event	0	0	0	0	0	0		0	0			0	0
+120754	11	7900	Love's Dawn	Clear [The Dark Arena]	Assets/Product/Texture/Image/IconTask/TaskIconActiveLuxiyaEffectCoatingV302.png	120754	1	15215	20398	Event	0	0	0	0	0	0		0	0			0	0
+120755	11	7800	Tsubaki	Clear [Prasanga]	Assets/Product/Texture/Image/IconTask/TaskIconActiveLuxiya2EffectCoatingV215.png	120755	1	15215	20399	Event	0	0	0	0	0	0		0	0			0	0
+120756	11	10000	Circuit Calculus (1)	Clear [Circuit Calculus] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120756	1	69511	0	Event	0	0	0	0	0	48006		0	0			0	0
+120757	11	9900	Circuit Calculus (2)	Clear [Circuit Calculus] Stage 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120757	1	69512	0	Event	0	0	0	0	0	48006		0	0			0	0
+120758	11	9800	Circuit Calculus (3)	Clear [Circuit Calculus] Stage 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120758	1	69513	0	Event	0	0	0	0	0	48006		0	0			0	0
+120759	11	9700	Circuit Calculus (4)	Clear [Circuit Calculus] Stage 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120759	1	69514	0	Event	0	0	0	0	0	48006		0	0			0	0
+120760	11	9600	Circuit Calculus (5)	Clear [Circuit Calculus] Stage 5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120760	1	69515	0	Event	0	0	0	0	0	48006		0	0			0	0
+120761	11	9500	Circuit Calculus (6)	Clear [Circuit Calculus] Stage 6	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120761	1	69516	0	Event	0	0	0	0	0	48006		0	0			0	0
+120762	11	9400	Circuit Calculus (7)	Clear [Circuit Calculus] Stage 7	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120762	1	69517	0	Event	0	0	0	0	0	48006		0	0			0	0
+120763	11	9300	Circuit Calculus (8)	Clear [Circuit Calculus] Stage 8	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120763	1	69518	0	Event	0	0	0	0	0	48006		0	0			0	0
+120764	11	9200	Circuit Calculus (9)	Clear 7 battle nodes in [Circuit Calculus] Stage 9	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120764	7	69519	0	Event	0	0	0	0	0	48006		0	0			0	0
+120765	11	9100	Circuit Calculus (10)	Clear 14 battle nodes in [Circuit Calculus] Stage 9	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	120765	14	69520	0	Event	0	0	0	0	0	48006		0	0			0	0
 99800	11	10000	Chasing Night Through Ashes (1)	Win 5 battles.	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	99800	5	66880		Event													
 99801	11	9900	Chasing Night Through Ashes (2)	Win 15 battles.	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	99801	15	66881		Event													
 99802	11	9800	Chasing Night Through Ashes (3)	Win 25 battles.	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	99802	25	66882		Event													
@@ -13448,10 +13560,10 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 140203	11	9700	Crowd Igniter	Clear any 4 stages	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140203	4	69249		Event						46010							
 140204	11	9600	Master of the House	Clear [Perfect Tuning]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140204	1	69250		Event						46010							
 140207	108	8800	Shrouded Requiem [13]	Clear [Labyrinth Breakout] Difficulty 5	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140207	1	69257		Event													
-140208	108	8700	Shrouded Requiem [14]	Reach 45000 points in Kamui archive	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140208	1	69258		Event													
-140209	108	8600	Shrouded Requiem [15]	Complete 10 battles in [Labyrinth Breakout]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140209	10	69259		Event													
-140210	108	8500	Shrouded Requiem [16]	Complete 20 battles in [Labyrinth Breakout]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140210	20	69260		Event													
-140211	108	8400	Shrouded Requiem [17]	Complete 30 battles in [Labyrinth Breakout]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140211	30	69261		Event													
+140208	108	8700	Shrouded Requiem [14]	Kamui Archive score reaches 45000	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140208	1	69258		Event													
+140209	108	8600	Shrouded Requiem [15]	Complete 10 battles in [Labyrinth Breakout] or [Nightshroud Tales]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140209	10	69259		Event													
+140210	108	8500	Shrouded Requiem [16]	Complete 20 battles in [Labyrinth Breakout] or [Nightshroud Tales]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140210	20	69260		Event													
+140211	108	8400	Shrouded Requiem [17]	Complete 30 battles in [Labyrinth Breakout] or [Nightshroud Tales]	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140211	30	69261		Event													
 140212	11	10000	Shrouded Requiem I	Complete 6 matches in [Phantom Clash] (excluding Promotion Challenges)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140212	6	69262		Event													
 140213	11	9900	Shrouded Requiem II	Complete 12 matches in [Phantom Clash] (excluding Promotion Challenges)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140213	12	69263		Event													
 140214	11	9800	Shrouded Requiem III	Complete 18 matches in [Phantom Clash] (excluding Promotion Challenges)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140214	18	69264		Event													
@@ -13488,7 +13600,7 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 140245	11	9400	Summer Promise (1)	Read any 3 characters' invitation stories	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140245	3	69338			725					47008	2026/9/23 5:00				2026/8/19 5:00		
 140246	11	9300	Summer Promise (2)	Read any 10 characters' invitation stories	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140246	10	69339			725					47008	2026/9/23 5:00				2026/8/19 5:00		
 140247	11	9200	Holiday Performance (1)	Deploy performers on 2 instruments at once	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140247	1	69340			725					47008	2026/9/23 5:00				2026/8/19 5:00		
-140248	11	9100	Holiday Performance (2)	Deploy performers on all instruments	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140248	1	69341			725					47008	2026/9/23 5:00				2026/8/19 5:00		
+140248	11	9100	Holiday Performance (2)	Deploy every instrument and musician at the same time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140248	1	69341			725					47008	2026/9/23 5:00				2026/8/19 5:00		
 140260	11	10000	Placeholder_战双兄弟二期打脸涂装任务	Placeholder_战双兄弟二期打脸涂装任务		140250	1	69420		Event						47005							
 140261	11	9900	Underground Soundcheck	Clear Stage 01	Assets/Product/Texture/Image/UiPBR/UiPBRJuWai/UiPBRJWBg73.png	140301	1	69403		Event						47005							
 140262	11	9800	Rock the Block	Clear Stage 02	Assets/Product/Texture/Image/UiPBR/UiPBRJuWai/UiPBRJWBg73.png	140302	1	69404		Event						47005							
@@ -13531,3 +13643,60 @@ Id	Type	Priority	Title	Desc	Icon	Condition[1]	Result	RewardId	SkipId	Suffix	Grou
 140299	11	8500	Dancefloor Riot	Defeat 6 Sharky: Pokeys.	Assets/Product/Texture/Image/UiPBR/UiPBRJuWai/UiPBRJWBg73.png	140315	6	69417		Event						47005							
 140300	11	8400	Encore Time	Reach Endless Wave 11 when clearing Stage 04.	Assets/Product/Texture/Image/UiPBR/UiPBRJuWai/UiPBRJWBg73.png	140316	1	69418		Event						47005							
 140301	11	8300	Platinum After Dark	Reach Endless Wave 11 when clearing Stage 08.	Assets/Product/Texture/Image/UiPBR/UiPBRJuWai/UiPBRJWBg73.png	140317	1	69419		Event						47005							
+140320	80	10801	Easy Achievement 1-1	1-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140320	1	61138	0		0	0	0	0	0	1004		0	0			0	0
+140321	80	10802	Easy Achievement 1-2	2-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140321	1	61139	0		0	0	0	0	0	1004		0	0			0	0
+140322	80	10803	Easy Achievement 1-3	3-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140322	1	61140	0		0	0	0	0	0	1004		0	0			0	0
+140323	80	10804	Easy Achievement 1-4	4-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140323	1	61141	0		0	0	0	0	0	1004		0	0			0	0
+140324	80	10805	Easy Achievement 1-5	5-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140324	1	61142	0		0	0	0	0	0	1004		0	0			0	0
+140325	80	10806	Easy Achievement 1-6	6-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140325	1	61143	0		0	0	0	0	0	1004		0	0			0	0
+140326	80	10807	Easy Achievement 1-7	7-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140326	1	61144	0		0	0	0	0	0	1004		0	0			0	0
+140327	80	10808	Easy Achievement 1-8	8-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140327	1	61145	0		0	0	0	0	0	1004		0	0			0	0
+140328	80	10809	Easy Achievement 1-9	9-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140328	1	61146	0		0	0	0	0	0	1004		0	0			0	0
+140329	80	10810	Easy Achievement 1-10	10-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140329	1	61147	0		0	0	0	0	0	1004		0	0			0	0
+140330	80	10811	Easy Achievement 1-11	11-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140330	1	61148	0		0	0	0	0	0	1004		0	0			0	0
+140331	80	10812	Easy Achievement 1-12	12-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140331	1	61149	0		0	0	0	0	0	1004		0	0			0	0
+140332	80	10813	Easy Achievement 1-13	13-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140332	1	61150	0		0	0	0	0	0	1004		0	0			0	0
+140333	80	10814	Easy Achievement 1-14	14-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140333	1	61151	0		0	0	0	0	0	1004		0	0			0	0
+140334	80	10814	Easy Achievement 1-15	15-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140334	1	69277	0		0	0	0	0	0	1004		0	0			0	0
+140335	80	10901	Hard Achievement 1-1	1-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140335	1	61152	0		0	0	0	0	0	1004		0	0			0	0
+140336	80	10902	Hard Achievement 1-2	2-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140336	1	61153	0		0	0	0	0	0	1004		0	0			0	0
+140337	80	10903	Hard Achievement 1-3	3-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140337	1	61154	0		0	0	0	0	0	1004		0	0			0	0
+140338	80	10904	Hard Achievement 1-4	4-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140338	1	61155	0		0	0	0	0	0	1004		0	0			0	0
+140339	80	10905	Hard Achievement 1-5	5-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140339	1	61156	0		0	0	0	0	0	1004		0	0			0	0
+140340	80	10906	Hard Achievement 1-6	6-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140340	1	61157	0		0	0	0	0	0	1004		0	0			0	0
+140341	80	10907	Hard Achievement 1-7	7-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140341	1	61158	0		0	0	0	0	0	1004		0	0			0	0
+140342	80	10908	Hard Achievement 1-8	8-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140342	1	61159	0		0	0	0	0	0	1004		0	0			0	0
+140343	80	10909	Hard Achievement 1-9	9-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140343	1	61160	0		0	0	0	0	0	1004		0	0			0	0
+140344	80	10910	Hard Achievement 1-10	10-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140344	1	61161	0		0	0	0	0	0	1004		0	0			0	0
+140345	80	10911	Hard Achievement 1-11	11-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140345	1	61162	0		0	0	0	0	0	1004		0	0			0	0
+140346	80	10912	Hard Achievement 1-12	12-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140346	1	61163	0		0	0	0	0	0	1004		0	0			0	0
+140347	80	10913	Hard Achievement 1-13	13-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140347	1	61164	0		0	0	0	0	0	1004		0	0			0	0
+140348	80	10914	Hard Achievement 1-14	14-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140348	1	61165	0		0	0	0	0	0	1004		0	0			0	0
+140349	80	10914	Hard Achievement 1-15	15-Win Streak	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	140349	1	69280	0		0	0	0	0	0	1004		0	0			0	0
+140350	108	8300	Shrouded Requiem [18]	Nirvatia Archive score reaches 45000	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140350	1	69457	0	Event	0	0	0	0	0	0		0	0			0	0
+140351	108	8200	Shrouded Requiem [19]	Complete 8 battles as Nirvatia (Phantom Clash not included)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140351	8	69458	0	Event	0	0	0	0	0	0		0	0			0	0
+140352	108	8100	Shrouded Requiem [20]	Complete 16 battles as Nirvatia (Phantom Clash not included)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140352	16	69459	0	Event	0	0	0	0	0	0		0	0			0	0
+140353	108	8000	Shrouded Requiem [21]	Complete 24 battles as Nirvatia (Phantom Clash not included)	Assets/Product/Texture/Image/UiTheatre6/UiTheatre6RewardGridTask02.png	140353	24	69460	0	Event	0	0	0	0	0	0		0	0			0	0
+140354	11	10000	Benchmark Test	Clear Benchmark Test - 3		140354	1	69496	90077		0	0	0	0	0	48007		0	0			0	0
+140355	11	9900	Parallel Calculation - α-1	Clear Parallel Calculation - α-1		140355	1	69497	90077		0	0	0	0	0	48007		0	0			0	0
+140356	11	9800	Parallel Calculation - α-3	Clear Parallel Calculation - α-3		140356	1	69498	90077		0	0	0	0	0	48007		0	0			0	0
+140357	11	9700	Parallel Calculation - α-4	Clear Parallel Calculation - α-4		140357	1	69499	90077		0	0	0	0	0	48007		0	0			0	0
+140358	11	9600	Parallel Calculation - α-6	Clear Parallel Calculation - α-6		140358	1	69500	90077		0	0	0	0	0	48007		0	0			0	0
+140359	11	9500	Parallel Calculation - α-8	Clear Parallel Calculation - α-8		140359	1	69501	90077		0	0	0	0	0	48007		0	0			0	0
+140360	11	9400	Parallel Calculation - β-1	Clear Parallel Calculation - β-1		140360	1	69502	90077		0	0	0	0	0	48007		0	0			0	0
+140361	11	9300	Parallel Calculation - β-3	Clear Parallel Calculation - β-3		140361	1	69503	90077		0	0	0	0	0	48007		0	0			0	0
+140362	11	9200	Parallel Calculation - β-4	Clear Parallel Calculation - β-4		140362	1	69504	90077		0	0	0	0	0	48007		0	0			0	0
+140363	11	9100	Parallel Calculation - β-6	Clear Parallel Calculation - β-6		140363	1	69505	90077		0	0	0	0	0	48007		0	0			0	0
+140364	11	9000	Parallel Calculation - β-8	Clear Parallel Calculation - β-8		140364	1	69506	90077		0	0	0	0	0	48007		0	0			0	0
+140365	11	8900	Peak Calculation - 3	Clear Peak Calculation - 3		140365	1	69507	90077		0	0	0	0	0	48007		0	0			0	0
+140366	11	8800	Peak Calculation - 5	Clear Peak Calculation - 5		140366	1	69508	90077		0	0	0	0	0	48007		0	0			0	0
+140367	11	8700	Peak Calculation - 10	Clear Peak Calculation - 10		140367	1	69509	90077		0	0	0	0	0	48007		0	0			0	0
+140368	11	8600	Peak Calculation - 15	Clear Peak Calculation - 15		140368	1	69510	90077		0	0	0	0	0	48007		0	0			0	0
+140369	11	10000	Dream of Stagnant Cycle	Clear [Shatter the Nightmare]	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140369	1	67450	90073	Event	783	0	0	0	0	0	2026/11/3 23:59	1060038	0		2026/9/23 23:00	0	0
+140370	11	9900	Circuit Calculus	Clear [Circuit Calculus] Stage 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140370	1	67451	90074	Event	783	0	0	0	0	0	2026/11/4 5:00	1060038	0		2026/9/23 23:00	0	0
+140371	11	9800	Overclock Simulation	Clear Benchmark Test - 3	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140371	1	67452	90077	Event	783	0	0	0	0	0	2026/11/4 5:00	1060038	0		2026/9/23 23:00	0	0
+140372	11	9700	Shrouded Requiem	Complete 2 battles as Nirvatia	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140372	2	67453	89102	Event	783	0	0	0	0	0	2026/11/5 5:00	1060038	0		2026/9/23 23:00	0	0
+140373	11	9600	Wreck-It Huhu	Play Sunlit Zone Drift - 1	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140373	1	67454	89049	Event	783	0	0	0	0	0	2026/11/4 5:00	1060038	0		2026/9/23 23:00	0	0
+140374	11	9500	Wrathful Monsoon	Clear [Updraft]	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140374	1	67455	11724	Event	783	0	0	0	0	0	2026/10/19 5:00	1060038	0		2026/9/23 23:00	0	0
+140375	11	9400	Event - Research Protocol: Part I	Use a total of 10000 Event/Date A Live Construct R&D Tickets	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140375	10000	67456	20131	Event	783	0	0	0	0	0	2026/11/5 5:00	1060038	0		2026/9/23 23:00	0	0
+140376	11	9300	Event - Research Protocol: Part II	Use a total of 25000 Event/Date A Live Construct R&D Tickets	Assets/Product/Texture/Image/IconTask/TaskIconActiveV401.png	140376	25000	67457	20131	Event	783	0	0	0	0	0	2026/11/5 5:00	1060038	0		2026/9/23 23:00	0	0

@@ -4833,15 +4833,14 @@ internal static partial class DrawManager
     
     private readonly record struct DrawRotationWindow(int TimeId, long StartTime, long EndTime, int[] CharacterIds);
 
-    /// <summary>Generic server-owned category template for a 4.7 draw derived from DrawServerCatalog.
-    /// Currency, cost, banner, tag, type, priority and order follow the established per-category
-    /// conventions already present in this catalog (themed/fate character, target weapon, CUB target);
-    /// identity/target/window/guarantee come from the authoritative derived rows.</summary>
+    /// <summary>Derive scheduled banner identity from the client preview and the
+    /// official event window; category-specific cost and presentation follow the
+    /// corresponding existing draw conventions.</summary>
     private static DrawInfo BuildServerCatalogDraw(DrawServerCatalogTable row)
     {
         DrawInfo draw = row.Category switch
         {
-            "Themed" => new DrawInfo
+            "Themed" or "Collab" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50005,
@@ -4851,7 +4850,7 @@ internal static partial class DrawManager
                 IsShowBubble = false,
                 BtnDrawCount = [1, 10],
             },
-            "Fate" => new DrawInfo
+            "Fate" or "CollabFate" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50005,
@@ -4861,7 +4860,7 @@ internal static partial class DrawManager
                 IsShowBubble = false,
                 BtnDrawCount = [1, 10],
             },
-            "Weapon" => new DrawInfo
+            "Weapon" or "CollabWeapon" => new DrawInfo
             {
                 DrawType = 2,
                 UseItemId = 50003,
@@ -4872,7 +4871,7 @@ internal static partial class DrawManager
                 BtnDrawCount = [1, 10],
                 PurchaseUiType = [5, 6, 2],
             },
-            "Cub" => new DrawInfo
+            "Cub" or "Otherworld" => new DrawInfo
             {
                 DrawType = 3,
                 UseItemId = 50009,
@@ -4884,6 +4883,17 @@ internal static partial class DrawManager
             },
             _ => throw new InvalidOperationException($"DrawServerCatalog has unknown category {row.Category}")
         };
+        // AscNet local policy (not recovered retail binding): collab banners display the paid
+        // ItemCombine primary; earned 50021-50023 fund it through Inventory.PlanCombinedCost.
+        if (row.Category is "Collab" or "CollabFate")
+            draw.UseItemCount = 175; // Official Kurumi ticket cost.
+        draw.UseItemId = row.Category switch
+        {
+            "Collab" or "CollabFate" => 50017,
+            "CollabWeapon" => 50018,
+            "Otherworld" => 50019,
+            _ => draw.UseItemId,
+        };
         draw.Id = row.Id;
         draw.GroupId = row.GroupId;
         draw.ResourceIds = new() { [1] = row.TargetId };
@@ -4894,26 +4904,15 @@ internal static partial class DrawManager
         return draw;
     }
 
-       private static DrawGroupInfo BuildServerCatalogGroup(DrawServerCatalogTable row)
+    private static DrawGroupInfo BuildServerCatalogGroup(DrawServerCatalogTable row)
     {
-        // Tab (Tag), Type, Priority and Order are authoritative DrawServerCatalog presentation fields:
-        // Tag maps to a DrawTabs entry (the featured Current Season banner is DrawTabs Id=2), while
-        // Type/Priority/Order are server-pushed display ordering. Identity/target/window/guarantee
-        // come from the same authoritative rows; the per-category currency/cost/banner convention
-        // remains inherited from the generic category templates below.
-        DrawGroupInfo group = row.Category switch
+        DrawInfo draw = BuildServerCatalogDraw(row);
+        DrawGroupInfo group = new()
         {
-            "Themed" => new DrawGroupInfo
-            {
-                UseItemId = 50005,
-                Banner = "Assets/Product/Ui/ComponentPrefab/DrawCollaboration/UiDrawCollaborationCharacterNormalV4P5.prefab",
-            },
-            "Fate" => new DrawGroupInfo
-            {
-                UseItemId = 50005,
-                Banner = "Assets/Product/Ui/ComponentPrefab/DrawCollaboration/UiDrawCollaborationCharacterFateV4P5.prefab",
-            },
-            _ => throw new InvalidOperationException($"DrawServerCatalog group {row.GroupId} category {row.Category} has no group template")
+            UseItemId = draw.UseItemId,
+            Banner = draw.Banner,
+            UiPrefab = "UiDraw",
+            UiBackGround = "Assets/Product/Ui/ComponentPrefab/DrawBackGround/DrawBackGround01.prefab"
         };
         group.Id = row.GroupId;
         group.Tag = row.Tag;
@@ -4941,10 +4940,19 @@ internal static partial class DrawManager
             }
             else
             {
-                // The 4.7 weapon/CUB draw joins the existing generic weapon (4) / CUB (22) group.
+                // A new season may share a group with an expired banner; retain
+                // historical draws but present the current season's tab/window.
                 if (!existing.OptionalDrawIdList.Contains(row.Id))
                     existing.OptionalDrawIdList.Add(row.Id);
                 existing.UseDrawIdDict.TryAdd(0, row.Id);
+                if (existing.EndTime != 0 && row.EndTime > existing.EndTime)
+                {
+                    existing.EndTime = row.EndTime;
+                    existing.Tag = row.Tag;
+                    existing.Type = row.Type;
+                    existing.Priority = row.Priority;
+                    existing.Order = row.Order;
+                }
             }
         }
         return groups.ToArray();
@@ -5096,10 +5104,12 @@ internal static partial class DrawManager
         }
     }
 
-    private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    internal static Func<DateTimeOffset> UtcNow = () => DateTimeOffset.UtcNow;
+    private static long Now() => UtcNow().ToUnixTimeSeconds();
     private static bool IsActive(DrawGroupInfo group) => (group.StartTime == 0 || group.StartTime <= Now()) && (group.EndTime == 0 || Now() < group.EndTime);
     private static bool IsActive(DrawInfo draw) => GroupsById.TryGetValue(draw.GroupId, out DrawGroupInfo? group) && IsActive(group) && HasAvailablePityLaw(draw) && (draw.StartTime == 0 || draw.StartTime <= Now()) && (draw.EndTime == 0 || Now() < draw.EndTime);
-    private static bool HasActiveDraws(DrawGroupInfo group) => DrawsByGroup.TryGetValue(group.Id, out List<DrawInfo>? draws) && draws.Any(IsActive);
+    private static bool HasActiveDraws(DrawGroupInfo group) =>
+        DrawsByGroup.TryGetValue(group.Id, out List<DrawInfo>? draws) && draws.Any(IsActive);
 
     public static List<DrawGroupInfo> GetDrawGroupInfos(Player player)
     {
@@ -5116,6 +5126,17 @@ internal static partial class DrawManager
                 value.EndTime = value.BannerEndTime;
                 value.OptionalDrawIdList = activeDraws.Select(x => x.Id).ToList();
             }
+            else if (DrawServerCatalog.Any(row => row.GroupId == group.Id && row.GroupId is not (4 or 22)))
+            {
+                value.BannerBeginTime = activeDraws.Min(x => x.StartTime);
+                value.BannerEndTime = activeDraws.Max(x => x.EndTime);
+                value.StartTime = value.BannerBeginTime;
+                value.EndTime = value.BannerEndTime;
+                value.OptionalDrawIdList = activeDraws.Select(x => x.Id).ToList();
+            }
+            else
+                value.OptionalDrawIdList = value.OptionalDrawIdList.Where(id =>
+                    DrawsById.TryGetValue(id, out DrawInfo? draw) && IsActive(draw)).ToList();
             value.UseDrawIdDict = GetSelections(player, group);
             value.SwitchDrawIdCount = player.DrawState.SwitchCountByGroup.GetValueOrDefault(group.Id);
             DrawInfo selected = GetSelected(player, group);

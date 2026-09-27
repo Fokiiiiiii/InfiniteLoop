@@ -3,6 +3,7 @@ Id	StartTime	EndTime	Source
 201	0	0	SimulateTrain:permanent-practice
 716	1787115600	1787806740	version-history:EN-LIVE:4.6.6@bb3c34765c9d9c1c542079d536a17e82b27f3245/TransfiniteActivity+EN-LIVE:4.5.6@69465ac7168a8f33f517f2ffd6e366aa9f3c3357/TransfiniteActivity+LoginNotice:EndTime+GameNotice:update-note-EndTime+maintenance-duration+CycleSeconds
 717	1787806800	1789016340	version-history:EN-LIVE:4.6.6@bb3c34765c9d9c1c542079d536a17e82b27f3245/TransfiniteActivity+EN-LIVE:4.5.6@69465ac7168a8f33f517f2ffd6e366aa9f3c3357/TransfiniteActivity+LoginNotice:EndTime+GameNotice:update-note-EndTime+maintenance-duration+CycleSeconds
+912	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+share/fuben/teaching/TeachingActivity:Id=51:TimeId=912
 13101	0	0	feature-window:ArcadeAnima:permanent-mode; EN share/fuben/charactertower/CharacterTower.json Id=1001 OpenTimeId=13101; unbounded availability policy, no promotional window authored
 13102	0	0	feature-window:ArcadeAnima:permanent-mode; EN share/fuben/charactertower/CharacterTower.json Id=1002 OpenTimeId=13102; unbounded availability policy, no promotional window authored
 15101	0	0	feature-window:ArcadeAnima:permanent-mode; EN share/fuben/charactertower/CharacterTower.json Id=1003 OpenTimeId=15101; unbounded availability policy, no promotional window authored
@@ -42,3 +43,42 @@ Id	StartTime	EndTime	Source
 49930	1787220000	1789362000	feature-window:SpecialActivity:SkipId=11724+GameNotice:4a7a5308f1b4a1288a8994d3
 49931	1788429600	1790139600	feature-window:SpecialActivity:SkipId=89093+GameNotice:4a7a5308f1b4a1288a8994d2
 49934	1784264400	1790139600	feature-window:SpecialActivity:SkipId=89102+feature-window:Theatre6PvpActivity+Theatre6ClientConfig+Item:97090
+50100	1790676000	1793768400	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50103	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50107	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50112	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50201	1790226000	1793768400	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50202	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50301	1790226000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+SignIn:Id=116
+50401	1790226000	1793854800	client/activitybrief/ActivityBriefGroup:RefreshActivityMainLine2+LoginNotice:EndTime+GameNotice:update-note-EndTime
+50402	1790226000	1793854800	client/activity/Activity:Id=401:ActivityDes:shop-expiry+client/activitybrief/ActivityBriefShop:ShopId=1421:TimeId+LoginNotice:EndTime
+50403	1790226000	1793854800	client/activity/Activity:Id=401:ActivityDes:shop-expiry+client/activitybrief/ActivityBriefShop:ShopId=1421:TimeId+LoginNotice:EndTime+AscNet-policy:paired-panel-window-inferred-from-shop
+50405	1790226000	1793833200	feature-window:FubenClientConfig.MainPanelTimeId:installed-table:client/fuben/FubenClientConfig.json+SpecialActivity
+50406	1790226000	1790330400	feature-window:FubenActivityTimeTips:installed-table:client/fuben/FubenActivityTimeTips.json+FubenActivity:installed-table:share/fuben/FubenActivity.json+ActivitySchedule:complete-component-segment
+50407	1790330400	1790676000	feature-window:FubenActivityTimeTips:installed-table:client/fuben/FubenActivityTimeTips.json+FubenActivity:installed-table:share/fuben/FubenActivity.json+ActivitySchedule:complete-component-segment
+50408	1790676000	1791453600	feature-window:FubenActivityTimeTips:installed-table:client/fuben/FubenActivityTimeTips.json+FubenActivity:installed-table:share/fuben/FubenActivity.json+ActivitySchedule:complete-component-segment
+50409	1791453600	1793750340	feature-window:FubenActivityTimeTips:installed-table:client/fuben/FubenActivityTimeTips.json+FubenActivity:installed-table:share/fuben/FubenActivity.json+ActivitySchedule:complete-component-segment
+50410	1793750340	1793768400	feature-window:FubenActivityTimeTips:installed-table:client/fuben/FubenActivityTimeTips.json+FubenActivity:installed-table:share/fuben/FubenActivity.json+ActivitySchedule:complete-component-segment
+50501	1790330400	1792386000	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50502	1790330400	1792386000	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50601	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50602	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50709	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50801	1791453600	1793768400	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50903	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50904	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+client/activity/Activity:Id=408,409
+50906	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+client/activity/Activity:Id=412,413
+50909	1790226000	1793854800	client/activitybrief/ActivityBrief+LoginNotice:EndTime+GameNotice:update-note-EndTime
+50911	1790226000	1793768400	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+SignIn:Id=117
+50912	1790330400	1791090000	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+SignIn:Id=118
+50914	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+client/activity/Activity:Id=410,411
+50915	1790676000	1793750340	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+client/activity/Activity:Id=414
+50916	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50922	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+PassportActivity:Id=47
+50938	1790226000	1793833200	GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html+share/draw/DrawCanLiverActivity:Id=3:TimeId=50938
+50941	1790226000	1793768400	feature-window:SpecialActivity:SkipId=90074+GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50942	1790676000	1793768400	feature-window:SpecialActivity:SkipId=90077+GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50943	1791453600	1793768400	feature-window:SpecialActivity:SkipId=89049+GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50944	1790676000	1793750340	feature-window:SpecialActivity:SkipId=20395+GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+50945	1790330400	1792386000	feature-window:SpecialActivity:SkipId=11724+GameNotice:update-note-html:6ab46150f1b4a12f7f8a7adb.html
+51001	1790416800	1793833200	GameNotice:dated-article:6ab45bcaf1b4a12f7f8a7acb.html+GachaFashionSelfChoiceActivity:Id=4+GachaFashionSelfChoiceGroup:Id=5

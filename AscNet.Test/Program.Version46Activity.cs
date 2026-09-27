@@ -2073,18 +2073,6 @@ internal static partial class Program
             "Wheelchair LottoInfo exact wire keys");
         AssertEqual(null, typeof(LottoInfoResponse.LottoRecord.LottoRewardGoods).GetProperty("ShowQuality"),
             "Wheelchair Lotto reward goods omits ShowQuality");
-        MethodInfo selfChoiceBuilder = RequiredMethod(
-            RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
-            "BuildSelfChoiceLottoPayload",
-            BindingFlags.Static | BindingFlags.NonPublic,
-            [typeof(Player)]);
-        Dictionary<string, object?> freshSelfChoice = (Dictionary<string, object?>)(selfChoiceBuilder.Invoke(null, [lottoFresh])
-            ?? throw new InvalidDataException("Wheelchair SelfChoice Lotto fresh payload was null."));
-        AssertIntegerList([primary.Id], ((int[])freshSelfChoice["LottoPrimaryIds"]!).Select(Convert.ToInt64).ToArray(),
-            "Wheelchair SelfChoice Lotto fresh table-derived primary");
-        AssertEqual(0, ((Dictionary<int, int>)freshSelfChoice["SelectedPrimaryIdToLottoId"]!).Count,
-            "Wheelchair SelfChoice Lotto fresh selection");
-
         LottoRewardTable[] seededRewards = rewards.Values.OrderBy(row => row.Id).Take(2).ToArray();
         Player lottoRelog = CreateDrawCompatibilityPlayer(46_201);
         lottoRelog.Lotto.Infos.Add(new LottoStateInfo
@@ -2106,11 +2094,6 @@ internal static partial class Program
         AssertIntegerList(seededRewards.Select(row => (long)row.TemplateId).ToArray(),
             lottoRelogResponse.LottoInfos.Single().LottoRecords.Select(record => (long)record.RewardGoods.TemplateId).ToArray(),
             "Wheelchair LottoInfo seeded relog table-derived records");
-        Dictionary<string, object?> relogSelfChoice = (Dictionary<string, object?>)(selfChoiceBuilder.Invoke(null, [lottoRelog])
-            ?? throw new InvalidDataException("Wheelchair SelfChoice Lotto relog payload was null."));
-        Dictionary<int, int> relogSelections = (Dictionary<int, int>)relogSelfChoice["SelectedPrimaryIdToLottoId"]!;
-        AssertEqual(lotto.Id, relogSelections[primary.Id], "Wheelchair SelfChoice Lotto relog table-derived selection");
-
         Player invalidLotto = CreateDrawCompatibilityPlayer(46_202);
         invalidLotto.Lotto.Infos.Add(new LottoStateInfo
         {

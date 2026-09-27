@@ -59,6 +59,64 @@ namespace AscNet.Common.Database
             return items.Where(item => IsValidClientItemId(item.Id)).ToList();
         }
 
+        // Source ItemCombine: one client-visible balance across physical family members.
+        // AscNet policy: spend lower-priority (earned) stacks first, then by ascending Id.
+        private static readonly Lazy<Dictionary<int, int[]>> CombinedSpendOrder = new(() =>
+        {
+            List<ItemCombineTable> rows = TableReaderV2.Parse<ItemCombineTable>();
+            return rows.GroupBy(row => row.GroupId)
+                .SelectMany(group => group.Select(row => (row.ItemId, Ids: group
+                    .OrderBy(member => member.Priority).ThenBy(member => member.ItemId)
+                    .Select(member => member.ItemId).ToArray())))
+                .ToDictionary(pair => pair.ItemId, pair => pair.Ids);
+        });
+
+        public static IReadOnlyList<int> CombinedItemIds(int itemId) =>
+            CombinedSpendOrder.Value.TryGetValue(itemId, out int[]? ids) ? ids : [itemId];
+
+        public long CombinedCount(int itemId, DateTimeOffset now) => CombinedItemIds(itemId).Sum(id => UsableCount(id, now));
+
+        /// <summary>Physical debits covering <paramref name="cost"/> of <paramref name="itemId"/>'s combined
+        /// balance at <paramref name="now"/>; null when invalid or insufficient. Callers apply each debit
+        /// and record per-Id progress.</summary>
+        public List<(int ItemId, int Count)>? PlanCombinedCost(int itemId, long cost, DateTimeOffset now)
+        {
+            if (cost <= 0 || cost > int.MaxValue || !IsValidClientItemId(itemId)) return null;
+            List<(int ItemId, int Count)> plan = [];
+            long remaining = cost;
+            foreach (int id in CombinedItemIds(itemId))
+            {
+                long take = Math.Min(remaining, UsableCount(id, now));
+                if (take <= 0) continue;
+                plan.Add((id, (int)take));
+                remaining -= take;
+                if (remaining == 0) return plan;
+            }
+            return null;
+        }
+
+        // Source Item timeliness: FromConfig(1) = StartTime+Duration, AfterGet(2) = CreateTime+Duration;
+        // StartTime is authored "yyyy/M/d H:mm" read as UTC like other table times.
+        // ponytail: Batch(3) has no server batch model, so it stays unrestricted; add per-batch expiry with that model.
+        private long UsableCount(int id, DateTimeOffset now) =>
+            Items.Where(item => item.Id == id && !IsExpired(item, now)).Sum(item => item.Count);
+
+        private static bool IsExpired(Item item, DateTimeOffset now)
+        {
+            ItemTable? table = TableReaderV2.Parse<ItemTable>().Find(row => row.Id == item.Id);
+            if (table?.Duration is not > 0) return false;
+            long? start = table.TimelinessType switch
+            {
+                1 when DateTimeOffset.TryParseExact(table.StartTime, "yyyy/M/d H:mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out DateTimeOffset parsed) => parsed.ToUnixTimeSeconds(),
+                2 => item.CreateTime,
+                _ => null,
+            };
+            return start is long begin && now.ToUnixTimeSeconds() >= begin + table.Duration.Value;
+        }
+
 
         public static Inventory FromUid(long uid)
         {

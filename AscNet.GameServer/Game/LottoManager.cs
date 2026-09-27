@@ -19,7 +19,7 @@ internal static class LottoManager
         LottoPrimaryTable Primary,
         IReadOnlyDictionary<int, LottoRewardTable> Rewards);
 
-    private static readonly Lazy<Catalog?> CurrentCatalog = new(CreateCurrentCatalog);
+    private static readonly Lazy<Dictionary<int, Catalog>> Catalogs = new(CreateCatalogs);
     private static readonly Lazy<Dictionary<int, int>> CharacterQualities = new(() =>
         TableReaderV2.Parse<CharacterQualityTable>()
             .GroupBy(row => row.CharacterId)
@@ -40,9 +40,9 @@ internal static class LottoManager
     internal const int InvalidPrimary = 20111008;
     internal const int InsufficientItems = 20012004;
 
-    internal static LottoResponse Draw(Session session, int primaryId)
+    internal static LottoResponse Draw(Session session, int primaryId, int lottoId)
     {
-        int code = GetOpenProgress(session.player, primaryId, out Catalog? catalog, out LottoStateInfo? progress);
+        int code = GetOpenProgress(session.player, primaryId, lottoId, out Catalog? catalog, out LottoStateInfo? progress);
         if (code != 0) return new() { Code = code };
         Catalog current = catalog!;
         LottoStateInfo state = progress!;
@@ -75,7 +75,7 @@ internal static class LottoManager
         LottoPendingOperation pending = state.Pending!;
         (RewardApplicationResult application, List<RewardGoods> extra) = Complete(session, current, state);
         application.SendPushes(session);
-        TryBuildInfo(session.player, out LottoInfoResponse.LottoInfo info);
+        LottoInfoResponse.LottoInfo info = BuildInfo(session.player, current);
         return new()
         {
             LottoRewardId = pending.RewardId,
@@ -88,7 +88,7 @@ internal static class LottoManager
 
     internal static LottoBuyTicketResponse BuyTicket(Session session, LottoBuyTicketRequest request)
     {
-        int code = GetOpenProgress(session.player, request.LottoPrimaryId, out Catalog? catalog, out LottoStateInfo? progress);
+        int code = GetOpenProgress(session.player, request.LottoPrimaryId, request.LottoId, out Catalog? catalog, out LottoStateInfo? progress);
         if (code != 0) return new() { Code = code };
         Catalog current = catalog!;
         LottoStateInfo state = progress!;
@@ -125,30 +125,54 @@ internal static class LottoManager
 
     internal static void RecoverPending(Session session)
     {
-        Catalog? catalog = CurrentCatalog.Value;
-        if (catalog is not null && TryGetProgress(session.player, catalog, out LottoStateInfo? state)
-            && state?.Pending is not null)
-        {
-            (RewardApplicationResult application, _) = Complete(session, catalog, state);
-            application.SendPushes(session);
-        }
+        foreach (LottoStateInfo state in session.player.Lotto.Infos.ToArray())
+            if (Catalogs.Value.TryGetValue(state.Id, out Catalog? catalog)
+                && catalog.Primary.Id == state.LottoPrimaryId
+                && state.Pending is not null)
+            {
+                (RewardApplicationResult application, _) = Complete(session, catalog, state);
+                application.SendPushes(session);
+            }
     }
 
     private static long Balance(Session session, int itemId) =>
         session.inventory.Items.FirstOrDefault(item => item.Id == itemId)?.Count ?? 0;
 
-    private static int GetOpenProgress(Player player, int primaryId, out Catalog? catalog, out LottoStateInfo? state)
+    private static int GetOpenProgress(Player player, int primaryId, int lottoId, out Catalog? catalog, out LottoStateInfo? state)
     {
-        catalog = CurrentCatalog.Value;
+        player.Lotto ??= new LottoState();
         state = null;
-        if (catalog is null) return InvalidCatalog;
-        if (catalog.Primary.Id != primaryId) return InvalidPrimary;
-        // XLottoDrawEntity uses GetStart/EndTimeByTimeId: absent schedule means no time bound.
-        if (ActivityScheduleService.TryGet(catalog.Lotto.TimeId ?? 0, out ActivityScheduleEntry schedule)
-            && !schedule.IsOpen(DateTimeOffset.UtcNow)) return NotOpen;
+        LottoPrimaryTable? primary = TableReaderV2.Parse<LottoPrimaryTable>().FirstOrDefault(row => row.Id == primaryId);
+        if (primary is null || primary.LottoIdList.Count == 0)
+        {
+            catalog = null;
+            return InvalidPrimary;
+        }
+        if (lottoId == 0 && primary.LottoIdList.Count == 1)
+            lottoId = primary.LottoIdList[0]; // The pre-4.8 client omitted LottoId for single pools.
+        if (!primary.LottoIdList.Contains(lottoId)
+            || primary.LottoIdList.Count > 1
+               && player.Lotto.SelectedPrimaryIdToLottoId.GetValueOrDefault(primaryId) != lottoId)
+        {
+            catalog = null;
+            return InvalidPrimary;
+        }
+        if (!Catalogs.Value.TryGetValue(lottoId, out catalog) || catalog.Primary.Id != primaryId)
+            return InvalidCatalog;
+        if (!IsOpen(catalog)) return NotOpen;
         if (!TryGetProgress(player, catalog, out state)) return InvalidCatalog;
         state ??= new() { Id = catalog.Lotto.Id, LottoPrimaryId = catalog.Primary.Id };
         return 0;
+    }
+
+    private static bool IsOpen(Catalog catalog)
+    {
+        if (catalog.Lotto.TimeId is not int timeId || timeId == 0)
+            return false; // No calendar or current source link: do not re-open historical lotteries.
+        if (ActivityScheduleService.TryGet(timeId, out ActivityScheduleEntry schedule))
+            return schedule.IsOpen(DateTimeOffset.UtcNow);
+        return TableReaderV2.Parse<WheelchairManualActivityTable>()
+            .Any(row => row.LottoId == catalog.Lotto.Id && row.TimeId == timeId);
     }
 
     private static void SavePending(Session session, LottoStateInfo state, LottoPendingOperation pending)
@@ -215,14 +239,22 @@ internal static class LottoManager
         return (application, extra ? application.RewardGoods.Skip(1).ToList() : []);
     }
 
-    internal static bool TryBuildInfo(Player player, out LottoInfoResponse.LottoInfo info)
+    internal static List<LottoInfoResponse.LottoInfo> BuildInfos(Player player)
     {
-        info = new LottoInfoResponse.LottoInfo();
-        Catalog? catalog = CurrentCatalog.Value;
-        if (catalog is null || !TryGetProgress(player, catalog, out LottoStateInfo? progress))
-            return false;
+        player.Lotto ??= new LottoState();
+        return Catalogs.Value.Values.Where(IsOpen)
+            .Where(catalog => catalog.Primary.LottoIdList.Count == 1
+                || player.Lotto.SelectedPrimaryIdToLottoId.GetValueOrDefault(catalog.Primary.Id) == catalog.Lotto.Id)
+            .Where(catalog => TryGetProgress(player, catalog, out _))
+            .Select(catalog => BuildInfo(player, catalog))
+            .OrderBy(info => info.LottoPrimaryId).ThenBy(info => info.Id)
+            .ToList();
+    }
 
-        info = new LottoInfoResponse.LottoInfo
+    private static LottoInfoResponse.LottoInfo BuildInfo(Player player, Catalog catalog)
+    {
+        TryGetProgress(player, catalog, out LottoStateInfo? progress);
+        return new LottoInfoResponse.LottoInfo
         {
             Id = catalog.Lotto.Id,
             LottoPrimaryId = progress?.LottoPrimaryId ?? catalog.Primary.Id,
@@ -234,81 +266,75 @@ internal static class LottoManager
                 LottoTime = record.LottoTime
             }).ToList() ?? []
         };
-        return true;
     }
 
     internal static Dictionary<string, object?> BuildSelfChoicePayload(Player player)
     {
-        Catalog? catalog = CurrentCatalog.Value;
-        if (catalog is null || !TryGetProgress(player, catalog, out LottoStateInfo? progress))
-            return new()
-            {
-                ["LottoPrimaryIds"] = Array.Empty<int>(),
-                ["SelectedPrimaryIdToLottoId"] = new Dictionary<int, int>()
-            };
-
-        Dictionary<int, int> selected = progress is null
-            ? new()
-            : new() { [catalog.Primary.Id] = catalog.Lotto.Id };
+        player.Lotto ??= new LottoState();
+        int[] primaries = Catalogs.Value.Values.Where(IsOpen)
+            .Select(catalog => catalog.Primary)
+            .Where(primary => primary.LottoIdList.Count > 1)
+            .Select(primary => primary.Id).Distinct().ToArray();
         return new()
         {
-            ["LottoPrimaryIds"] = new[] { catalog.Primary.Id },
-            ["SelectedPrimaryIdToLottoId"] = selected
+            ["LottoPrimaryIds"] = primaries,
+            ["CurrentPrimaryIdToLottoId"] = player.Lotto.SelectedPrimaryIdToLottoId
+                .Where(pair => primaries.Contains(pair.Key)
+                    && Catalogs.Value.ContainsKey(pair.Value)
+                    && Catalogs.Value[pair.Value].Primary.Id == pair.Key)
+                .ToDictionary(pair => pair.Key, pair => pair.Value)
         };
     }
 
-    private static Catalog? CreateCurrentCatalog()
+    internal static int Select(Player player, int primaryId, int lottoId)
     {
-        try
+        player.Lotto ??= new LottoState();
+        if (!Catalogs.Value.TryGetValue(lottoId, out Catalog? catalog)
+            || catalog.Primary.Id != primaryId || catalog.Primary.LottoIdList.Count < 2)
+            return InvalidPrimary;
+        if (!IsOpen(catalog)) return NotOpen;
+        player.Lotto.SelectedPrimaryIdToLottoId.TryGetValue(primaryId, out int previous);
+        player.Lotto.SelectedPrimaryIdToLottoId[primaryId] = lottoId;
+        try { player.SaveChecked(); }
+        catch
         {
-            WheelchairManualActivityTable[] activities = TableReaderV2.Parse<WheelchairManualActivityTable>()
-                .Where(row => row.LottoId > 0 && row.TimeId > 0)
-                .ToArray();
-            if (activities.Length != 1)
-                return null;
-
-            WheelchairManualActivityTable activity = activities[0];
-            LottoTable? lotto = TableReaderV2.Parse<LottoTable>()
-                .SingleOrDefault(row => row.Id == activity.LottoId && row.TimeId == activity.TimeId);
-            if (lotto is null || lotto.BuyTicketRuleIdList.Count == 0 || lotto.BuyTicketRuleIdList.Any(id => id <= 0))
-                return null;
-
-            LottoPrimaryTable[] primaries = TableReaderV2.Parse<LottoPrimaryTable>()
-                .Where(row => row.TimeId == activity.TimeId && row.LottoIdList.Contains(lotto.Id))
-                .ToArray();
-            if (primaries.Length != 1)
-                return null;
-
-            Dictionary<int, LottoRewardTable> rewards = TableReaderV2.Parse<LottoRewardTable>()
-                .Where(row => row.LottoId == lotto.Id)
-                .ToDictionary(row => row.Id);
-            if (rewards.Count == 0)
-                return null;
-
-            HashSet<int> buyTicketRules = TableReaderV2.Parse<LottoBuyTicketRuleTable>()
-                .Select(row => row.Id)
-                .ToHashSet();
-            return lotto.BuyTicketRuleIdList.All(buyTicketRules.Contains)
-                ? new Catalog(lotto, primaries[0], rewards)
-                : null;
+            if (previous == 0) player.Lotto.SelectedPrimaryIdToLottoId.Remove(primaryId);
+            else player.Lotto.SelectedPrimaryIdToLottoId[primaryId] = previous;
+            throw;
         }
-        catch (Exception exception) when (exception is InvalidOperationException or IOException or InvalidDataException)
-        {
-            return null;
-        }
+        return 0;
+    }
+
+    private static Dictionary<int, Catalog> CreateCatalogs()
+    {
+        HashSet<int> rules = TableReaderV2.Parse<LottoBuyTicketRuleTable>().Select(row => row.Id).ToHashSet();
+        ILookup<int, LottoRewardTable> rewards = TableReaderV2.Parse<LottoRewardTable>().ToLookup(row => row.LottoId);
+        LottoTable[] lottoRows = TableReaderV2.Parse<LottoTable>().ToArray();
+        Dictionary<int, Catalog> catalogs = [];
+        foreach (LottoPrimaryTable primary in TableReaderV2.Parse<LottoPrimaryTable>())
+            foreach (LottoTable lotto in lottoRows
+                .Where(row => primary.LottoIdList.Contains(row.Id) && row.TimeId == primary.TimeId))
+            {
+                if (lotto.BuyTicketRuleIdList.Count == 0
+                    || !lotto.BuyTicketRuleIdList.All(rules.Contains)
+                    || lotto.ConsumeCountList.Count < rewards[lotto.Id].Count()
+                    || !rewards[lotto.Id].Any())
+                    continue;
+                catalogs.TryAdd(lotto.Id, new Catalog(lotto, primary, rewards[lotto.Id].ToDictionary(row => row.Id)));
+            }
+        return catalogs;
     }
 
     private static bool TryGetProgress(Player player, Catalog catalog, out LottoStateInfo? progress)
     {
         progress = null;
         LottoState state = player.Lotto ??= new LottoState();
-        if (state.Infos.Count == 0)
-            return true;
-        if (state.Infos.Count != 1)
-            return false;
+        LottoStateInfo[] matches = state.Infos.Where(info => info.Id == catalog.Lotto.Id).ToArray();
+        if (matches.Length == 0) return true;
+        if (matches.Length != 1) return false;
 
-        LottoStateInfo candidate = state.Infos[0];
-        if (candidate.Id != catalog.Lotto.Id || candidate.LottoPrimaryId != catalog.Primary.Id
+        LottoStateInfo candidate = matches[0];
+        if (candidate.LottoPrimaryId != catalog.Primary.Id
             || candidate.ExtraRewardState is < 0 or > 2 || candidate.TicketPurchaseCount < 0
             || candidate.LottoRewards is null || candidate.LottoRecords is null)
             return false;

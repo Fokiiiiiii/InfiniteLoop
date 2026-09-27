@@ -1,31 +1,35 @@
 # InfiniteLoop
 
-InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. This branch focuses on bringing AscNet forward to the current global PC/Steam client path and documenting the compatibility work needed for the 4.5-era client.
+InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. The server core tracks the Global/EN PC client; the Steam bridge also routes the closely related JP PC client through its official regional config.
 
 This is research/dev infrastructure, not an official service. It expects a local client, a local AscNet process, and a local MongoDB database.
 
 ## Current target
 
-The current compatibility target in this tree is:
+The current server data/config target is **4.8**, not a claim of complete 4.8 gameplay compatibility:
 
 | Area | Value |
 | --- | --- |
 | Client package | `com.kurogame.pc.punishing.grayraven.en` |
-| Application version | `4.5.0` |
-| Document version | `4.5.12` |
-| Launch module version | `4.5.12` |
+| Application version | `4.8.0` |
+| Document version | `4.8.10` |
+| Launch module version | `4.8.10` |
 | Steam/PC channel | `205` |
 | Game server TCP port | `2335` by default |
 | SDK/HTTP URL used by the runner | `http://127.0.0.1:8080` by default |
 
-`Resources/Configs/version_config.json` carries the current `4.5.0 -> 4.5.12` version/hash tuple used by the current-client config endpoint.
+`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples.
 
-The observed JP PC client profile is also registered for the local bridge:
-`com.kurogame.punishing.grayraven.jp`, application `4.7.0`, document/launch
-version `4.7.15`, channel `5`, CDN key `BYf6VZR7DluwhM64`, and the observed
-`prod-jpcdn` CDN origins. The JP config is fetched from that official CDN and
-only its login destinations are rewritten to local AscNet; these values are
-routing metadata and do not replace the Global/EN default target.
+The JP PC bridge targets `com.kurogame.punishing.grayraven.jp`, application
+`4.8.0`, channel `5`, CDN key `BYf6VZR7DluwhM64`, and the observed `prod-jpcdn`
+origins. It fetches config from the official JP CDN and rewrites only login
+destinations. JP document and launch module versions are taken from that live
+config because their patch numbering can differ from Global/EN.
+
+For JP, start `run_steam.py --region jp --proxy-local`. The runner starts the
+local services and process-scoped mitmproxy, then waits; launch the game from
+Steam yourself. This path does not install DLLs, patch game files, or edit
+KRSDK cache files.
 
 ## What changed in this branch
 
@@ -48,7 +52,7 @@ routing metadata and do not replace the Global/EN default target.
 
 ### Steam/PC bridge
 
-- Added `run_steam.py`, a local runner that starts AscNet, optionally starts MongoDB, starts mitmproxy, performs SDK/config smoke checks, creates or verifies a local AscNet account, and launches the client command with proxy environment variables.
+- Added `run_steam.py`, a local runner that starts AscNet, optionally starts MongoDB, starts mitmproxy, performs SDK/config smoke checks, and creates or verifies a local AscNet account. JP mode then waits for the user to launch the game through Steam.
 - Added `proxy.py` routing for current PC/Steam HTTP traffic:
   - `sdkapi.kurogame-service.com`
   - `sdkapi.kurogame-service.xyz`
@@ -56,8 +60,43 @@ routing metadata and do not replace the Global/EN default target.
   - `prod-jpcdn-*.kurogame.net` and `prod-jpcdn-*.pgr-game.com` for the JP profile
   - local wildcard `/api/`, `/prod/`, and `/sdkcom/` requests
 - Added redacted proxy flow logging to `.runtime/proxy-flows.log`.
-- Added KRSDK cache repair/seeding helpers for local Steam bridge experiments.
-- Added `launch-pgr-ascnet.sh` as a macOS/CrossOver launch example. Its paths are workstation-specific; adjust them before reuse.
+
+### 4.8 data and feature changes
+
+Installed, SHA-verified client tables and Lua are the source for this update. `Resources/table/manifest.json` records per-table provenance and preserves earlier local-policy projections. This update adds no capture-backed runtime data.
+
+- Kurumi Tokisaki and Adelyde: Anabasis acquisition, normal progression, exhibition rewards, and training-item handling; training maximizes authored level/grade/eligible normal skills, not evolution or Leap.
+- Zafkiel and Kelpie CUB data, five weapons, Pesanteur memories, new coatings/portraits, and authored Harmony II upgrades. Memory resonance discounts now follow the two configured suits rather than the previous single-suit assumption.
+- Observer effects use `CharacterObsTransform` career/element rules, including Overlinker. Stage general-skill bans follow the authored stage flag.
+- Standard 4.8 draw catalogs, Crucible milestone claims, Date A Live acquired-copy task progression, and selected-lottery state. Unsupported collab currencies are not guessed.
+- Free-ticket rewards persist as serial ticket stock, not inventory items. Every paid or free draw freezes its rolled outcome, pity/history and debit plan in one durable write, then grants once through per-document reward receipts; login resumes frozen draws, and a retry cannot charge, grant or advance progress twice. Non-Fate collab banners spend the paid ticket family and combine earned tickets in the same cost plan; the Fate banner remains closed (below).
+- Updated notices, event calendars, multi-round sign-ins, the Farwatch File Passport season, and 487 Study stages, including new frame trials and Celica practice.
+- Chapter 43 (Anchored in Faith), its LifeTree/exhibition dependencies, Wrathful Monsoon boss trials, and Kurumi/Adelyde teaching trials, guides, affection tasks, trust gifts, and dorm interactions.
+- Festival and coating-trial progress is rebuilt from persisted stage clears rather than fixed login payloads. Teaching treasure claims recover partially persisted rewards at login, including after the event closes.
+- Coating self-choice gachas `50–53` use authored rewards, costs, limits, milestones, and calendar `51001`. Selection changes preserve each pool's progress; frozen draw/exchange intents recover without charging or granting twice. Scene rewards persist ownership and notify the client.
+- Music playlist reordering uses the original client's reversed wire/display order and persists across login.
+- Envelope invitation/open/bind/story mutations, task notifications, first-day grant, accumulated per-business-day catch-up and earned-but-unclaimed task reissue; server-local Team Recommendation boards with persisted, server-evaluated target progress.
+- FangKuai v2 Start/Sync/Settle state, scoring operands, rewards, and tasks; chapter calendars `50802–50804` inherit the authored parent window. The client owns board generation; snapshot checks do not prove native move history.
+- Equipment mutations push every affected slot in one `NotifyEquipDataList` before the response. Taking a weapon off, or moving one to another character that does not hand back the weapon it displaces, is rejected; login normalization gives a weaponless owned character its authored default weapon and frees incompatible wearables.
+
+Distributed sources do not carry every retail rule. These surfaces state their local policy explicitly:
+
+| Surface | AscNet policy (not retail parity) / remaining gap |
+| --- | --- |
+| Collab draws `5612`, `381`, `7068` | AscNet policy (not retail): open at the 4.8 maintenance end, 2026-09-24 05:00 UTC (`1790226000`), instead of retail 2026-09-29 10:00 UTC (`1790676000`); end unchanged. Groups 37/38 carry Tag `5` from client `DrawTabs` Id 5 (Collab / Kurumi Tokisaki Pool). Login pushes `NotifyDateALiveDraw` with `DateALiveActivity` draws that are currently open (`{1:[5612]}` in window, empty otherwise). Paid ticket family `50017–50019` and earned family `50021–50023` fund a single combined cost plan, and the banner presents the paid family's primary item. |
+| Collab Fate `5613` | Pity is published only as an inclusive `80–100` range and the threshold weights are not distributed, so this banner fails closed: not advertised, no draw infos served, requests rejected. The threshold law is still missing and no substitute distribution is invented. |
+| Circuit Calculus / Punishaar | All 19 requests implemented over the authored activity tables: shop blocks map onto remedy/shop groups, stock and level rules, empty starting deck, per-save persisted RNG, and earned-gold accounting (sale refunds excluded). The client Lua simulates the battle; finish-fight results are consistency-checked, not battle proof. |
+| Overclock Simulation / Transfinite Tower | Its six requests are implemented: chapter/floor progression, energy accounting with rollback refunds, MVP, and a server-local rank board whose rank rewards (including ChatBoard unlocks) are delivered through durable receipts resumed at login. |
+| Wreck-It Huhu / FangKuai | Chapter calendars `50802–50804` inherit the authored parent window (permanent when the parent has none); authored `PreStageId` progression still gates entry. |
+| Team Recommendation | "Global" standings are this server's persisted accounts, not a retail leaderboard: eligible authored base formations (all three members owned inside the quality-star window, each with one table-valid weapon, six awareness sites and at most one partner) rank by quality-star, then level, then lowest UID. Snapshots expose template IDs only. |
+| Envelope Enter | Every authored business day from the schedule start through today accrues one daily ticket grant under its own receipt; the first-ever entry day pays the authored first-day reward instead, and earned-but-unclaimed daily tasks are reissued under their period claim key. |
+| Cosmic Wonders `50302` / self-choice lottery `49501` | The 4.8 client contains Cosmic Wonders data, but no authoritative 4.8 event window: `50302` is not scheduled and its calendar remains closed. The separate 3.7 self-choice lottery `49501` retains its user-approved unbounded window because its client UI requires a positive end time. |
+| Simulated Battlefield `50402` / `50403` | Availability follows the 4.8 activity start after the 2026-09-24 05:00 UTC update through the explicitly dated shop expiry on 2026-11-05 05:00 UTC. Applying those same bounds to task calendar `50403` is an AscNet scheduling policy, supported by the paired-ID precedent in 4.7, not a claim of an independently recovered retail task end date. |
+| Theatre6 / Nirvatia | Default buff 10 authors starting-skill family 22, whose composition is not shipped. AscNet policy (not retail parity) resolves it through authored Theatre6BuildTag 31 "Dreamlure": the lowest-id level-1, in-pool Nirvatia skill carrying that tag. Characters without such skills still reject. Character-specific mission counters and the authored skill-level-up trigger are implemented. |
+
+The table decoder verified 16,113 typed tables; 4,461 ancillary raw assets remain undecoded, outside the imported gameplay dependencies.
+
+Focused verification on 2026-09-24: the `--non-fate-policy-only` compatibility harness passed against a private MongoDB. Ten PacketCodec scenarios completed 154 transactions without collector failures; eight bounded replays through the installed 4.8 client's original Lua passed 1,178 checks. The separate banner/equipment regression scenario completed 15 transactions and 50 client-consumer checks. Fixtures used synthetic accounts only, and dated scenarios injected the handler/scenario clock rather than rewriting production calendars. This is not a full-mode native playthrough: engine adapters, declared out-of-scope login pushes and synthetic skill-merge inputs remain explicit proof boundaries; native combat, rendered UI and movie playback are unverified. Throwaway collectors and private database files were removed after verification; the permanent compatibility harness remains in `AscNet.Test`.
 
 ### Game protocol and data compatibility
 
@@ -69,7 +108,7 @@ This branch adds or fixes current-client server behavior for:
 - Dorm commission system upgrades retain the current level until the saved start time plus the table-defined duration has elapsed. Relogs and restarts cannot finish them early; reconciliation completes each upgrade once and recovers previously stuck AscNet upgrades without restarting their timer or charging again.
 - Ultima Awakening checks claimed Exhibition milestones for the relevant construct. Eligible skills still require an unlock request, and learned skills survive character reloads.
 - Character login normalization reuses skill-upgrade, condition, and skill-level indexes within one roster pass; skill eligibility is still evaluated per character against current player state.
-- Observer activation (including Ishmael) derives from the actual deployed team and all applicable learned observation skills. Empty descriptive skill rows no longer hide activation effects; Tank/Amplifier/Breaker selection follows the client rules, including physical-member exclusions and catalog-based Breaker availability. Ordinary, guild and roguelike pre-fight builders share this logic; cached mode battle payloads retain the effects, and the base Observer career remains unchanged.
+- Observer activation derives from the deployed team, learned observation skills, and authored career/element transformations. Ordinary, guild and roguelike pre-fight builders share this logic; cached mode battle payloads retain the effects, and the base Observer career remains unchanged.
 - Current-client notice payloads.
 - Stage bookmark compatibility.
 - Board mutual push compatibility.
@@ -245,6 +284,22 @@ Run the focused server compatibility harness:
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre6-compat-only
 ```
 
+### Circuit Connect (SameColorGame)
+
+Circuit Connect implements the current `SameColorGame` match-three mode with its own persisted activity, boards, runs, records and shared tasks. The client is a renderer of server-ordered actions, so board generation, matching and cascades, props, summons, boss skills, role skills and passives, score settlement and completion are owned by the server. The eight mode requests (`SameColorGameEnterStage`, `SwapItem`, `UseItem`, `CancelUseItem`, `GiveUp`, `PauseResume`, `CountDown`, `OpenRank`) and the `NotifySameColorGameData`/`NotifySameColorGameUpdate` pushes follow the recovered client contract; login no longer sends the former empty data stub.
+
+- **Authority vs policy:** mode content comes from the authored `Resources/table/share/samecolorgame` tables (activity, attribute factor, ball, boss, boss grade, boss skill, buff, combo, passive skill, role, score, skill, skill group). Board initialization/refill randomness, effect resolution order, score accumulation and completion boundaries, and mode availability are explicitly AscNet policy where no proprietary server algorithm exists; they are not recovered retail server rules or a parity claim. Captures are behavioural oracles only.
+- **Records and login:** `NotifySameColorGameData` carries the selected activity and each boss's best score, best combo and last used role for the player. Records survive relog; no mid-board run is resumed because the client has no resume request.
+- **Tasks:** the 21 authored tasks (`90970`-`90990`, groups `404`/`405`, TimeId `907`) publish at login and in shared task syncs. Boss-grade condition `69005` reports the achieved grade (S publishes `11`, which is also its authored target) and cumulative condition `69002` reports the accumulated total score against each row's authored `Result`. Claims use `FinishTaskRequest`/`FinishMultiTaskRequest` with activity-scoped claim keys, existing reward receipts and checked claim markers, so a retry after a partial save never pays twice, claimed state survives relog, and no Circuit task is reset by the daily or weekly mission rollover.
+- **Availability:** every positive `SameColorGameActivity.TimerId` (`907` for the current row) is permanently available with start and end `0`, derived by `ActivityScheduleService` from the authored activity table. This is the same permanent-mode representation as the other local mode policies; no other schedule entry changes.
+- **Guide and shop:** Circuit claims feed the existing guide activity `10012` (source group `3002`, item `50005` target `350`) and push the guide update. Shop `1291` opens through the shared `GetShopInfoRequest`/`BuyRequest` path using an AscNet local-policy catalog in `Resources/Configs/client_shops.json` (not a retail extract): authored per-mission reward quantities priced in Signal Diffusers, plus a local-policy exchange (6 × Serum Bundle Beta (M) → 50 Signal Diffusers, limit 8) because the current activity's tasks grant the former and never the latter; the exchange pays half the catalog's own `90031` rate so the pair cannot be arbitraged. Purchase counts persist through the shared shop path, and no `shop_base_infos.json` entry is required because the mode panel reads `GetShopInfo`/`GetShopGoodsList` only.
+
+Run the focused server compatibility harness:
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-only
+```
+
 ### Gender setup fix
 
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
@@ -284,8 +339,7 @@ This also covers the earlier broken state where `Gender` may have been written b
 | `AscNet.Test/` | Focused compatibility harness and regression checks. |
 | `Resources/` | Runtime configs, current client tables, data fixtures, notices. |
 | `proxy.py` | mitmproxy script that routes client HTTP traffic back to local AscNet. |
-| `run_steam.py` | Steam/PC bridge runner for AscNet + proxy + optional MongoDB + launch command. |
-| `launch-pgr-ascnet.sh` | macOS/CrossOver launch example for the Steam client. |
+| `run_steam.py` | Steam/PC bridge runner for AscNet + mitmproxy + optional MongoDB. |
 
 ## Requirements
 
@@ -296,10 +350,6 @@ Minimum local tooling:
 - Python 3.10 or newer for `run_steam.py`
 - mitmproxy/mitmdump for Steam/PC bridge mode
 - A local Punishing: Gray Raven PC/Steam installation for client testing
-
-Optional/macOS-specific:
-
-- CrossOver or another Wine launcher if you use `launch-pgr-ascnet.sh`
 
 ## Running AscNet directly
 
@@ -329,11 +379,16 @@ Basic local bridge with MongoDB managed by the runner:
 python3 run_steam.py --with-mongo
 ```
 
-Run AscNet, proxy traffic, and launch the client command:
+For JP, start the bridge and leave it running. Then launch Punishing: Gray
+Raven from Steam so Steam performs its normal launch/authentication flow:
 
 ```bash
-python3 run_steam.py --with-mongo --launch-cmd ./launch-pgr-ascnet.sh
+python3 run_steam.py --region jp --with-mongo --proxy-local --proxy-log "" --tcp-capture
 ```
+
+Wait for `AscNet Steam bridge is running`, then launch the game from Steam.
+Do not pass `--launch-cmd` in JP mode; the runner rejects it to prevent direct
+`PGR.exe` launches outside Steam.
 
 Useful options:
 
@@ -347,38 +402,48 @@ Common options:
 | --- | --- |
 | `--region global` | Use the existing local Global/EN config and routing behavior (default). |
 | `--region tw` | Pass the known TW standalone config through upstream and rewrite only its login destinations to local AscNet. |
-| `--region jp` | Use the observed JP PC profile (`com.kurogame.punishing.grayraven.jp`, channel `5`, version `4.7.0`/`4.7.15`) and smoke-check the official config before bridging it. |
+| `--region jp` | Use the JP PC profile (`com.kurogame.punishing.grayraven.jp`, channel `5`, application `4.8.0`), smoke-check the official regional config, then bridge its login destinations. |
 | `--sdk-url http://127.0.0.1:8080` | Local SDK/config URL exposed by AscNet. |
 | `--proxy-host 127.0.0.1` | mitmproxy bind host. |
 | `--proxy-port 8081` | mitmproxy bind port. |
-| `--proxy-local` | Use mitmproxy's process-scoped OS redirector without modifying the game directory. HTTP is rewritten by the bridge; pinned HTTPS is tunneled; the game TCP destination comes from the rewritten ServerList. |
+| `--proxy-local` | Use mitmproxy's process-scoped OS redirector without modifying the game directory or KRSDK cache. JP HTTP config routes are rewritten; known pinned HTTPS is tunneled; the local login response sends the game socket to `127.0.0.1:2335`, whose raw TCP is captured. |
 | `--proxy-local-process PGR.exe,KRSDKExternal.exe` | Override the comma-separated process names/PIDs captured by `--proxy-local`. |
+| `--tcp-capture` | With `--proxy-local --region jp`, record raw TCP chunks for the JP game socket only at `.runtime/jp-game-tcp.jsonl`; pass `--proxy-log ""` to disable HTTP flow logging while keeping config rewriting active. |
 | `--with-mongo` | Start local MongoDB if it is not already reachable. |
 | `--ascnet-username test` | Local AscNet account used for Steam login handoff. |
 | `--ascnet-password test` | Password used when creating that local account. |
 | `--gate-fallback-username <name>` | Map unknown Steam/KRSDK gate logins to an existing local account. |
 | `--no-ensure-account` | Skip local account creation/checking and disable implicit unknown-user fallback. |
-| `--seed-krsdk-cache` | Opt in to writing local AscNet account data into KRSDK cache files. |
-| `--krsdk-cache-dir <path>` | Override the KRSDK login-cache directory used for repair/seeding. |
 | `--no-proxy` | Run only AscNet; skip mitmproxy. |
-| `--no-smoke` | Skip config smoke checks before launching. |
+| `--no-smoke` | Skip config smoke checks before starting the bridge. |
 | `--proxy-log <path>` | Write redacted request/response diagnostics. |
 | `--protocol-gap-log <path>` | Write protocol compatibility metadata as JSONL; JP defaults to `.runtime/protocol-gap-jp.jsonl`. |
-| `--launch-cmd ...` | Command to start after AscNet/proxy are ready. |
-
-On native Windows, pass the client's actual `%APPDATA%\KR_G143\A1855` directory with `--krsdk-cache-dir` when using KRSDK cache repair or `--seed-krsdk-cache`; the default path targets the macOS/CrossOver launch example.
+| `--launch-cmd ...` | Start a command after services are ready. JP mode reserves game launch for Steam and rejects this option. |
 
 The runner sets:
 
 - `ASCNET_PUBLIC_HTTP_ORIGIN`
 - `ASCNET_GATE_FALLBACK_USERNAME`
-- proxy variables for the launch command
+- HTTP proxy variables in environment-proxy mode (not in JP local-capture mode)
 - `ASCNET_PROXY_TARGET`
 - `ASCNET_PROXY_LOG`
 - `ASCNET_REGION`
 - `ASCNET_PROTOCOL_GAP_LOG` when protocol probing is enabled
 
-Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP keep observed upstream config metadata authoritative and rewrite only login destinations to local AscNet. JP uses only the package, `prod-jpcdn-*` hosts, channel `5`, version `4.7.0`/`4.7.15`, and CDN key observed in the official/client config; it does not copy Global/EN package metadata into the JP profile. A direct local JP config request returns `421 Misdirected Request` so a bridge mistake cannot silently serve the Global/EN fallback.
+Region config policy is intentionally asymmetric: Global keeps the existing local config smoke targets, while TW and JP keep upstream config metadata authoritative and rewrite only login destinations to local AscNet. JP uses its regional package, `prod-jpcdn-*` hosts, channel `5`, application `4.8.0`, and observed CDN key; document and launch module versions are read from JP's live config instead of copied from Global/EN. A direct local JP config request returns `421 Misdirected Request` so a bridge mistake cannot silently serve the Global/EN fallback.
+
+JP TCP capture runs through mitmproxy's process-scoped local mode and does not
+modify the game directory, KRSDK cache, or system certificate store. HTTPS
+hosts known to use certificate pinning stay end-to-end tunneled. The local
+login response supplies `127.0.0.1:2335` as the raw game socket; only that
+TCP endpoint is captured. QUIC/HTTP3 and generic
+UDP capture are disabled in this mode. Each JSONL entry stores one raw receive
+chunk with its direction and Base64 bytes; TCP chunk boundaries are arbitrary
+and are not protocol packet boundaries.
+
+Rewriting the JP HTTPS config response requires the mitmproxy CA to already be
+trusted by the game's runtime or operating system. The runner does not install
+that CA; pinned hosts remain tunneled and game files stay untouched.
 
 When `ASCNET_PROTOCOL_GAP_LOG` is set, the game session writes metadata-only JSONL events for unknown requests/pushes, MessagePack DTO decoding failures, request field mismatches, client exception responses, and disconnect points. It records the last successful request but never stores packet payloads. Analyze the result against the EN/Lua/handler baseline with:
 
@@ -422,6 +487,7 @@ Run one focused check:
 ```bash
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --player-gender-compat-only
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre-compat-only
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --version-48-compat-only
 ```
 
 Available focused switches:
@@ -450,6 +516,18 @@ Available focused switches:
 --theatre-compat-only
 --theatre6-compat-only
 --theatre6-visibility-only
+--version-48-compat-only
+--version-48-frames-only
+--version-48-draw-cub-compat-only
+--version-48-equipment-cosmetics-only
+--version-48-audio-only
+--date-alive-task-progress-only
+--team-recommend-only
+--fangkuai-only
+--punishaar-only
+--non-fate-policy-only
+--stage-general-skill-ban-only
+--transfinite-tower-boundary-only
 ```
 
 Build the main projects:
@@ -484,8 +562,7 @@ Ignore rules do not untrack existing files or remove them from Git history. Remo
 - This remains a compatibility/research server, not a complete production backend.
 - Some modules are still skeletal or best-effort.
 - Steam support is local-bridge based: it relies on local SDK/config responses plus mitmproxy routing.
-- HTTPS proxying for pinned KRSDK hosts may break; the runner keeps HTTPS proxying opt-in through `--proxy-https`.
-- `launch-pgr-ascnet.sh` is an example for one macOS/CrossOver setup and should be edited for other machines.
+- `--proxy-https` is available only for environment-proxy diagnostics; JP uses `--proxy-local` and rejects that option so pinned TLS remains tunneled.
 
 ## Upstream
 

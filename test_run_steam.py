@@ -85,10 +85,22 @@ class RegionProfileRunnerTests(unittest.TestCase):
         self.assertTrue(profile.matches_config_host("prod-jpcdn-tx.kurogame.net"))
         self.assertTrue(profile.matches_notice_host("prod-jpcdn-ak.pgr-game.com"))
 
-    def test_jp_smoke_expects_observed_versions(self):
+    def test_global_launcher_smoke_targets_48_mobile_and_steam_clients(self):
+        targets = run_steam.get_region_profile("global").config_smoke_targets
+        self.assertEqual(("4.8.0", "4.8.0"), tuple(target.application_version for target in targets))
+        self.assertEqual(("4.8.10", "4.8.10"), tuple(target.document_version for target in targets))
+        self.assertTrue(all("/4.8.0/standalone/config.tab" in target.path for target in targets))
+
+    def test_tcp_capture_is_opt_in(self):
+        with patch.object(sys, "argv", ["run_steam.py", "--tcp-capture"]):
+            args = run_steam.parse_args()
+        self.assertTrue(args.tcp_capture)
+
+    def test_jp_smoke_targets_48_without_global_document_assumptions(self):
         target = run_steam.get_region_profile("jp").config_smoke_targets[0]
-        self.assertEqual("4.7.0", target.application_version)
-        self.assertEqual("4.7.15", target.document_version)
+        self.assertEqual("4.8.0", target.application_version)
+        self.assertIsNone(target.document_version)
+        self.assertIn("/4.8.0/standalone/config.tab", target.path)
         self.assertEqual("Channel\tint\t5", target.channel_assertion)
         self.assertEqual("https://prod-jpcdn-tx.kurogame.net", target.base_url)
 
@@ -105,9 +117,9 @@ class RegionProfileRunnerTests(unittest.TestCase):
             def read(self):
                 return (
                     "Key\tType\tValue\r\n"
-                    "ApplicationVersion\tstring\t4.7.0\r\n"
-                    "DocumentVersion\tstring\t4.7.15\r\n"
-                    "LaunchModuleVersion\tstring\t4.7.15\r\n"
+                    "ApplicationVersion\tstring\t4.8.0\r\n"
+                    "DocumentVersion\tstring\t4.8.13\r\n"
+                    "LaunchModuleVersion\tstring\t4.8.12\r\n"
                     "Channel\tint\t5\r\n"
                     "ServerListStr\tstring\t日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
                     "ChannelServerListStr\tstring\tdefault#日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
@@ -119,7 +131,7 @@ class RegionProfileRunnerTests(unittest.TestCase):
 
         requested_url = open_request.call_args.args[0]
         self.assertEqual(target.base_url + target.path, requested_url)
-        self.assertIn("Smoke OK [jp-client] upstream:", stdout.getvalue())
+        self.assertIn("Smoke OK [jp-client] upstream (DocumentVersion 4.8.13; LaunchModuleVersion 4.8.12):", stdout.getvalue())
 
     def test_tw_authoritative_smoke_is_not_faked_locally(self):
         with patch("sys.stdout", new_callable=io.StringIO) as stdout:
@@ -135,12 +147,28 @@ class RegionProfileRunnerTests(unittest.TestCase):
         self.assertEqual("5", env["ASCNET_EXPECTED_CHANNEL"])
 
     def test_local_proxy_environment_removes_application_proxy_variables(self):
-        base = {"HTTP_PROXY": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9"}
+        base = {
+            "HTTP_PROXY": "http://127.0.0.1:9",
+            "https_proxy": "http://127.0.0.1:9",
+            "ALL_PROXY": "http://127.0.0.1:9",
+        }
         with tempfile.TemporaryDirectory() as root, patch.object(run_steam, "ROOT", Path(root)):
-            env = run_steam.proxy_env(base, "127.0.0.1", 8081, "http://127.0.0.1:8080", "", False, "global", "", True)
+            env = run_steam.proxy_env(base, "127.0.0.1", 8081, "http://127.0.0.1:8080", "", True, "global", "", True)
         self.assertEqual("1", env["ASCNET_LOCAL_CAPTURE"])
         self.assertNotIn("HTTP_PROXY", env)
         self.assertNotIn("https_proxy", env)
+        self.assertNotIn("ALL_PROXY", env)
+
+    def test_jp_runner_requires_local_proxy_and_manual_steam_launch(self):
+        with patch.object(sys, "argv", ["run_steam.py", "--region", "jp"]):
+            with self.assertRaises(SystemExit) as error:
+                run_steam.main()
+        self.assertIn("--proxy-local", str(error.exception))
+
+        with patch.object(sys, "argv", ["run_steam.py", "--region", "jp", "--proxy-local", "--launch-cmd", "PGR.exe"]):
+            with self.assertRaises(SystemExit) as error:
+                run_steam.main()
+        self.assertIn("from Steam", str(error.exception))
 
 
 class GateFallbackUsernameTests(unittest.TestCase):

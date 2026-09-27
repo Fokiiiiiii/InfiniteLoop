@@ -1,8 +1,9 @@
 """Region profiles shared by the Steam runner and mitmproxy bridge.
 
-Only values already present in the bridge, its tests, or an observed client
-request are recorded as known. The JP profile is populated from the observed
-4.7.0 PC client log; no package, host, channel, or version values are guessed.
+The JP package, CDN route, and channel come from the observed JP PC client.
+The profile uses the shared 4.8 application version, while document metadata is
+read from the official regional config at runtime because its patch numbering
+can differ from Global/EN.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ class ConfigSmokeTarget:
     label: str
     path: str
     channel_assertion: str
-    application_version: str = "4.6.0"
+    application_version: str = "4.8.0"
     document_version: str | None = None
     base_url: str | None = None
 
@@ -105,13 +106,15 @@ GLOBAL_PROFILE = RegionProfile(
     config_smoke_targets=(
         ConfigSmokeTarget(
             "global-client",
-            "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.punishing.grayraven.en/4.6.0/standalone/config.tab",
+            "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.punishing.grayraven.en/4.8.0/standalone/config.tab",
             "Channel\tint\t5",
+            document_version="4.8.10",
         ),
         ConfigSmokeTarget(
             "steam-pc-package",
-            "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.pc.punishing.grayraven.en/4.6.0/standalone/config.tab",
+            "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.pc.punishing.grayraven.en/4.8.0/standalone/config.tab",
             "Channel\tint\t205",
+            document_version="4.8.10",
         ),
     ),
 )
@@ -162,11 +165,11 @@ JP_PROFILE = RegionProfile(
     config_smoke_targets=(
         ConfigSmokeTarget(
             "jp-client",
-            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.7.0/standalone/config.tab",
+            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.8.0/standalone/config.tab",
             "Channel\tint\t5",
             base_url="https://prod-jpcdn-tx.kurogame.net",
-            application_version="4.7.0",
-            document_version="4.7.15",
+            application_version="4.8.0",
+            document_version=None,
         ),
     ),
     metadata_status="observed",

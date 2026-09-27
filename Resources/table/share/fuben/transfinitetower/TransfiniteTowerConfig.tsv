@@ -1,0 +1,7 @@
+Key	Desc	Values[0]	Values[1]
+FightCount	Default Deployment Limit	3	
+RankRewardNeedRank	Ranking Reward Threshold	1000	
+RankRefreshTime	Ranking Refresh Time	10:00:00	
+RankRewardExpireInterval	Time until ranking rewards expire (seconds)	259200	
+CharacterDebuff	Non-navigator debuff description	Computing Power quota: Max HP -{0}%	Computing Power quota affects a frame's max HP. Each point lost reduces max HP by 33%. At 0 Computing Power quota, the frame cannot be deployed.
+TaskRewards	任务奖励预览	69588	

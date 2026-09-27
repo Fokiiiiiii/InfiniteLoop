@@ -1,0 +1,14 @@
+Key	Desc	Weight
+CharacterOwn	Character Ownership Completion Weight	100
+CharacterLevel	Character Level Completion Weight	0
+CharacterSkill	Character Skill Completion Weight	0
+WeaponWear	Weapon Equip Completion Weight	100
+WeaponLevel	Weapon Upgrade Completion Weight	30
+WeaponResonance	Weapon Resonance Completion Weight	30
+WeaponOverrun	Weapon Harmony Completion Weight	40
+AwarenessWear	Memory Equip Completion Weight	120
+AwarenessLevel	Memory Upgrade Completion Weight	30
+AwarenessResonance	Memory Resonance Completion Weight	30
+AwarenessOverclock	Memory Hypertune Completion Weight	30
+PartnerWear	CUB Equip Completion Weight	100
+PartnerLevel	CUB Upgrade Completion Weight	30

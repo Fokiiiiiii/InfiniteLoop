@@ -14,3 +14,7 @@ GroupId	TargetPercent	FeaturedTargetPercent	Calibration	PityMin	PityMax	FirstPit
 24	100	100	0	80	100	0	24	10
 35	100	100	0	60	60	0	35	10
 36	100	100	0	80	100	0	36	10
+37	100	100	0	60	60	0	37	10
+38	100	100	0	80	100	0	38	10
+39	80	80	1	30	30	0	39	10
+40	100	100	0	20	20	0	40	10
