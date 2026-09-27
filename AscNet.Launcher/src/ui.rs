@@ -1555,7 +1555,8 @@ unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
                 }
                 if m.settings.selected_game.is_none() {
                     ID_BROWSE
-                } else if m.build.is_none()
+                } else if m.update_available == Some(true)
+                    || m.build.is_none()
                     || m.package.is_none()
                     || !matches!(m.patch, Some(PatchState::Current))
                 {
@@ -2226,7 +2227,7 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
         "RUNNING"
     } else if !can_restore {
         "SELECT GAME"
-    } else if update_available == Some(true) && !can_launch {
+    } else if update_available == Some(true) {
         "UPDATE"
     } else if !can_launch {
         "SETUP"

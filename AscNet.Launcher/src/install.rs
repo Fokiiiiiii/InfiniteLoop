@@ -849,7 +849,7 @@ fn remove_rollback_directory(path: &Path) {
 pub fn game_running() -> Result<bool> {
     #[cfg(windows)]
     {
-        let output = Command::new("tasklist.exe")
+        let output = crate::local::hide_console(&mut Command::new("tasklist.exe"))
             .args(["/FI", "IMAGENAME eq PGR.exe", "/FO", "CSV", "/NH"])
             .output()
             .context("querying running processes")?;

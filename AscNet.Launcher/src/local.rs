@@ -223,7 +223,7 @@ fn prepare_logged(
     #[cfg(windows)]
     let setup_job = create_job()?;
     let mut child = OwnedChild(
-        Command::new("powershell.exe")
+        hide_console(&mut Command::new("powershell.exe"))
             .args([
                 "-NoLogo",
                 "-NoProfile",
@@ -865,8 +865,18 @@ fn terminate_child(child: &mut Child) {
     let _ = child.wait();
 }
 
+/// The launcher has no console, so console children would each open their own window.
+pub(crate) fn hide_console(command: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+    }
+    command
+}
+
 fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std::process::Output> {
-    let mut child = command
+    let mut child = hide_console(&mut command)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
