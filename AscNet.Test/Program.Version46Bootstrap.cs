@@ -35,6 +35,7 @@ internal partial class Program
 {
     private static void ValidateVersion46BootstrapCompatibility()
     {
+        ValidateRegionalConfigTab();
         ValidateVersion46ConfigurationMetadata();
         ValidateVersion46LoginShape();
         ValidateVersion46TableDrivenDrawCatalog();
@@ -227,6 +228,49 @@ internal partial class Program
     }
 
 
+    private static void ValidateRegionalConfigTab()
+    {
+        Type controller = Type.GetType("AscNet.SDKServer.Controllers.ConfigController, AscNet.SDKServer", throwOnError: true)!;
+        MethodInfo handle = RequiredMethod(controller, "HandleConfigRequest", BindingFlags.Static | BindingFlags.NonPublic, [typeof(HttpContext)]);
+        Dictionary<string, string> Serve(string package, string? cdnKey)
+        {
+            DefaultHttpContext context = new();
+            context.Request.Scheme = "http";
+            context.Request.Host = new HostString("127.0.0.1:8080");
+            context.Request.RouteValues["package"] = package;
+            context.Request.RouteValues["version"] = "4.8.0";
+            if (cdnKey is not null)
+                context.Request.RouteValues["cdnKey"] = cdnKey;
+            return ((string)handle.Invoke(null, [context])!)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.TrimEnd('\r').Split('\t'))
+                .Where(cells => cells.Length >= 3)
+                .ToDictionary(cells => cells[0], cells => cells[2]);
+        }
+
+        foreach (string? cdnKey in new[] { null, "B7OBn4RZic1fijNJ" })
+        {
+            Dictionary<string, string> tw = Serve("com.kurogame.punishing.grayraven.tw", cdnKey);
+            AssertEqual("4.8.10", tw["DocumentVersion"], "TW 4.8 DocumentVersion");
+            AssertEqual("4.8.10", tw["LaunchModuleVersion"], "TW 4.8 LaunchModuleVersion");
+            AssertEqual("b683b400819a9095ec5ae0945cd95064809aa82f", tw["IndexSha1"], "TW 4.8 IndexSha1");
+            AssertEqual("3d7e0c4479062d60fc6c8311ef8022ac1976eed6", tw["LaunchIndexSha1"], "TW 4.8 LaunchIndexSha1");
+            AssertEqual("http://prod-twcdn-ak.pgr-game.com/prod", tw["PrimaryCdns"], "TW PrimaryCdns");
+            AssertEqual("http://prod-twcdn-aliyun.kurogame.net/prod", tw["SecondaryCdns"], "TW SecondaryCdns");
+            AssertEqual("5", tw["Channel"], "TW Channel");
+            AssertEqual(false, tw.ContainsKey("IndexMd5"), "TW omits IndexMd5 like its live config");
+
+            Dictionary<string, string> en = Serve("com.kurogame.punishing.grayraven.en", cdnKey);
+            AssertEqual("4.8.10", en["DocumentVersion"], "EN 4.8 DocumentVersion");
+            AssertEqual("b22b87996db98720100e39586167440a005ea531", en["IndexSha1"], "EN 4.8 IndexSha1");
+            AssertEqual("9b4ecc9495e317975240f009bdb0876423750a5c", en["LaunchIndexSha1"], "EN 4.8 LaunchIndexSha1");
+            AssertEqual("http://prod-encdn-ak.pgr-game.com/prod", en["PrimaryCdns"], "EN PrimaryCdns");
+            AssertEqual("http://prod-encdn-aliyun.kurogame.net/prod", en["SecondaryCdns"], "EN SecondaryCdns");
+            AssertEqual("5", en["Channel"], "EN Channel");
+            AssertEqual("c5d4baac85a6e37b8109ea43dc045d31", en["IndexMd5"], "EN keeps its live IndexMd5");
+        }
+    }
+
     private static void ValidateVersion46ConfigurationMetadata()
     {
         Type controller = Type.GetType("AscNet.SDKServer.Controllers.ConfigController, AscNet.SDKServer", throwOnError: true)!;
@@ -257,7 +301,7 @@ internal partial class Program
         AssertEqual("5f41e51783a5183a619d14d586638dbdb557a996", current.IndexSha1, "4.7 live IndexSha1");
         AssertEqual("2ea1ce3cc9271c9e75df7a16b5465cfb8922abc7", current.LaunchIndexSha1, "4.7 live LaunchIndexSha1");
         ServerVersionConfig fallback = (ServerVersionConfig)getVersion.Invoke(null, ["99.0.0"])!;
-        AssertEqual(current.IndexSha1, fallback.IndexSha1, "unknown future version uses latest live metadata");
+        AssertEqual(((ServerVersionConfig)getVersion.Invoke(null, ["4.8.0"])!).IndexSha1, fallback.IndexSha1, "unknown future version uses latest live metadata");
         ServerVersionConfig previous = (ServerVersionConfig)getVersion.Invoke(null, ["4.5.0"])!;
         if (previous.IndexSha1 == live.IndexSha1)
             throw new InvalidDataException("4.6 configuration metadata did not remain distinct from 4.5.");

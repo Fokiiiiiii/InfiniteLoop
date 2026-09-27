@@ -19,5 +19,8 @@ namespace AscNet.SDKServer.Models
 
         [JsonProperty("LaunchIndexSha1", NullValueHandling = NullValueHandling.Ignore)]
         public string LaunchIndexSha1 { get; set; }
+
+        [JsonProperty("Packages", NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, ServerVersionConfig>? Packages { get; set; }
     }
 }

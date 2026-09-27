@@ -18,7 +18,7 @@ The current server data/config target is **4.8**, not a claim of complete 4.8 ga
 | Game server TCP port | `2335` by default |
 | SDK/HTTP URL used by the runner | `http://127.0.0.1:8080` by default |
 
-`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0 (launcher 1.0.5, patch 0.3.0).
+`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0, EN and TW (launcher 1.0.6, patch 0.3.0).
 
 ## What changed in this branch
 

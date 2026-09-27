@@ -413,6 +413,7 @@ mod tests {
         for hash in [
             "910a2988f5819641ba3d0b5fcbcb8659e088b5899e7f3b22f4098efcfe1c4d5e",
             "ea70a4d72cd11fd9cfdaf9408ae79ab7e926ed1da8593a6d3c62db8f1283dbbd",
+            "9defd05a6c7e6c3172bdc8f55bf9b7e70fba4ba355c92348f0996a82d56654ba",
         ] {
             assert!(package.manifest.accepts_original("GameAssembly.dll", Some(hash)));
             assert!(!package.manifest.accepts_original("PGR.exe", Some(hash)));

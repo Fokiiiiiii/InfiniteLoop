@@ -58,6 +58,7 @@ namespace AscNet.SDKServer.Controllers
             bool currentClient = IsVersionAtLeast(version, 4, 5, 0);
             string publicHttpOrigin = PublicHttpOrigin(ctx);
             ServerVersionConfig versionConfig = GetVersionConfig(version);
+            versionConfig = versionConfig.Packages?.GetValueOrDefault(package) ?? versionConfig;
 
             List<RemoteConfig> remoteConfigs = new();
             if (currentClient)
@@ -337,7 +338,9 @@ namespace AscNet.SDKServer.Controllers
             remoteConfigs.AddConfig("MemoryLimit", 2048);
             remoteConfigs.AddConfig("CloseMsgEncrypt", false);
             remoteConfigs.AddConfig("ServerListStr", CurrentServerListStr(publicHttpOrigin));
-            remoteConfigs.AddConfig("IndexMd5", versionConfig.IndexMd5);
+            // TW's authoritative config carries no IndexMd5; only emit it where the region publishes one.
+            if (versionConfig.IndexMd5 is not null)
+                remoteConfigs.AddConfig("IndexMd5", versionConfig.IndexMd5);
             remoteConfigs.AddConfig("AndroidReturnEnabled", false);
             remoteConfigs.AddConfig("AndroidPayCallbackList", $"{publicHttpOrigin}/api/XPay/HeroHgAndroidPayResult");
             remoteConfigs.AddConfig("AndroidPayCallbackUrl", $"{publicHttpOrigin}/api/XPay/HeroHgAndroidPayResult");
@@ -392,6 +395,10 @@ namespace AscNet.SDKServer.Controllers
                 "com.kurogame.punishing.grayraven.en" or "com.kurogame.gplay.punishing.grayraven.en" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",
+                    5),
+                "com.kurogame.punishing.grayraven.tw" when currentClient => (
+                    "http://prod-twcdn-ak.pgr-game.com/prod",
+                    "http://prod-twcdn-aliyun.kurogame.net/prod",
                     5),
                 "com.kurogame.pc.punishing.grayraven.en" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
