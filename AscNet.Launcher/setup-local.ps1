@@ -193,7 +193,8 @@ function Set-NetworkConfig([object]$Config, [int]$GamePort, [int]$MongoPort) {
 function Write-JsonAtomic([string]$Path, [object]$Value) {
     $temp = "$Path.$PID.tmp"
     [IO.File]::WriteAllText($temp, ($Value | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
-    if (Test-Path -LiteralPath $Path) { [IO.File]::Replace($temp, $Path, $null) } else { [IO.File]::Move($temp, $Path) }
+    # PowerShell turns $null into "" for .NET string parameters; File.Replace rejects "" as a backup path.
+    if (Test-Path -LiteralPath $Path) { [IO.File]::Replace($temp, $Path, [NullString]::Value) } else { [IO.File]::Move($temp, $Path) }
 }
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This bootstrap currently supports native Windows only.' }
