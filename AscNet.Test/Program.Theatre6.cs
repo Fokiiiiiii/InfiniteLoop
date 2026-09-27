@@ -71,17 +71,41 @@ internal partial class Program
         RequiemCalls.Clear();
         RequiemSuccessfulCalls.Clear();
         ValidateRequiemAvailabilityChecks();
-        ValidateRequiemStoryAndGameplayChecks();
-        ValidateRequiemShopAndSkillChecks();
-        ValidateRequiemNativeBattleChecks();
-        ValidateRequiemBattleRelicRewardsChecks();
-        ValidateRequiemPvpChecks();
-        ValidateRequiemRewardShopChecks();
-        ValidateRequiemMissionProgressChecks();
-        ValidateRequiemJournalChecks();
-        ValidateRequiemTerminalRecoveryChecks();
-        ValidateRequiemReceiptWindowChecks();
-        ValidateRequiemDefenceHandoffChecks();
+        ValidateRequiemCharacterBattleMissionChecks();
+        ValidateRequiemNirvatiaTagBuffChecks();
+        // Everything below needs an open Phantom Clash season. The production window (48601) has
+        // ended and stays closed on disk; real-clock rejection was asserted above. This scope is a
+        // TEST-ONLY synthetic window in the in-memory schedule cache (FangKuai pattern), restored in
+        // finally: it permits behaviour checks at controlled availability and authors no date.
+        (_, int pvpTimeId, _) = RequiemGate();
+        ActivityScheduleEntry[] schedules = (ActivityScheduleEntry[])ActivityScheduleService.All;
+        int pvpIndex = Array.FindIndex(schedules, entry => entry.Id == pvpTimeId);
+        if (pvpIndex < 0)
+            throw new InvalidDataException($"Theatre6 PVP time {pvpTimeId} has no schedule entry to scope.");
+        ActivityScheduleEntry productionWindow = schedules[pvpIndex];
+        long syntheticNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        schedules[pvpIndex] = productionWindow with
+        {
+            StartTime = syntheticNow - 86_400, EndTime = syntheticNow + 30 * 86_400, Source = "synthetic-test:Theatre6Pvp"
+        };
+        try
+        {
+            ValidateRequiemStoryAndGameplayChecks();
+            ValidateRequiemShopAndSkillChecks();
+            ValidateRequiemNativeBattleChecks();
+            ValidateRequiemBattleRelicRewardsChecks();
+            ValidateRequiemPvpChecks();
+            ValidateRequiemRewardShopChecks();
+            ValidateRequiemMissionProgressChecks();
+            ValidateRequiemJournalChecks();
+            ValidateRequiemTerminalRecoveryChecks();
+            ValidateRequiemReceiptWindowChecks();
+            ValidateRequiemDefenceHandoffChecks();
+        }
+        finally
+        {
+            schedules[pvpIndex] = productionWindow;
+        }
         Require(RequiemRequestNames.All(RequiemCalls.Contains),
             "Theatre6 requests not exercised: " + string.Join(", ", RequiemRequestNames.Except(RequiemCalls)));
         Require(RequiemRequestNames.All(RequiemSuccessfulCalls.Contains),
@@ -92,31 +116,27 @@ internal partial class Program
     private static Dictionary<string, object?> Req(params (string Key, object? Value)[] fields) =>
         fields.ToDictionary(field => field.Key, field => field.Value);
 
-    // Gate chain: Theatre6PvpActivity.TimeId -> EventCatalog.SkipId -> SkipFunctional.FunctionalId
-    // -> FunctionalOpen.Condition -> Condition type10101 level. Derived from the authored tables so
-    // no literal activity id can pin the wrong promotion.
+    // Gate chain, identical to the server's LoadAvailability: SkipFunctional(UiName XTheatre6) ->
+    // the FunctionalOpen whose condition is NOT Theatre6PvpConfig.UnlockPvpModeConditionId -> Condition
+    // type 10101 level; the season is Theatre6PvpActivity.TimeId. 4.8 moved the EventCatalog
+    // entry for skip 89102 (Activity 405 / ActivityBriefGroup 146) to TimeId 50947, so the catalog
+    // no longer shares the Phantom Clash season TimeId (48601) and is not part of the chain.
     private static (Theatre6PvpActivityTable Season, int TimeId, int RequiredLevel) RequiemGate()
     {
-        List<EventCatalogTable> catalog = TableReaderV2.Parse<EventCatalogTable>();
-        List<SkipFunctionalTable> skips = TableReaderV2.Parse<SkipFunctionalTable>();
         Dictionary<int, FunctionalOpenTable> functions = TableReaderV2.Parse<FunctionalOpenTable>().ToDictionary(row => row.Id);
         Dictionary<int, ConditionTable> conditions = TableReaderV2.Parse<ConditionTable>().ToDictionary(row => row.Id);
-        foreach (Theatre6PvpActivityTable season in TableReaderV2.Parse<Theatre6PvpActivityTable>().OrderBy(row => Convert.ToInt32(row.Id)))
-        {
-            List<EventCatalogTable> entries = catalog.Where(row => Convert.ToInt32(row.TimeId) == Convert.ToInt32(season.TimeId)).ToList();
-            if (entries.Count != 1)
-                continue;
-            List<SkipFunctionalTable> skipRows = skips
-                .Where(row => Convert.ToInt32(row.SkipId) == Convert.ToInt32(entries[0].SkipId) && Convert.ToInt32(row.FunctionalId) > 0)
-                .ToList();
-            if (skipRows.Count != 1 || !functions.TryGetValue(Convert.ToInt32(skipRows[0].FunctionalId), out FunctionalOpenTable? function))
-                continue;
-            if (function.Condition.Count != 1 || !conditions.TryGetValue(Convert.ToInt32(function.Condition[0]), out ConditionTable? condition))
-                continue;
-            if (Convert.ToInt32(condition.Type) != 10101 || condition.Params.Count != 1)
-                continue;
+        int pvpCondition = Convert.ToInt32(TableReaderV2.Parse<Theatre6PvpConfigTable>().Single(row => row.Key == "UnlockPvpModeConditionId").Values);
+        List<FunctionalOpenTable> baseFunctions = TableReaderV2.Parse<SkipFunctionalTable>()
+            .Where(row => row.UiName == "XTheatre6" && Convert.ToInt32(row.FunctionalId ?? 0) > 0)
+            .Select(row => Convert.ToInt32(row.FunctionalId)).Distinct()
+            .Where(functions.ContainsKey).Select(id => functions[id])
+            .Where(function => !function.Condition.Select(Convert.ToInt32).Contains(pvpCondition)).ToList();
+        Theatre6PvpActivityTable? season = TableReaderV2.Parse<Theatre6PvpActivityTable>()
+            .OrderBy(row => Convert.ToInt32(row.Id)).FirstOrDefault(row => Convert.ToInt32(row.TimeId) > 0);
+        if (season is not null && baseFunctions is [FunctionalOpenTable function] && function.Condition.Count == 1
+            && conditions.TryGetValue(Convert.ToInt32(function.Condition[0]), out ConditionTable? condition)
+            && Convert.ToInt32(condition.Type) == 10101 && condition.Params.Count == 1)
             return (season, Convert.ToInt32(season.TimeId), Convert.ToInt32(condition.Params[0]));
-        }
 
         throw new InvalidDataException("Theatre6 PVP activity has no authoritative gate chain in the tables.");
     }
@@ -157,16 +177,22 @@ internal partial class Program
             AssertEqual(true, authorized.PureAvailable(open), "Theatre6 projection authorizes the authored required level");
             JObject notify = authorized.Login();
             AssertEqual(baseActivity, notify.Value<int>("ActivityId"), "Theatre6 login snapshot carries the authored base activity");
+            // Login runs on the real clock: the season is authorized only while its authored window is open.
+            bool openNow = ActivityScheduleService.IsOpen(timeId, DateTimeOffset.UtcNow);
+            AssertEqual(openNow ? Convert.ToInt32(season.Id) : 0, authorized.State.Pvp.AuthorizedSeasonId,
+                "A level-eligible login authorizes the PVP season exactly while its authored window is open");
+            authorized.Reconcile(open);
             AssertEqual(Convert.ToInt32(season.Id), authorized.State.Pvp.AuthorizedSeasonId,
-                "A level-eligible login authorizes the authored PVP season id");
+                "A level-eligible account is authorized for the season inside its authored window");
 
             // Level-eligible is not admitted: the authored unlock condition (stage progress plus two
             // archives) is enforced by the Phantom Clash entry point, so a fresh account is
             // authorized but locked, and the refusal must not move any durable state.
             byte[] beforeLockedEntry = authorized.State.ToBson();
             JObject locked = authorized.Call("Theatre6PvpStartRequest", null, success: false);
-            AssertEqual(20427023, locked.Value<int>("Code"),
-                "An unadmitted Theatre6 account is refused with the authored ModeLocked code");
+            // EnsureSeason re-derives on the real clock: closed window -> NotOpen, open -> authored ModeLocked.
+            AssertEqual(openNow ? 20427023 : 20427001, locked.Value<int>("Code"),
+                "An unadmitted Theatre6 account is refused (ModeLocked in-window, NotOpen after the authored end)");
             AssertEqual(Convert.ToHexString(beforeLockedEntry), Convert.ToHexString(authorized.State.ToBson()),
                 "A locked Phantom Clash entry cannot mutate durable Theatre6 state");
             AssertEqual(true, authorized.State.Pvp.Battle is null, "An unadmitted Theatre6 account opens no battle");

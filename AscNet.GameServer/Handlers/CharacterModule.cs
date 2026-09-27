@@ -11,6 +11,7 @@ using AscNet.Table.V2.share.character.skill;
 using AscNet.Table.V2.share.fashion;
 using AscNet.Table.V2.share.item;
 using MessagePack;
+using AscNet.Table.V2.share.condition;
 
 namespace AscNet.GameServer.Handlers
 {
@@ -84,6 +85,18 @@ namespace AscNet.GameServer.Handlers
 
     [MessagePackObject(true)]
     public class CharacterLevelUpResponse
+    {
+        public int Code;
+    }
+
+    [MessagePackObject(true)]
+    public class CharacterUseOneClickItemRequest
+    {
+        public int CharacterId;
+    }
+
+    [MessagePackObject(true)]
+    public class CharacterUseOneClickItemResponse
     {
         public int Code;
     }
@@ -378,6 +391,107 @@ namespace AscNet.GameServer.Handlers
             SaveCharacterProgress(session);
 
             session.SendResponse(new CharacterLevelUpResponse(), packet.Id);
+        }
+
+        [RequestPacketHandler("CharacterUseOneClickItemRequest")]
+        public static void CharacterUseOneClickItemRequestHandler(Session session, Packet.Request packet)
+        {
+            CharacterUseOneClickItemRequest request = packet.Deserialize<CharacterUseOneClickItemRequest>();
+            CharacterData? character = session.character.Characters.Find(candidate => candidate.Id == request.CharacterId);
+            CharacterTable? template = TableReaderV2.Parse<CharacterTable>().Find(row => row.Id == request.CharacterId);
+            if (character is null || template is null || template.Type != 1)
+            {
+                session.SendResponse(new CharacterUseOneClickItemResponse { Code = 20009021 }, packet.Id);
+                return;
+            }
+            // The installed item table has one ordinary consumable: the Transition Device.
+            // Refuse ambiguous catalogs rather than consuming a different item.
+            int[] trainingItems = TableReaderV2.Parse<ItemTable>()
+                .Where(row => row.ItemType == (int)ItemType.NormalConsumableItem)
+                .Select(row => row.Id).Take(2).ToArray();
+            if (trainingItems.Length != 1)
+            {
+                session.SendResponse(new CharacterUseOneClickItemResponse { Code = 20009021 }, packet.Id);
+                return;
+            }
+            int trainingItemId = trainingItems[0];
+            if (!HasEnoughItems(session, trainingItemId, 1))
+            {
+                session.SendResponse(new CharacterUseOneClickItemResponse { Code = 20012004 }, packet.Id);
+                return;
+            }
+
+            int configuredMaxLevel = Character.characterLevelUpTemplates
+                .Where(row => row.Type == template.LevelUpTemplateId)
+                .Select(row => row.Level)
+                .DefaultIfEmpty()
+                .Max();
+            int maxGrade = TableReaderV2.Parse<CharacterGradeTable>()
+                .Where(row => row.CharacterId == request.CharacterId)
+                .Select(row => row.Grade)
+                .DefaultIfEmpty()
+                .Max();
+            if (configuredMaxLevel <= 0 || maxGrade <= 0)
+            {
+                session.SendResponse(new CharacterUseOneClickItemResponse { Code = 20009021 }, packet.Id);
+                return;
+            }
+
+            int targetLevel = Math.Max(character.Level, configuredMaxLevel);
+            CharacterData projected = new()
+            {
+                Level = targetLevel,
+                Quality = character.Quality,
+                Star = character.Star,
+                EnhanceSkillList = character.EnhanceSkillList
+            };
+            Dictionary<int, int> maxSkillLevels = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
+                .GroupBy(row => row.SkillId)
+                .ToDictionary(group => group.Key, group => group.Max(row => row.Level));
+            ILookup<int, CharacterSkillUpgradeTable> upgrades = TableReaderV2.Parse<CharacterSkillUpgradeTable>()
+                .ToLookup(row => row.SkillId);
+            HashSet<int> liberationConditions = TableReaderV2.Parse<ConditionTable>()
+                .Where(row => row.Type == 11102)
+                .Select(row => row.Id)
+                .ToHashSet();
+            List<(CharacterSkill Skill, int Level)> skillLevels = new();
+            foreach (CharacterSkill skill in character.SkillList)
+            {
+                int skillId = (int)skill.Id;
+                if (upgrades[skillId].Any(row => row.Level == 0
+                    && row.ConditionId.Any(liberationConditions.Contains)))
+                    continue;
+                int level = skill.Level;
+                int maximum = maxSkillLevels.GetValueOrDefault(skillId);
+                while (level < maximum)
+                {
+                    CharacterSkillUpgradeTable? upgrade = upgrades[skillId].FirstOrDefault(row => row.Level == level);
+                    if (upgrade is null
+                        || (upgrade.UseCoin.GetValueOrDefault() == 0 && upgrade.UseSkillPoint.GetValueOrDefault() == 0)
+                        || !Character.MeetsCharacterSkillCondition(projected, upgrade.ConditionId,
+                            session.player.GatherRewards, session.player.PlayerData.Level))
+                        break;
+                    level++;
+                }
+                if (level > skill.Level)
+                    skillLevels.Add((skill, level));
+            }
+
+            bool promoted = character.Grade < maxGrade;
+            character.Level = targetLevel;
+            character.Exp = 0;
+            character.Grade = Math.Max(character.Grade, maxGrade);
+            foreach ((CharacterSkill skill, int level) in skillLevels)
+                skill.Level = level;
+            session.character.UnlockQualityGatedSkills(character, session.player.GatherRewards);
+            Item spent = session.inventory.Do(trainingItemId, -1);
+            session.SendPush(new NotifyItemDataList { ItemDataList = { spent } });
+            session.SendPush(new NotifyCharacterDataList { CharacterDataList = { character } });
+            SaveCharacterProgress(session);
+            if (promoted)
+                TaskModule.RecordConditionType(session, 13206);
+            TaskModule.RecordTableDrivenProgress(session, [(11202, trainingItemId, 1)]);
+            session.SendResponse(new CharacterUseOneClickItemResponse(), packet.Id);
         }
 
         [RequestPacketHandler("CharacterSendGiftRequest")]

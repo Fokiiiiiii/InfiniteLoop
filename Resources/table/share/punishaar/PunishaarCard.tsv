@@ -1,0 +1,115 @@
+Id	Name	Desc	Type	ReleaseMode	Size	Color	EffectGroupId	Icon	IsShow	Order	Tag[1]	Tag[2]	DescParams[1]	DescParams[2]	DescParams[3]
+10001	Rosetta: Arete	· [Permanent] Adjacent unit to the right gains +{0} DMG.	1	0	1	1	196	Assets/Product/Texture/Image/Role/RoleHeadR4Luosaita2Q.png	1	1	3	6	30		
+10002	Bianca: Crepuscule	· [Permanent] Adjacent units' DMG +{0}.	1	0	1	1	197	Assets/Product/Texture/Image/Role/RoleHeadR5Bianka2Q.png	1	2	3	6	16		
+10003	Adelyde: Anabasis	· [Per Trigger] Adjacent units' DMG +{0}.	1	0	1	1	198	Assets/Product/Texture/Image/Role/RoleHeadR3Adelaide2Q.png	1	3	1	3	8		
+10004	Karenina: Effulgence	· [Permanent] Max cooldown -{0} for the adjacent unit to the left.	1	0	1	1	199	Assets/Product/Texture/Image/Role/RoleHeadR5Kalienina2Q.png	1	4	3	6	30%		
+10005	Selena: Pianissimo	· When any unit triggers, cooldown -{0}s.	1	0	1	1	200	Assets/Product/Texture/Image/Role/RoleHeadR5Sailinna2Q.png	1	5	1		0.5		
+10006	Veronica: Aegis	· [Per Trigger] All units to the right gain +{0} DMG.	1	0	2	1	201	Assets/Product/Texture/Image/Role/RoleHeadR3Weiluonika2Q.png	1	6	1	3	10		
+10007	Hanying: Solacetune	· [Per Trigger] Leftmost unit's DMG +{0}.	1	0	2	1	202	Assets/Product/Texture/Image/Role/RoleHeadR3Hanying2Q.png	1	7	1	3	20%		
+10008	Discord: Secator	· [Permanent] DMG +{0} when in the leftmost position.\n· [Tap to Cast]	1	1	1	1	203	Assets/Product/Texture/Image/Role/RoleHeadR2Xiezou2Q.png	1	8	3		5		
+10009	Yata: Fulgor	· [Permanent] Adjacent unit to the left gains +{0} DMG.\n· [Tap to Cast]	1	1	1	1	204	Assets/Product/Texture/Image/Role/RoleHeadR2Bazhi2Q.png	1	9	3	6	5		
+10010	Jetavie: Daybreak	· [Permanent] Adjacent units' DMG +{0}.\n· [Tap to Cast]	1	1	2	1	205	Assets/Product/Texture/Image/Role/RoleHeadR2Jietawei2Q.png	1	10	3	6	3		
+10011	Qu: Shukra	· No special effect.\n· [Tap to Cast]	1	1	1	1	313	Assets/Product/Texture/Image/Role/RoleHeadR3Qu2Q.png	1	11					
+10201	Buzzling	· Deals {0} hits of DMG.\n· [Multi-Hit] Deals multiple hits based on DMG value within a single trigger.	2	0	1	1	206	Assets/Product/Texture/Image/RolePartner/Pet3Signal1.png	1	13	1		3		
+10202	Noctiluca	· Deals {0} hits of DMG.\n· [Permanent] DMG +{1} when adjacent to any unit.\n· [Multi-Hit] Deals multiple hits based on DMG within a single trigger.	2	0	1	1	207	Assets/Product/Texture/Image/RolePartner/Pet3Jellyfish1.png	1	14	1	3	2	10	
+10203	Kelpie	· Deals {0} hits of DMG.\n· When an adjacent unit triggers, DMG +{1}.\n· [Multi-Hit] Deals multiple hits based on DMG within a single trigger.	2	0	1	1	208	Assets/Product/Texture/Image/RolePartner/Pet3Sailfish1.png	1	15	1	3	2	5	
+10204	Patrick	· No special effects.	2	0	2	1	209	Assets/Product/Texture/Image/RolePartner/Pet3Starfish1.png	1	16	2				
+10205	Snow Waltz	· Deals {0} hits of DMG.\n· [Per Trigger] Adjacent characters' cooldowns -{1}s.\n· [Multi-Hit] Deals multiple hits based on DMG within a single trigger.	2	0	2	1	210	Assets/Product/Texture/Image/RolePartner/Pet3Speaker1.png	1	17	1	3	3	0.5	
+10206	Scaled Rampart	· Deals {0} hits of DMG.\n· Hit count +{2} for every {1} adjacent Red Orb CUB(s).\n· [Multi-Hit] Deals multiple hits based on DMG within a single trigger.	2	0	3	1	211	Assets/Product/Texture/Image/RolePartner/Pet3Bladeshield1.png	1	18	1	6	4	1	1
+10207	Dreamwing	· When a battle starts, the first hit of DMG dealt is doubled.	2	0	3	1	212	Assets/Product/Texture/Image/RolePartner/Pet3Die1.png	1	19	2		1		
+10208	Jet Jaeger	· No special effect.\n· [Tap to Cast]	2	1	1	1	213	Assets/Product/Texture/Image/RolePartner/Pet3Hu.png	1	20					
+10209	Moonhopper	· No special effect.\n· [Tap to Cast]	2	1	2	1	214	Assets/Product/Texture/Image/RolePartner/Pet3Tu1.png	1	21					
+10210	Shimmer	· No special effect.\n· [Tap to Cast]	2	1	3	1	215	Assets/Product/Texture/Image/RolePartner/Pet3Yu1.png	1	22					
+10211	Huiyu	· Deals {0} hits of DMG.\n· [Multi-Hit] Deals multiple hits based on DMG value within a single trigger.\n· [Tap to Cast]	2	1	1	1	216	Assets/Product/Texture/Image/RolePartner/Pet3Peacock1.png	1	23	1		2		
+10212	Motorbolt	· Deals {0} hits of DMG.\n· [Multi-Hit] Deals multiple hits based on DMG value within a single trigger.\n· [Tap to Cast]	2	1	2	1	217	Assets/Product/Texture/Image/RolePartner/Pet3Motor1.png	1	24	1		2		
+10213	Toniris	· Deals {0} hits of DMG.\n· [Multi-Hit] Deals multiple hits based on DMG value within a single trigger.\n· [Tap to Cast]	2	1	3	1	218	Assets/Product/Texture/Image/RolePartner/Pet3He2.png	1	25	1		2		
+11001	Sinful Peak	· [Permanent] Associated character's orb generation +{0}, max cooldown +{1}.	3	0	1	1	219	Assets/Product/Texture/Image/IconSkill/R4Luosaita/R4Luosaitahong1.png	1	26	4		5	40%	
+11002	Twilight Judgment	· [Permanent] Associated character's DMG -{0}.\n· [Battle Start] Shield +{1}.\n· [Shield] Blocks 1 hit of DMG.	3	0	1	1	220	Assets/Product/Texture/Image/IconSkill/R5Biankahong1.png	1	27	4		5	4	
+11003	Remote Detonation	· [Permanent] Associated character's max cooldown -{0}.	3	0	1	1	221	Assets/Product/Texture/Image/IconSkill/R3Helentinehong1.png	1	28	6		30%		
+11004	Helm Awakened	· [Permanent] Associated character's orb generation +{0}, DMG +{1}.	3	0	1	1	222	Assets/Product/Texture/Image/IconSkill/R5Kalieninahong1.png	1	29	4	6	2	15	
+11005	Flaming Chord	· When any unit's cooldown is reduced, associated character's orb generation +{0}, this attack's DMG +{1}.	3	0	1	1	223	Assets/Product/Texture/Image/IconSkill/R5Sailinnahong1.png	1	30	1	6	1	5	
+11006	Raging Thornfire	· [Per Trigger] All Red Orb CUBs' cooldowns -{0}s.	3	0	1	1	224	Assets/Product/Texture/Image/IconSkill/R3Weiluonikahong1.png	1	31	1	6	0.7		
+11007	Shattered Melody	· [Per Trigger] Leftmost unit's DMG +{0}.	3	0	1	1	225	Assets/Product/Texture/Image/IconSkill/R3Hanyinghong1.png	1	32	1	3	15%		
+11201	Wave Drift	· [Permanent] Associated CUB's orb cost +{0}, max cooldown -{1}.	4	0	1	1	226	Assets/Product/Texture/Image/IconPetSkill/Pet3SignalSkillbeidong04.png	1	36	4	6	1	30%	
+11202	Luminous Stinger	· [Permanent] Associated CUB's orb cost +{0}, DMG +{1}.	4	0	1	1	227	Assets/Product/Texture/Image/IconPetSkill/Pet3JellyfishSkillbeidong04.png	1	37	4	6	1	25%	
+11203	Tidal Aftermath	· [Permanent] Associated CUB's orb cost +{0}, DMG +{1}.	4	0	1	1	228	Assets/Product/Texture/Image/IconPetSkill/Pet3SailfishSkillbeidong03.png	1	38	4	6	1	18	
+11204	Hunter's Halo	· [Permanent] Associated Red Orb CUB's hit count +{0}, DMG -{1}.	4	0	1	1	229	Assets/Product/Texture/Image/IconPetSkill/Pet3StarfishSkillbeidong04.png	1	39	1		1	20%	
+11205	Light and Shade	· [Per Trigger] All Red Orb CUBs' DMG +{0}.	4	0	1	1	230	Assets/Product/Texture/Image/IconPetSkill/Pet3SoundSkillbeidong04.png	1	40	1	6	2		
+11206	Searing Ember	· [Per Trigger] Associated CUB's DMG +{0}.	4	0	1	1	231	Assets/Product/Texture/Image/IconPetSkill/Pet3BladeshieldSkillbeidong04.png	1	41	1	6	6		
+11207	River Immortal	· [Permanent] Associated CUB's DMG +{0}, hit count +{1}, orb cost +{2}.	4	0	1	1	232	Assets/Product/Texture/Image/IconPetSkill/Pet3DieSkillbeidong04.png	1	42	2	6	10%	1	2
+20001	Kamui: Aeternion	· [Permanent] Adjacent CUB to the right costs {0} fewer orb(s).	1	0	1	3	233	Assets/Product/Texture/Image/Role/RoleHeadR4Shenwei2Q.png	1	87	3	4	2		
+20002	Vera: Geiravor	· [Permanent] Adjacent units' max cooldown -{0}.	1	0	1	3	234	Assets/Product/Texture/Image/Role/RoleHeadR4Weila2Q.png	1	88	3	6	15%		
+20003	Watanabe: Epitaph	· [Permanent] When the adjacent unit to the left triggers, restores {0} Blue Orb(s).	1	0	1	3	235	Assets/Product/Texture/Image/Role/RoleHeadR4Dubian2Q.png	1	89	3	4	3		
+20004	Nirvatia: Dirge	· [Permanent] Adjacent units' DMG +{0}.	1	0	1	3	236	Assets/Product/Texture/Image/Role/RoleHeadR3Nietiya2Q.png	1	90	3	6	30%		
+20005	Luna: Oblivion	· [Battle Start] Generates {0} Blue Orb(s), orb slot limit +{1}.	1	0	1	3	237	Assets/Product/Texture/Image/Role/RoleHeadR4Luna2Q.png	1	91	4		5	5	
+20006	Ishmael: Parhelion	· [Permanent] Adjacent CUBs' DMG +{0}. Restores {1} Blue Orb(s) when triggered.	1	0	2	3	238	Assets/Product/Texture/Image/Role/RoleHeadR3Cibeizhe2Q.png	1	92	3	6	30%	2	
+20007	Lee: Hyperreal	· [Permanent] Every {0} triggers of the adjacent unit to the left, that unit's next hit of DMG +{1}.\n· [Permanent] Max cooldown -{2}s for the unit to the left.	1	0	2	3	239	Assets/Product/Texture/Image/Role/RoleHeadR4Li2Q.png	1	93	3	6	2	60%	1.5
+20008	Liv: Empyrea	· [Permanent] DMG +{0} when in the rightmost position.\n· [Tap to Cast]	1	1	1	3	240	Assets/Product/Texture/Image/Role/RoleHeadR4Lifu3Q.png	1	94	3		10%		
+20009	Lucia: Pyroath	· [Permanent] Adjacent unit to the left gains +{0} DMG.\n· [Tap to Cast]	1	1	1	3	241	Assets/Product/Texture/Image/Role/RoleHeadR6Luxiya2Q.png	1	95	3	6	10%		
+20010	Sophia: Silverfang	· [Permanent] Adjacent units' DMG +{0}.\n· [Tap to Cast]	1	1	2	3	242	Assets/Product/Texture/Image/Role/RoleHeadSufeiya3Q.png	1	96	3	6	5%		
+20011	Lilith: Daemonissa	· No special effect.\n· [Tap to Cast]	1	1	1	3	314	Assets/Product/Texture/Image/Role/RoleHeadR3Lilith2Q.png	1	97					
+20201	Ignis	· Deals {0} hits of DMG.\n· When the adjacent unit to the right triggers, DMG +{1}.	2	0	1	3	243	Assets/Product/Texture/Image/RolePartner/Pet3Lion1.png	1	98	1	3	1	20%	
+20202	Wrathfang	· Deals {0} hits of DMG.\n· When an adjacent unit triggers, DMG +{1}.	2	0	1	3	244	Assets/Product/Texture/Image/RolePartner/Pet3Redwolf1.png	1	99	1	3	1	10%	
+20203	Shadow Wing	· Deals {0} hits of DMG.\n· When an adjacent unit triggers, reduces this card's current cooldown by {1}.	2	0	1	3	245	Assets/Product/Texture/Image/RolePartner/Pet3Bat1.png	1	100	1	3	1	20%	
+20204	Morigan	· Deals {0} hits of DMG.\n· Every {1} triggers, the adjacent CUB to the right deals {2} more DMG on the next hit.	2	0	2	3	246	Assets/Product/Texture/Image/RolePartner/Pet3Duya1.png	1	101	2	3	1	2	100%
+20205	Guardrake	· Deals {0} hits of DMG.\n· [Per Trigger] Adjacent Blue Orb CUB to the right gains +{1} DMG.	2	0	2	3	247	Assets/Product/Texture/Image/RolePartner/Pet3Dragon1.png	1	102	3	6	1	40%	
+20206	Diamaton	· Deals {0} hits of DMG.\n· [Per Trigger] DMG +{1}.	2	0	3	3	248	Assets/Product/Texture/Image/RolePartner/Pet3Pandora1.png	1	103	1	6	1	33%	
+20207	Punchy	· Deals {0} hits of DMG.\n· After every {1} attacks, the next hit deals +{2} DMG.	2	0	3	3	249	Assets/Product/Texture/Image/RolePartner/Pet3Quan1.png	1	104	2		1	2	300%
+20208	Hades Fangs	· No special effect.\n· [Tap to Cast]	2	1	1	3	250	Assets/Product/Texture/Image/RolePartner/Pet3Wolf1.png	1	105					
+20209	Corvus	· No special effect.\n· [Tap to Cast]	2	1	2	3	251	Assets/Product/Texture/Image/RolePartner/Pet3Raven1.png	1	106					
+20210	Yuan Ye	· No special effect.\n· [Tap to Cast]	2	1	3	3	252	Assets/Product/Texture/Image/RolePartner/RolePartnerPet2Niu2.png	1	107					
+20211	Noctua	· No special effect.\n· [Tap to Cast]	2	1	1	3	253	Assets/Product/Texture/Image/RolePartner/Pet3Xiao2.png	1	108					
+20212	Seeshell	· No special effect.\n· [Tap to Cast]	2	1	2	3	254	Assets/Product/Texture/Image/RolePartner/Pet2Bei1.png	1	109					
+20213	Frost Oath	· No special effect.\n· [Tap to Cast]	2	1	3	3	255	Assets/Product/Texture/Image/RolePartner/Pet3Ma1.png	1	110					
+21001	Heartfall	· [Permanent] Associated character's orb generation +{0}, max cooldown -{1}.	3	0	1	3	256	Assets/Product/Texture/Image/IconSkill/R4Shenweilan1.png	1	111	4	6	2	30%	
+21002	Scorching Sweep	· [Permanent] Associated character's orb generation -{0}.\n· [Battle Start] Shield +{1}.\n· [Shield] Blocks 1 hit of DMG.	3	0	1	3	257	Assets/Product/Texture/Image/IconSkill/R4Weilalan1.png	1	112	4		3	4	
+21003	Fiery Glimpse	· [Permanent] Max orb slots +{0}; associated character's max cooldown -{1}.	3	0	1	3	258	Assets/Product/Texture/Image/IconSkill/R4Dubianlan1.png	1	113	4		5	40%	
+21004	Burial Rites	· [Battle Start] Immediately generates {0} Blue Orb(s); all Blue Orb CUBs' cooldown -{1}	3	0	1	3	259	Assets/Product/Texture/Image/IconSkill/R3Nietiyalan1.png	1	114	4	5	10	30%	
+21005	Waning Trajectory	· When any unit triggers, the next trigger generates {0} additional orb(s), DMG +{1}.	3	0	1	3	260	Assets/Product/Texture/Image/IconSkill/R4Lunalan1.png	1	115	4	6	2	5	
+21006	Celestial Aria	· [Battle Start] Adjacent Blue Orb CUBs' cooldowns -{0}, DMG +{1}.	3	0	1	3	261	Assets/Product/Texture/Image/IconSkill/R3Cibeizhelan1.png	1	116	2	3	30%	30	
+21007	Falling Blast	· [Battle Start] All Blue Orb CUBs' next hit of DMG +{0}.	3	0	1	3	262	Assets/Product/Texture/Image/IconSkill/R4Lianglan1.png	1	117	2	3	100%		
+21201	Solar Rupture	· [Permanent] Associated CUB's orb cost -{0}, DMG +{1}.	4	0	1	3	263	Assets/Product/Texture/Image/IconPetSkill/Pet3GoldenLionSkillbeidong04.png	1	125	4	6	4	20%	
+21202	Jagged Assault	· [Permanent] Associated CUB's DMG +{0}.	4	0	1	3	264	Assets/Product/Texture/Image/IconPetSkill/Pet3RedwolfSkillbeidong04.png	1	126	2	6	50%		
+21203	Propelled Incineration	· [Battle Start] Restores {0} Blue Orb(s), next hit of DMG +{1}.	4	0	1	3	265	Assets/Product/Texture/Image/IconPetSkill/Pet3BatSkillbeidong04.png	1	127	2	4	5	150%	
+21204	Soultether	· [Battle Start] Next hit of DMG +{0}.	4	0	1	3	266	Assets/Product/Texture/Image/IconPetSkill/Pet3CrowSkillbeidong04.png	1	128	2		200%		
+21205	Dark Nihility	· [Battle Start] Cooldown -{0}; the next hit of DMG costs no orbs.	4	0	1	3	267	Assets/Product/Texture/Image/IconPetSkill/Pet3DragonSkillbeidong04.png	1	129	2	4	100%		
+21206	Union of Life	· [Permanent] Costs {0} extra orbs; associated CUB's max cooldown -{1}.	4	0	1	3	268	Assets/Product/Texture/Image/IconPetSkill/Pet3PandoraSkillbeidong04.png	1	130	1	4	3	40%	
+21207	Flame Blast	· [Permanent] Costs {0} extra orbs; associated CUB's DMG +{1}.	4	0	1	3	269	Assets/Product/Texture/Image/IconPetSkill/Pet3QuanSkillbeidong04.png	1	131	2	4	4	100%	
+30001	Lucia: Inverse Crown	· [Per Trigger] Adjacent units' cooldowns -{0}s.	1	0	1	2	270	Assets/Product/Texture/Image/Role/RoleHeadR7Luxiya2Q.png	1	43	5	3	1.5		
+30002	Teddy: Spectre	· When any unit triggers, cooldown -{0}s.	1	0	1	2	271	Assets/Product/Texture/Image/Role/RoleHeadR3Buouxiong2Q.png	1	44	5		1		
+30003	Wanshi: Lucid Dreamer	· When any unit's cooldown is reduced, current orb generation +{0}.	1	0	1	2	353	Assets/Product/Texture/Image/Role/RoleHeadR3Wanshi2Q.png	1	45	5	4	2		
+30004	Liv: Limpidity	· [Per Trigger] Cooldown -{0}s for the adjacent unit to the left.	1	0	1	2	273	Assets/Product/Texture/Image/Role/RoleHeadR5Lifu2Q.png	1	46	5	3	2.5		
+30005	Helentine: Lacrimosa	· When any unit triggers, cooldown -{0}s.	1	0	1	2	274	Assets/Product/Texture/Image/Role/RoleHeadR3Helentine2Q.png	1	47	5		2		
+30006	Nanami: Startrail	· When the adjacent unit to the right triggers, this unit's current cooldown -{0}.	1	0	2	2	275	Assets/Product/Texture/Image/Role/RoleHeadR6Yongyechao2Q.png	1	48	5	3	100%		
+30007	Alisa: Echo	· [Per Trigger] The rightmost unit's cooldown -{0}.	1	0	2	2	276	Assets/Product/Texture/Image/Role/RoleHeadR3Yalisha2Q.png	1	49	5	3	100%		
+30008	Haicma: Starveil	· [Permanent] Max cooldown -{0} when in the rightmost position.\n· [Tap to Cast]	1	1	1	2	277	Assets/Product/Texture/Image/Role/RoleHeadHakama3Qnew.png	1	50	3		25%		
+30009	Ayla: Kaleido	· [Permanent] Max cooldown -{0} for the adjacent unit to the right.\n· [Tap to Cast]	1	1	1	2	278	Assets/Product/Texture/Image/Role/RoleHeadR3Aila2Q.png	1	51	3	6	20%		
+30010	Roland: Flambeau	· [Permanent] Max cooldown -{0} for adjacent units.\n· [Tap to Cast]	1	1	2	2	279	Assets/Product/Texture/Image/Role/RoleHeadR2Luolan3Q.png	1	52	3	6	10%		
+30011	Lamia: Lost Lullaby	· [Permanent] Max cooldown -{1} for {0} units to the right.\n· [Tap to Cast]	1	1	1	2	312	Assets/Product/Texture/Image/Role/RoleHeadR3Lamiya2Q.png	1	53	3	6	2	10%	
+30201	Allos	· Inflicts [DoT].\n· [Per Trigger] Reduces adjacent units' current cooldowns by {0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	1	2	280	Assets/Product/Texture/Image/RolePartner/Pet3Motordragon1.png	1	54	5	3	30%	1	
+30202	Pop	· Inflicts [DoT].\n· [Per Trigger] Reduces the adjacent unit to the right's cooldown by {0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	1	2	281	Assets/Product/Texture/Image/RolePartner/Pet3Elecpanda1.png	1	55	5	3	30%	1	
+30203	Snowveil	· Inflicts [DoT].\n· Whenever any unit's cooldown is reduced, DMG +{0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	1	2	282	Assets/Product/Texture/Image/RolePartner/Pet3Fox1.png	1	56	5	6	1	1	
+30204	Levvi	· Inflicts [DoT].\n· [Per Trigger] Reduces adjacent Yellow Orb CUBs' current cooldowns by {0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	2	2	283	Assets/Product/Texture/Image/RolePartner/Pet3Wuya1.png	1	57	5	3	15%	1	
+30205	Grand Duke	· Inflicts [DoT].\n· Whenever any unit's cooldown is reduced, reduces this card's current cooldown by {0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	2	2	284	Assets/Product/Texture/Image/RolePartner/Pet3Chandelier1.png	1	58	5		30%	1	
+30206	Bramble Angler	· Inflicts [DoT].\n· When an adjacent CUB triggers, reduces this card's current cooldown by {0}.\n· [DoT] Deals {1} hit(s) of DMG per second and can stack.	2	0	3	2	285	Assets/Product/Texture/Image/RolePartner/Pet3Anglerfish1.png	1	59	5	3	50%	1	
+30207	Dawn Chorus	· Inflicts [DoT].\n· When this card's cooldown is reduced, the next hit's DMG is doubled.\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.	2	0	3	2	286	Assets/Product/Texture/Image/RolePartner/Pet3Griffon1.png	1	60	5	6	1		
+30208	Lingya	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	1	2	287	Assets/Product/Texture/Image/RolePartner/Pet2Yang1.png	1	61			1		
+30209	Rainbow	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	2	2	288	Assets/Product/Texture/Image/RolePartner/Pet3Wuzei1.png	1	62			1		
+30210	Thorny	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	3	2	289	Assets/Product/Texture/Image/RolePartner/Pet2Ciwei.png	1	63			1		
+30211	Cetus	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	1	2	290	Assets/Product/Texture/Image/RolePartner/Pet3Dolphin1.png	1	64			1		
+30212	Billie	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	2	2	291	Assets/Product/Texture/Image/RolePartner/Pet3Chiprobot1.png	1	65			1		
+30213	Nitor	· Inflicts [DoT].\n· [DoT] Deals {0} hit(s) of DMG per second and can stack.\n· [Tap to Cast]	2	1	3	2	292	Assets/Product/Texture/Image/RolePartner/Pet3Mao1.png	1	66			1		
+31001	Dusklit Severance	· [Permanent] Associated units' orb generation +{0}, DMG +{1}.	3	0	1	2	293	Assets/Product/Texture/Image/IconSkill/R7Luxiyahuang1.png	1	67	4		3	8	
+31002	Ultra Bass Reverb	· [Permanent] Associated unit's max cooldown +{0}s.\n· [Battle Start] Shield +{1}.\n· [Shield] Blocks 1 hit of DMG.	3	0	1	2	294	Assets/Product/Texture/Image/IconSkill/R3Buouxionghuang1.png	1	68	4		2	4	
+31003	Strigine Assault	· [Battle Start] All units' cooldowns -{0}.	3	0	1	2	295	Assets/Product/Texture/Image/IconSkill/R3Wanshihuang1.png	1	69	5	6	50%		
+31004	Scattered Delusion	· [Per Trigger] Adjacent units' next hit of DMG +{0}.	3	0	1	2	296	Assets/Product/Texture/Image/IconSkill/R5Lifuhuang1.png	1	70	3	6	10		
+31005	Withered Cycle	· [Per Trigger] Adjacent units' cooldowns -{0}s.	3	0	1	2	297	Assets/Product/Texture/Image/IconSkill/R3Helentinehuang1.png	1	71	5	3	1.5		
+31006	Starbeam Deconstruction	· [Per Trigger] All units' cooldowns -{0}s.	3	0	1	2	298	Assets/Product/Texture/Image/IconSkill/R5Yongyechaohuang1.png	1	72	5	1	0.5		
+31007	Cosmic Descent	· [Per Trigger] Associated unit has a {0} chance to trigger again. Can trigger multiple times.	3	0	1	2	299	Assets/Product/Texture/Image/IconSkill/R3Yalishahuang1.png	1	73	5	1	40%		
+31201	Glacial Embers	· [Permanent] Adjacent Yellow Orb characters' max cooldowns -{0}.	4	0	1	2	300	Assets/Product/Texture/Image/IconPetSkill/Pet3MotordragonSkillbeidong04.png	1	74	3		30%		
+31202	Photon-Cooling Cycle	· [Permanent] Adjacent Yellow Orb CUBs' DMG +{0}.	4	0	1	2	301	Assets/Product/Texture/Image/IconPetSkill/Pet3PandaSkillbeidong04.png	1	75	3	6	5		
+31203	Lucent Heart	· [Per Trigger] Adjacent Yellow Orb CUBs' cooldowns -{0}s.	4	0	1	2	302	Assets/Product/Texture/Image/IconPetSkill/Pet3FoxSkillbeidong04.png	1	76	5	3	3		
+31204	Azure Blessing	· [Permanent] Associated CUB's DMG +{0}.	4	0	1	2	303	Assets/Product/Texture/Image/IconPetSkill/Pet3WuyaSkillbeidong04.png	1	77	6		10		
+31205	Fluorite Dispersion	· When the associated CUB's cooldown is reduced, current orb cost -{0}.	4	0	1	2	304	Assets/Product/Texture/Image/IconPetSkill/Pet3ChandelierSkillbeidong04.png	1	78	5	4	3		
+31206	Cosmic Flame Rift	· Each time the associated CUB's cooldown is reduced, DMG +{0}.	4	0	1	2	305	Assets/Product/Texture/Image/IconPetSkill/Pet3AnglerfishSkillbeidong04.png	1	79	5	6	4		
+31207	Free Soaring	· Each time any unit's cooldown is reduced, the associated CUB's DMG +{0}	4	0	1	2	306	Assets/Product/Texture/Image/IconPetSkill/Pet3GriffonSkillbeidong04.png	1	80	5	6	2		

@@ -529,6 +529,11 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             StageTable? stageTable = ResolveStageTable(req.PreFightData.StageId, out bool isCurrentStudyStage);
+            if (TransfiniteTowerModule.ApplyPreFight(session, req.PreFightData, out int towerCode) && towerCode != 0)
+            {
+                session.SendResponse(new PreFightResponse { Code = towerCode }, packet.Id);
+                return;
+            }
             if (stageTable is null
                 && !BossModule.IsStage(req.PreFightData.StageId)
                 && !BossInshotModule.IsStage(req.PreFightData.StageId)
@@ -693,7 +698,8 @@ namespace AscNet.GameServer.Handlers
                     ? validRequestedRobotIds
                     : configuredStudyRobotIds.ToList();
             }
-            else if (BossInshotModule.IsStage(req.PreFightData.StageId))
+            else if (BossInshotModule.IsStage(req.PreFightData.StageId)
+                || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId))
             {
                 robotIds = requestedRobotIds;
             }
@@ -774,7 +780,9 @@ namespace AscNet.GameServer.Handlers
 
             int deployedCharacterCount = playerNpcData.Count;
             if (robotIds.Count > 0
-                && (stageTable is null || req.PreFightData.CardIds is null || deployedCharacterCount == 0 || (deployedCharacterCount + robotIds.Count) == 3))
+                && (stageTable is null || req.PreFightData.CardIds is null || deployedCharacterCount == 0
+                    || deployedCharacterCount + robotIds.Count == 3
+                    || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId)))
             {
                 int npcKey = 0;
                 foreach (var robotId in robotIds)
@@ -816,7 +824,9 @@ namespace AscNet.GameServer.Handlers
                 foreach (var magic in BuildObservationMagicIds(deployedCharacters, (CharacterData)npc.Character))
                     magicIds[magic.Key] = magic.Value;
             }
+            // xfuben/XFubenAgency.lua:1062 nils PreFightData.GeneralSkill for Stage.IsBanGeneralSkill stages.
             if (req.PreFightData.GeneralSkill > 0
+                && Convert.ToInt32(stageTable?.IsBanGeneralSkill) == 0
                 && IsValidGeneralSkill(req.PreFightData.GeneralSkill, deployedCharacters))
             {
                 rsp.FightData.EventIds.Add(GeneralSkillFightEventId(req.PreFightData.GeneralSkill));
@@ -850,6 +860,12 @@ namespace AscNet.GameServer.Handlers
             {
 
                 rsp.Code = transfiniteCommitCode;
+                session.SendResponse(rsp, packet.Id);
+                return;
+            }
+            if (!TransfiniteTowerModule.TryCommitPreFight(session, req.PreFightData, rsp.FightData, out int towerCommitCode))
+            {
+                rsp.Code = towerCommitCode;
                 session.SendResponse(rsp, packet.Id);
                 return;
             }
@@ -987,17 +1003,14 @@ namespace AscNet.GameServer.Handlers
             IEnumerable<CharacterData> team,
             CharacterData observer)
         {
-            // Native XEnumConst.CHARACTER values, also defined by CharacterCareer/CharacterElement.
-            const int tank = 2, support = 3, amplifier = 5, observation = 7, breaker = 8;
-            const int physical = 1, nihil = 6;
+            const int observation = 7, physical = 1;
             List<CharacterTable> characters = TableReaderV2.Parse<CharacterTable>();
             if (characters.Find(row => row.Id == observer.Id)?.Career != observation)
                 return [];
 
-            int observerCount = 0;
-            int physicalCount = 0;
-            int candidateCount = 0;
-            CharacterTable? candidate = null;
+            List<CharacterObsTransformTable> transforms = TableReaderV2.Parse<CharacterObsTransformTable>();
+            int observerCount = 0, physicalCount = 0, configuredCareerCount = 0, matchedCount = 0;
+            int activeCareer = 0, activeElement = 0;
             bool observerDeployed = false;
             foreach (CharacterData member in team)
             {
@@ -1008,27 +1021,25 @@ namespace AscNet.GameServer.Handlers
                 {
                     observerCount++;
                     observerDeployed |= member.Id == observer.Id;
+                    continue;
                 }
-                else if (character.Element == physical)
+                if (character.Element == physical)
                     physicalCount++;
-                else if (character.Career is tank or support or amplifier or breaker)
+                if (transforms.Any(row => row.SourceCareer == character.Career))
+                    configuredCareerCount++;
+                CharacterObsTransformTable? match = transforms.Find(row =>
+                    row.SourceCareer == character.Career && row.SourceElement == character.Element);
+                if (character.Element != physical && match is { TransformCareer: > 0 })
                 {
-                    candidateCount++;
-                    candidate = character;
+                    matchedCount++;
+                    activeCareer = match.TransformCareer;
+                    activeElement = character.Element;
                 }
             }
 
             if (!observerDeployed || observerCount != 1 || physicalCount > 1
-                || candidateCount != 1 || candidate is null)
+                || configuredCareerCount >= 2 || matchedCount != 1)
                 return [];
-
-            int activeElement = candidate.Element;
-            int activeCareer = candidate.Career is tank or breaker
-                ? amplifier
-                : (candidate.Career == amplifier && activeElement == nihil)
-                    || characters.Any(row => row.Element == activeElement && row.Career == breaker)
-                    ? breaker
-                    : tank;
 
             Dictionary<int, int> magicIds = new();
             List<CharacterObsTriggerMagicTable> configs = TableReaderV2.Parse<CharacterObsTriggerMagicTable>();
@@ -1699,8 +1710,18 @@ namespace AscNet.GameServer.Handlers
                 }
             }
 
+            if (!TeamPrefabPlanKeepsWeaponsEquipped(session.character, equipPlan))
+            {
+                session.log.Warn(
+                    $"TeamPrefabApply rejected TeamId={teamPrefab.TeamId}: a preset weapon transfer " +
+                    "has no replacement weapon to hand back");
+                SendInvalidTeamPrefabApplyResponse(session, packet.Id);
+                return;
+            }
+
+            HashSet<uint> affectedEquipIds = [];
             foreach ((int characterId, EquipData equip, _) in equipPlan)
-                ApplyTeamPrefabEquip(session.character, characterId, equip);
+                ApplyTeamPrefabEquip(session.character, characterId, equip, affectedEquipIds);
 
             HashSet<int> targetCharacterIds = teamPrefab.TeamData.Values
                 .Where(characterId => characterId > 0)
@@ -1758,6 +1779,10 @@ namespace AscNet.GameServer.Handlers
                     .ToList(),
                 OperateTypes = carryChanged ? [2, 3] : [2]
             });
+            session.SendPush(new NotifyEquipDataList
+            {
+                EquipDataList = session.character.Equips.Where(equip => affectedEquipIds.Contains(equip.Id)).ToList()
+            });
             session.SendResponse(new TeamPrefabApplyRequestResponse(), packet.Id);
         }
 
@@ -1771,7 +1796,8 @@ namespace AscNet.GameServer.Handlers
         private static void ApplyTeamPrefabEquip(
             AscNet.Common.Database.Character character,
             int characterId,
-            EquipData selectedEquip)
+            EquipData selectedEquip,
+            HashSet<uint> affectedEquipIds)
         {
             EquipTable selectedRow = EquipRowsById.Value[selectedEquip.TemplateId];
             int previousCharacterId = selectedEquip.CharacterId;
@@ -1781,9 +1807,56 @@ namespace AscNet.GameServer.Handlers
                 && EquipRowsById.Value.TryGetValue(candidate.TemplateId, out EquipTable? candidateRow)
                 && candidateRow.Site == selectedRow.Site);
             if (previousEquip is not null)
+            {
                 previousEquip.CharacterId = selectedRow.Site == 0 ? previousCharacterId : 0;
+                affectedEquipIds.Add(previousEquip.Id);
+            }
 
             selectedEquip.CharacterId = characterId;
+            affectedEquipIds.Add(selectedEquip.Id);
+        }
+
+        // ApplyTeamPrefabEquip assigns a weapon to the preset's character and hands the weapon it
+        // displaces back to the incoming weapon's previous owner (site 0 only; every other site goes to
+        // the inventory). Replay those ownership changes on a simulated map before mutating anything and
+        // reject the whole preset when a worn weapon would move to a character with no weapon of that
+        // slot to hand back: the pushed snapshot clears the weapon's previous slot and never reinstalls a
+        // spare, so that state would leave the client without a weapon preview.
+        private static bool TeamPrefabPlanKeepsWeaponsEquipped(
+            AscNet.Common.Database.Character character,
+            IReadOnlyList<(int CharacterId, EquipData Equip, TeamPrefabEquipEntry Preset)> equipPlan)
+        {
+            Dictionary<uint, int> ownerByEquipId = new();
+            foreach (EquipData equip in character.Equips)
+            {
+                if (EquipRowsById.Value.TryGetValue(equip.TemplateId, out EquipTable? row) && row.Site == 0)
+                    ownerByEquipId[equip.Id] = equip.CharacterId;
+            }
+
+            foreach ((int characterId, EquipData equip, _) in equipPlan)
+            {
+                if (!EquipRowsById.Value.TryGetValue(equip.TemplateId, out EquipTable? selectedRow)
+                    || selectedRow.Site != 0
+                    || !ownerByEquipId.TryGetValue(equip.Id, out int previousCharacterId))
+                {
+                    continue;
+                }
+
+                EquipData? displacedEquip = character.Equips.FirstOrDefault(candidate =>
+                    candidate.Id != equip.Id
+                    && EquipRowsById.Value.TryGetValue(candidate.TemplateId, out EquipTable? candidateRow)
+                    && candidateRow.Site == 0
+                    && ownerByEquipId.TryGetValue(candidate.Id, out int candidateOwner)
+                    && candidateOwner == characterId);
+                if (previousCharacterId > 0 && previousCharacterId != characterId && displacedEquip is null)
+                    return false;
+
+                ownerByEquipId[equip.Id] = characterId;
+                if (displacedEquip is not null)
+                    ownerByEquipId[displacedEquip.Id] = previousCharacterId;
+            }
+
+            return true;
         }
 
         internal static IReadOnlyList<EquipData> BuildTeamPrefabFightEquips(
@@ -2550,6 +2623,12 @@ namespace AscNet.GameServer.Handlers
                         return;
                     }
                     uint stageId = ResolveFightSettleStageId(session, req);
+                    if (TransfiniteTowerModule.TrySettle(session, req.Result, stageId, out FightSettleResponse towerFailedResponse))
+                    {
+                        session.fight = null;
+                        session.SendResponse(towerFailedResponse, packet.Id);
+                        return;
+                    }
                     session.log.Warn($"Recovered failed fight settlement with malformed optional telemetry for stage {stageId}.");
                     ClearFailedFightSettle(session);
                     session.SendResponse(BuildFailedFightSettleResponse(stageId, req), packet.Id);
@@ -2644,6 +2723,13 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             StageTable? stageTable = ResolveStageTable(req.Result.StageId, out _);
+            uint responseStageId = ResolveFightSettleStageId(session, req);
+            if (TransfiniteTowerModule.TrySettle(session, req.Result, responseStageId, out FightSettleResponse towerResponse))
+            {
+                session.fight = null;
+                session.SendResponse(towerResponse, packet.Id);
+                return;
+            }
             if (stageTable is null
                 && !BossModule.IsStage(req.Result.StageId)
                 && !BossInshotModule.IsStage(req.Result.StageId)
@@ -2659,7 +2745,6 @@ namespace AscNet.GameServer.Handlers
                 req.Result.StageId,
                 (int)session.player.PlayerData.Level);
             int challengeCount = session.fight?.PreFight.PreFightData.ChallengeCount ?? 1;
-            uint responseStageId = ResolveFightSettleStageId(session, req);
             ExploreModule.TrySettle(session, req.Result);
             StageDatum? previousStageData = session.stage?.Stages.TryGetValue(responseStageId, out StageDatum? existingStageData) == true ? existingStageData : null;
             StageDatum? previousSourceStageData = responseStageId == req.Result.StageId
@@ -3059,6 +3144,8 @@ namespace AscNet.GameServer.Handlers
             }
             session.fight = null;
             session.SendPush(new NotifyStageData() { StageList = new() { stageData } });
+            if (isFirstClear)
+                AccountModule.PushNewlyFinishedExperiments(session, stageData.StageId);
             if (unlockStagesBefore is not null && unlockStagesAfter is not null)
             {
                 foreach (object hiddenStageId in unlockStagesAfter)

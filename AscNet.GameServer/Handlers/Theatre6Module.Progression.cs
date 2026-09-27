@@ -397,7 +397,7 @@ internal static partial class Theatre6Module
 
             TriggerEffects(mutation, run, TriggerChoice, amount: 1, parameter: request.SelectType);
             // Permanent missions: one settled choice resolution (condition 136004 counters 140125-127/140215-217).
-            RecordMetaProgress(mutation, "Choice");
+            RecordMetaProgress(mutation, "Choice", value: 1, parameter: 0, characterId: 0);
 
             // A choice can end the run: the branch rewards and their buff effects spend sanity/vitality. The terminal
             // boundary runs here, before this response advertises another offer, and Core's settled-run gate then
@@ -676,8 +676,9 @@ internal static partial class Theatre6Module
             MonsterId = room.SelectedMonsterId
         });
 
-        // Permanent missions count completed battles regardless of outcome (condition 136005, parameter 3).
-        RecordMetaProgress(m, "Battle", 1, parameter: 3);
+        // Permanent missions count completed battles regardless of outcome (condition 136005, parameter 3), and
+        // 136012 per run archive character (Theatre6Character id, e.g. 5 Nirvatia for 140351-140353).
+        RecordMetaProgress(m, "Battle", value: 1, parameter: 3, characterId: run.File.CharacterId);
 
         // Battle-counted buffs decrement at the fight boundary, before this fight's loot is granted.
         TickEffects(m, run, "fight");
@@ -793,7 +794,7 @@ internal static partial class Theatre6Module
         task.GoodsState = TaskStateAchieved;
         task.ConditionState = TaskStateAchieved;
         TriggerEffects(m, run, TriggerTaskFinish, amount: 1);
-        RecordMetaProgress(m, "Task");
+        RecordMetaProgress(m, "Task", value: 1, parameter: 0, characterId: 0);
     }
 
     /// <summary>Terminal boundary: freezes the settlement and pushes it. Returns the frozen settlement.</summary>

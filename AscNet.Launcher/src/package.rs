@@ -90,6 +90,23 @@ pub fn refresh_supported_client(directory: &Path, source: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Preflight before setup: the bundled metadata must accept the game's unpatched binaries.
+pub fn check_supported_client(source: &Path, game: &Path) -> Result<()> {
+    let metadata = parse_supported_client(&read_bounded(source, MAX_METADATA_BYTES)?)
+        .context("invalid bundled supported-client.json")?;
+    for path in ["PGR.exe", "GameAssembly.dll"] {
+        let hash = sha256_file(&game.join(path)).ok();
+        if !metadata.originals.get(path).is_some_and(|allowed| hash.as_ref().is_some_and(|h| allowed.contains(h))) {
+            bail!("{}", unsupported_client(&metadata.application_version, path));
+        }
+    }
+    Ok(())
+}
+
+pub fn unsupported_client(application_version: &str, path: &str) -> String {
+    format!("{path} is not the supported {application_version} client — update the game if it is older, or the launcher if the game is newer")
+}
+
 fn parse_supported_client(bytes: &[u8]) -> Result<SupportedClient> {
     let metadata: SupportedClient =
         serde_json::from_slice(bytes).context("invalid supported-client.json")?;
@@ -354,6 +371,26 @@ mod tests {
     }
 
     #[test]
+    fn setup_preflight_rejects_unsupported_client_with_version_guidance() {
+        let root = package();
+        let game = root.join("game");
+        fs::create_dir(&game).unwrap();
+        fs::write(game.join("PGR.exe"), b"exe").unwrap();
+        fs::write(game.join("GameAssembly.dll"), b"asm").unwrap();
+        let metadata = root.join("supported-client.json");
+        let error = check_supported_client(&metadata, &game).unwrap_err().to_string();
+        assert_eq!(error, "PGR.exe is not the supported 4.7.0 client — update the game if it is older, or the launcher if the game is newer");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&metadata).unwrap()).unwrap();
+        value["originals"]["PGR.exe"] = serde_json::json!([sha256_file(&game.join("PGR.exe")).unwrap()]);
+        fs::write(&metadata, serde_json::to_vec(&value).unwrap()).unwrap();
+        assert!(check_supported_client(&metadata, &game).unwrap_err().to_string().starts_with("GameAssembly.dll is not"));
+        value["originals"]["GameAssembly.dll"] = serde_json::json!([sha256_file(&game.join("GameAssembly.dll")).unwrap()]);
+        fs::write(&metadata, serde_json::to_vec(&value).unwrap()).unwrap();
+        check_supported_client(&metadata, &game).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn local_package_is_constructed_and_payload_changes_are_detected() {
         let root = package();
         let package = load_package(&root).unwrap();
@@ -374,8 +411,8 @@ mod tests {
         .unwrap();
         let package = load_package(&root).unwrap();
         for hash in [
-            "036b2f823e89465cd0542c7736e9d763ef880d9a791c19d412dfe1f4d8fd5ed0",
-            "7dbdbc91ea9952b3e1d37b65817152326287c36e1cf82f6a83ad33d37c5d5eab",
+            "910a2988f5819641ba3d0b5fcbcb8659e088b5899e7f3b22f4098efcfe1c4d5e",
+            "ea70a4d72cd11fd9cfdaf9408ae79ab7e926ed1da8593a6d3c62db8f1283dbbd",
         ] {
             assert!(package.manifest.accepts_original("GameAssembly.dll", Some(hash)));
             assert!(!package.manifest.accepts_original("PGR.exe", Some(hash)));

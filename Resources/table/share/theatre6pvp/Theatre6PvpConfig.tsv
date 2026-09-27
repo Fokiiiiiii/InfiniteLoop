@@ -11,7 +11,7 @@ MaxBattleRecordCount	Maximum Battle Log Count	10
 DlcFightWorldId	DLC Fight WorldId	202
 FightExpireDuration	Combat Timeout (Seconds)	86400
 RestartFightTimesLimit	Max Re-entry Attempts	3
-ActionPointInit	体力初始值	6
-ActionPointPerCost	体力单次消耗值	1
+ActionPointInit	Initial Stamina	6
+ActionPointPerCost	Stamina cost per use	1
 RefreshMatchPeriodSeconds	Refresh Time Interval Duration	60
 RefreshMatchMaxCountPerPeriod	Refresh Count Within Interval	5

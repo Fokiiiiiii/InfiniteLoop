@@ -40,9 +40,13 @@ def normalized_name(value: str) -> str:
 
 
 def _rows(source: Path, relative: str, region: str = "en") -> list[dict[str, Any]]:
-    value = json.loads((source / region / "bytes" / relative).read_text())
-    if not isinstance(value, list):
-        raise ValueError(f"{region}/bytes/{relative}: expected a JSON array")
+    path = source / relative if (source / relative).is_file() else source / region / "bytes" / relative
+    if not path.is_file() and (source / "client/activity/Activity.json").is_file():
+        # Installed bundles omit some unchanged table assets; retain the last exported corpus.
+        path = source.resolve().parents[2].parent / "PGR_Data" / region / "bytes" / relative
+    value = json.loads(path.read_text())
+    if not isinstance(value, list) or not all(isinstance(row, dict) for row in value):
+        raise ValueError(f"{path}: expected an array of table rows")
     return value
 
 
@@ -67,6 +71,46 @@ def _add(records: list[tuple[int, int | None, int | None, str, int | None, str]]
     if key not in seen:
         seen.add(key)
         records.append(record)
+
+
+_ARTICLE_PERIOD = re.compile(
+    r"(?:Event Period|Event Duration|Duration):?\s*"
+    r"(After the (?:version )?update on \d{4}/\d{1,2}/\d{1,2}"
+    r"|\d{4}/\d{1,2}/\d{1,2}\s*,?\s*\d{1,2}:\d{2}"
+    r"|[A-Z][a-z]+ \d{1,2}, \d{4}, \d{1,2}:\d{2})\s*-\s*"
+    r"(\d{4}/\d{1,2}/\d{1,2}\s*,?\s*\d{1,2}:\d{2}"
+    r"|[A-Z][a-z]+ \d{1,2}, \d{4}, \d{1,2}:\d{2})\s*\(UTC\)",
+    re.I,
+)
+
+
+def _parse_article_period(text: str, index: int, maintenance_end: int) -> tuple[int, int] | None:
+    match = _ARTICLE_PERIOD.search(text, index, index + 900)
+    if match is None or re.search(r"\b(?:[IVX]+)\.\s|\b(?:[5-9]|\d{2,})\)\s", text[index:match.start()]):
+        return None
+
+    def timestamp(value: str) -> int:
+        if value.lower().startswith("after the "):
+            return maintenance_end
+        for pattern in ("%Y/%m/%d %H:%M", "%B %d, %Y, %H:%M"):
+            try:
+                normalized = value.replace(",", "", 1) if "/" in value else value
+                return int(dt.datetime.strptime(normalized, pattern).replace(tzinfo=dt.timezone.utc).timestamp())
+            except ValueError:
+                continue
+        raise ValueError(f"unrecognized official event time: {value}")
+
+    start, end = timestamp(match.group(1)), timestamp(match.group(2))
+    return (start, end) if start < end else None
+
+
+def _maintenance_end(notice_root: Path) -> int:
+    notice = json.loads((notice_root / "LoginNotice.json").read_text())
+    end = notice.get("EndTime")
+    if not isinstance(end, int) or end <= 0:
+        raise ValueError("official maintenance EndTime is missing")
+    return end
+
 
 
 def build_catalog(source: Path) -> list[tuple[int, int | None, int | None, str, int | None, str]]:
@@ -148,11 +192,7 @@ def _update_note_event_windows(
 ) -> dict[str, tuple[int, int, str]]:
     """Extract explicitly dated event periods from the official update note."""
     output: dict[str, tuple[int, int, str]] = {}
-    period = re.compile(
-        r"Event Period:\s*([A-Z][a-z]+ \d{1,2}, \d{4}, \d{2}:\d{2})\s*-\s*"
-        r"([A-Z][a-z]+ \d{1,2}, \d{4}, \d{2}:\d{2})\s*\(UTC\)",
-        re.I,
-    )
+    maintenance_end = _maintenance_end(notice_root)
     names = {
         row["Name"]
         for row in catalog
@@ -175,21 +215,12 @@ def _update_note_event_windows(
                 continue
             text = html.unescape(re.sub(r"<[^>]+>", " ", html_path.read_text(errors="replace")))
             text = " ".join(text.split())
-            folded = text.casefold()
             for name in names:
-                index = folded.find(name.casefold())
-                if index < 0:
-                    continue
-                match = period.search(text, index, index + 1000)
-                if match is None:
-                    continue
-                try:
-                    start = int(dt.datetime.strptime(match.group(1), "%B %d, %Y, %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
-                    end = int(dt.datetime.strptime(match.group(2), "%B %d, %Y, %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
-                except ValueError:
-                    continue
-                if start < end:
-                    output[normalized_name(name)] = (start, end, f"GameNotice:update-note-html:{html_path.name}")
+                for occurrence in re.finditer(re.escape(name), text, re.I):
+                    bounds = _parse_article_period(text, occurrence.start(), maintenance_end)
+                    if bounds is not None:
+                        output[normalized_name(name)] = (*bounds, f"GameNotice:update-note-html:{html_path.name}")
+                        break
     return output
 
 
@@ -382,6 +413,9 @@ def _current_minor_regional_rows(
     regions: tuple[str, ...] = ("en", "cn"),
 ) -> tuple[list[dict[str, Any]], str]:
     """Read a current-minor table, preferring the requested region order."""
+    installed = source / relative
+    if installed.is_file():
+        return _rows(source, relative), f"installed-table:{relative}"
     major, minor = _current_en_minor(source)
     observed: list[str] = []
     for region in regions:
@@ -615,7 +649,6 @@ def _special_activity_windows(
             if candidate_id in schedules
             and (schedules[candidate_id][1] == 0 or schedules[candidate_id][1] > patch_start)
             and (schedules[candidate_id][0] == 0 or schedules[candidate_id][0] < patch_end)
-            and not schedules[candidate_id][2].startswith("GameNotice:update-note-html:")
         ]
         if not candidates:
             continue
@@ -712,11 +745,7 @@ def _named_event_period(
     event_name: str,
 ) -> tuple[int, int, str] | None:
     """Return the official Event Period of a named update-note event (article HTML)."""
-    period = re.compile(
-        r"Event Period:\s*([A-Z][a-z]+ \d{1,2}, \d{4}, \d{2}:\d{2})\s*-\s*"
-        r"([A-Z][a-z]+ \d{1,2}, \d{4}, \d{2}:\d{2})\s*\(UTC\)",
-        re.I,
-    )
+    maintenance_end = _maintenance_end(notice_root)
     for notice in notices:
         if not isinstance(notice.get("Title"), str) or "update note" not in notice["Title"].lower():
             continue
@@ -736,16 +765,9 @@ def _named_event_period(
             index = text.casefold().find(event_name.casefold())
             if index < 0:
                 continue
-            match = period.search(text, index, index + 1000)
-            if match is None:
-                continue
-            try:
-                start = int(dt.datetime.strptime(match.group(1), "%B %d, %Y, %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
-                end = int(dt.datetime.strptime(match.group(2), "%B %d, %Y, %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
-            except ValueError:
-                continue
-            if start < end:
-                return start, end, f"GameNotice:update-note-html:{html_path.name}"
+            bounds = _parse_article_period(text, index, maintenance_end)
+            if bounds is not None:
+                return *bounds, f"GameNotice:update-note-html:{html_path.name}"
     return None
 
 
@@ -771,18 +793,124 @@ def _signin_windows(
     notices: Iterable[dict[str, Any]],
     notice_root: Path,
 ) -> dict[int, tuple[int, int, str]]:
-    """Schedule the current 4.7 event sign-in (Id 115) from the article's 7-Day Sign-in period."""
-    signins = _rows(source, "share/signin/SignIn.json")
-    current = [row for row in signins if row.get("Id") == 115 and _int(row.get("TimeId")) is not None]
-    if len(current) != 1:
-        raise ValueError("current SignIn 115 must expose exactly one positive TimeId")
-    time_id = _int(current[0]["TimeId"])
-    assert time_id is not None
-    period = _named_event_period(notice_root, notices, "7-Day Sign-in")
-    if period is None:
-        raise ValueError("7-Day Sign-in Event Period is absent from the official update note")
-    start, end, provenance = period
-    return {time_id: (start, end, provenance + "+SignIn:Id=115")}
+    """Join authored event sign-ins to their dated official update-note periods."""
+    output: dict[int, tuple[int, int, str]] = {}
+    for row in _rows(source, "share/signin/SignIn.json"):
+        time_id = _int(row.get("TimeId"))
+        if row.get("Type") != 2 or time_id is None or not isinstance(row.get("Name"), str):
+            continue
+        name = row["Name"].replace(" - Sign-in", "").replace(" Sign-in", "")
+        period = _named_event_period(notice_root, notices, name)
+        if period is None and row.get("RoundDays") == [7] and any(
+            normalized_name(notice.get("Title", "").removesuffix(" UPDATE NOTE")) == normalized_name(name)
+            for notice in notices if isinstance(notice.get("Title"), str)
+            and notice["Title"].upper().endswith(" UPDATE NOTE")
+        ):
+            period = _named_event_period(notice_root, notices, "7-Day Sign-In")
+        if period is not None:
+            start, end, provenance = period
+            output[time_id] = (start, end, f"{provenance}+SignIn:Id={row['Id']}")
+    return output
+
+
+def _passport_windows(
+    source: Path,
+    notices: Iterable[dict[str, Any]],
+    notice_root: Path,
+) -> dict[int, tuple[int, int, str]]:
+    """Match the authored manual edition to its explicitly dated update-note section."""
+    output: dict[int, tuple[int, int, str]] = {}
+    for row in _rows(source, "share/passport/PassportActivity.json"):
+        time_id, name = _int(row.get("TimeId")), row.get("Name")
+        if time_id is None or not isinstance(name, str) or not name.strip():
+            continue
+        period = _named_event_period(notice_root, notices, f"Tactical Assessment Manual - {name}")
+        if period is not None:
+            start, end, provenance = period
+            output[time_id] = (start, end, f"{provenance}+PassportActivity:Id={row['Id']}")
+    return output
+
+
+def _teaching_trial_windows(
+    source: Path,
+    notices: Iterable[dict[str, Any]],
+    notice_root: Path,
+) -> dict[int, tuple[int, int, str]]:
+    """Date standalone character trials; calendar-linked trials inherit their parent window."""
+    calendar_skips = {
+        _int(row.get("SkipId"))
+        for row in _rows(source, "share/newactivitycalendar/NewActivityCalendarActivity.json")
+        if _int(row.get("MainTimeId"))
+    }
+    calendar_teaching_ids: set[int] = set()
+    for row in _rows(source, "client/functional/SkipFunctional.json"):
+        if _int(row.get("SkipId")) not in calendar_skips:
+            continue
+        calendar_teaching_ids.update(
+            value for value in (_int(part) for part in row.get("CustomParams", [])) if value
+        )
+        if _int(row.get("ParamId")):
+            calendar_teaching_ids.add(_int(row["ParamId"]))
+
+    output: dict[int, tuple[int, int, str]] = {}
+    for row in _rows(source, "share/fuben/teaching/TeachingActivity.json"):
+        time_id, name = _int(row.get("TimeId")), row.get("Name")
+        if not time_id or _int(row.get("Id")) in calendar_teaching_ids or not isinstance(name, str):
+            continue
+        period = _named_event_period(notice_root, notices, f"{name}: Character Trial Stage")
+        if period is not None:
+            start, end, provenance = period
+            output[time_id] = (
+                start, end, f"{provenance}+share/fuben/teaching/TeachingActivity:Id={row['Id']}:TimeId={time_id}"
+            )
+    return output
+
+
+def _self_choice_coating_windows(
+    source: Path,
+    notices: Iterable[dict[str, Any]],
+    notice_root: Path,
+) -> dict[int, tuple[int, int, str]]:
+    """Join authored coating choices to the dedicated, explicitly dated notice."""
+    groups = {row.get("Id"): row for row in _rows(source, "share/gacha/GachaFashionSelfChoiceGroup.json")}
+    output: dict[int, tuple[int, int, str]] = {}
+    for activity in _rows(source, "share/gacha/GachaFashionSelfChoiceActivity.json"):
+        time_id = _int(activity.get("TimeId"))
+        if not time_id:
+            continue
+        for group_id in activity.get("GachaGroupIds", []):
+            group = groups.get(group_id)
+            if group is None or _int(group.get("TimeId")) != time_id:
+                continue
+            rules = group.get("RuleText")
+            if not isinstance(rules, list) or not rules or not isinstance(rules[0], str):
+                continue
+            names = re.findall(r"\[([^\]]+)\]", rules[0])
+            if len(names) < 2:
+                continue
+            for notice in notices:
+                title = notice.get("Title")
+                if not isinstance(title, str) or "coating research rerun" not in title.casefold():
+                    continue
+                for entry in notice.get("Content", []):
+                    html_url = entry.get("Url") if isinstance(entry, dict) else None
+                    html_path = notice_root / html_url if isinstance(html_url, str) else None
+                    if html_path is None or not html_path.is_file():
+                        continue
+                    text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", html_path.read_text())).split())
+                    if not all(name.casefold() in text.casefold() for name in names):
+                        continue
+                    index = text.casefold().find(title.casefold())
+                    bounds = _parse_article_period(text, index, _maintenance_end(notice_root)) if index >= 0 else None
+                    if bounds is None or bounds != (notice.get("BeginTime"), notice.get("EndTime")):
+                        continue
+                    output[time_id] = (
+                        *bounds,
+                        f"GameNotice:dated-article:{html_path.name}"
+                        f"+GachaFashionSelfChoiceActivity:Id={activity['Id']}"
+                        f"+GachaFashionSelfChoiceGroup:Id={group_id}",
+                    )
+    return output
 
 
 def _main_panel_window(
@@ -797,7 +925,8 @@ def _main_panel_window(
     if len(config) != 1:
         raise ValueError("FubenClientConfig must define exactly one MainPanelTimeId")
     values = config[0].get("Values")
-    alias_time_id = _int(values[0]) if isinstance(values, list) and len(values) == 1 else None
+    value = values[0] if isinstance(values, list) and len(values) == 1 else None
+    alias_time_id = _int(int(value) if isinstance(value, str) and value.isdecimal() else value)
     if alias_time_id is None:
         raise ValueError("FubenClientConfig MainPanelTimeId must contain one positive integer")
 
@@ -854,6 +983,34 @@ def _theatre_decoration_windows(source: Path) -> dict[int, tuple[int, int, str]]
     return output
 
 
+def _simulated_battlefield_windows(source: Path, notices: Iterable[dict[str, Any]], login_notice_path: Path) -> dict[int, tuple[int, int, str]]:
+    """Pair the authored shop timer and activity panel for the current patch."""
+    activities = _rows(source, "client/activity/Activity.json")
+    shops = _rows(source, "client/activitybrief/ActivityBriefShop.json")
+    panels = [row for row in activities if row.get("Id") == 401 and row.get("Name") == "Simulated Battlefield"]
+    shop_rows = [row for row in shops if row.get("ShopId") == 1421]
+    if len(panels) != 1 or len(shop_rows) != 1:
+        raise ValueError("current Simulated Battlefield panel or shop is unavailable")
+    panel_id, shop_id = _int(panels[0].get("TimeId")), _int(shop_rows[0].get("TimeId"))
+    if (panel_id, shop_id) != (50403, 50402):
+        raise ValueError("current Simulated Battlefield panel and shop timers differ from authored pair")
+    description = panels[0].get("ActivityDes")
+    if not isinstance(description, str):
+        raise ValueError("Simulated Battlefield shop expiry description is unavailable")
+    expiry = re.search(r"limited-time shop exchange ends on ([A-Z][a-z]+ \d{1,2}, \d{4}), at (\d{2}:\d{2}) \(UTC\)", description)
+    if expiry is None:
+        raise ValueError("Simulated Battlefield shop expiry is unavailable")
+    end = int(dt.datetime.strptime(" ".join(expiry.groups()), "%B %d, %Y %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
+    start, _, _ = _maintenance_bounds(notices, login_notice_path)
+    if end <= start:
+        raise ValueError("Simulated Battlefield shop expiry precedes maintenance end")
+    source_note = "client/activity/Activity:Id=401:ActivityDes:shop-expiry+client/activitybrief/ActivityBriefShop:ShopId=1421:TimeId+LoginNotice:EndTime"
+    return {
+        shop_id: (start, end, source_note),
+        panel_id: (start, end, source_note + "+AscNet-policy:paired-panel-window-inferred-from-shop"),
+    }
+
+
 def build_schedule(
     catalog: list[dict[str, str]],
     notices: Iterable[dict[str, Any]],
@@ -864,12 +1021,10 @@ def build_schedule(
     """Join client identities to authoritative feature windows; omit unresolved rows."""
     notice_list = list(notices)
     windows = _notice_windows(notice_list)
-    for name, window in _catalog_show_begin_windows(catalog, notice_list).items():
-        windows.setdefault(name, window)
+    # Display starts do not supply authoritative ends; do not infer those from notice expiry.
     windows.update(_catalog_notice_name_windows(catalog, notice_list))
     if notice_root is not None:
-        for name, window in _update_note_event_windows(catalog, notice_list, notice_root).items():
-            windows.setdefault(name, window)
+        windows.update(_update_note_event_windows(catalog, notice_list, notice_root))
     by_name: dict[str, list[dict[str, str]]] = defaultdict(list)
     by_skip: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in catalog:
@@ -890,16 +1045,33 @@ def build_schedule(
                 continue
             output[int(row["TimeId"])] = (start, end, provenance)
     if source is not None:
-        output.update(_theatre6_windows(source))
-        if login_notice_path is None:
-            raise ValueError("official LoginNotice path is required for Transfinite schedule generation")
-        output.update(_transfinite_windows(source, notice_list, login_notice_path))
-        output.update(_draw_can_liver_windows(source, notice_list, login_notice_path))
-        output.update(_activity_brief_windows(source, notice_list, login_notice_path))
-        if notice_root is None:
-            raise ValueError("official notice root is required for article-derived schedule generation")
-        output.update(_concert_preheating_windows(source, notice_list, notice_root))
+        if login_notice_path is None or notice_root is None:
+            raise ValueError("official maintenance and notice paths are required for schedule generation")
+        staged = (source / "client/activity/Activity.json").is_file()
+        if staged:
+            patch_start, patch_end, _ = _maintenance_bounds(notice_list, login_notice_path)
+            brief = [row for row in _rows(source, "client/activitybrief/ActivityBrief.json") if _int(row.get("TimeId"))]
+            if len(brief) != 1:
+                raise ValueError("current ActivityBrief must expose one positive TimeId")
+            output[brief[0]["TimeId"]] = (patch_start, patch_end,
+                "client/activitybrief/ActivityBrief+LoginNotice:EndTime+GameNotice:update-note-EndTime")
+            for group in _rows(source, "client/activitybrief/ActivityBriefGroup.json"):
+                if group.get("Id") in brief[0].get("GroupIdList", []) and group.get("BtnInitMethodName") == "RefreshActivityMainLine2":
+                    time_id = _int(group.get("TimeId"))
+                    if time_id is not None:
+                        output[time_id] = (patch_start, patch_end,
+                            "client/activitybrief/ActivityBriefGroup:RefreshActivityMainLine2+LoginNotice:EndTime+GameNotice:update-note-EndTime")
+        else:
+            output.update(_theatre6_windows(source))
+            output.update(_transfinite_windows(source, notice_list, login_notice_path))
+            output.update(_draw_can_liver_windows(source, notice_list, login_notice_path))
+            output.update(_activity_brief_windows(source, notice_list, login_notice_path))
+            output.update(_concert_preheating_windows(source, notice_list, notice_root))
         output.update(_signin_windows(source, notice_list, notice_root))
+        output.update(_passport_windows(source, notice_list, notice_root))
+        output.update(_teaching_trial_windows(source, notice_list, notice_root))
+        output.update(_self_choice_coating_windows(source, notice_list, notice_root))
+        output.update(_simulated_battlefield_windows(source, notice_list, login_notice_path))
         output.update(_special_activity_windows(source, catalog, output, notice_list, login_notice_path))
         main_panel = _main_panel_window(source, output, notice_list, login_notice_path)
         output.update(main_panel)
@@ -974,9 +1146,8 @@ def _preserve_refresh_derived_windows(
 ) -> list[tuple[int, int, int, str]]:
     output = {time_id: (start, end, source) for time_id, start, end, source in refreshed}
     for time_id, (start, end, source) in existing.items():
-        if source.startswith("feature-window:") or source.startswith("version-history:"):
+        if time_id not in output:
             output[time_id] = (start, end, source)
-    output.update(_GODFALL_WINDOWS)
     return [(time_id, *output[time_id]) for time_id in sorted(output)]
 
 
@@ -1000,7 +1171,5 @@ def generate(
     notices = json.loads(notice_path.read_text())
     if not isinstance(notices, list):
         raise ValueError(f"{notice_path}: expected a JSON array")
-    write_schedule(
-        schedule_path,
-        build_schedule(read_catalog(catalog_path), notices, source, login_notice_path, notice_path.parent),
-    )
+    refreshed = build_schedule(read_catalog(catalog_path), notices, source, login_notice_path, notice_path.parent)
+    write_schedule(schedule_path, _preserve_refresh_derived_windows(refreshed, _read_schedule(schedule_path)))

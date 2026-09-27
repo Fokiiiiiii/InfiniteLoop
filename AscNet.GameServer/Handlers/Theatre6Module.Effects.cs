@@ -19,6 +19,8 @@ internal static partial class Theatre6Module
     private const int BuffTriggerChoice = 1;
     private const int BuffTriggerGoods = 2;
     private const int BuffTriggerStateChange = 3;
+    // 4.8 buff 12 "Each time a skill levels up" (Nirvatia tag buff): amount = levels gained.
+    private const int BuffTriggerSkillLevelUp = 5;
     private const int BuffTriggerImmediate = 7;
     private const int BuffTriggerRelic = 10;
     private const int BuffTriggerMission = 11;
@@ -64,7 +66,11 @@ internal static partial class Theatre6Module
         [3] = new[] { 17, 18 },  // <Block> / Block
         [4] = new[] { 15, 16 },  // <CRIT> / CRIT
         [5] = new[] { 11 },      // Stun
-        [6] = new[] { 28, 29 }   // Dawnlight / Dawnbreak
+        [6] = new[] { 28, 29 },  // Dawnlight / Dawnbreak
+        // AscNet policy (not recovered retail composition): 4.8 buff 10 "Starts with 1 Dreamlure Skill"
+        // authors family 22, which has no shipped family row. It resolves through the authored
+        // Theatre6BuildTag 31 "Dreamlure" (id 22 in that shared numbering is Counter, so it is not reused).
+        [22] = new[] { 31 }
     };
 
     // Nested effect application (buff 3500 grants 3600..3603) is bounded by the authored EventMaxDepth;
@@ -181,6 +187,7 @@ internal static partial class Theatre6Module
     /// trigger 2 goods — <paramref name="parameter"/> = goods id, <paramref name="amount"/> = gained amount;
     /// trigger 3 state — <paramref name="parameter"/> &gt; 0 = goods id gained, 0 = sanity decreased with
     /// <paramref name="amount"/> = signed sanity delta;
+    /// trigger 5 skill level-up — <paramref name="amount"/> = levels gained (merge or star-up buff);
     /// trigger 10 relic / 11 mission — <paramref name="amount"/> = acquisitions this event.
     /// </summary>
     internal static void TriggerEffects(Mutation m, Theatre6RunState run, int triggerType, int amount = 1, int parameter = 0, int depth = 0)
@@ -256,6 +263,7 @@ internal static partial class Theatre6Module
                 return kind == 4 && parameter == 0 ? 1 : 0;
             case BuffTriggerRelic:
             case BuffTriggerMission:
+            case BuffTriggerSkillLevelUp:
                 return amount;
             default:
                 return 0;
@@ -391,6 +399,7 @@ internal static partial class Theatre6Module
     /// eligibility rule the offer pools use: same character, not IsOutPool). A family with no authored
     /// candidate is a data error and is reported, never substituted with an unrelated skill.
     /// </summary>
+    // Family 22 (Dreamlure) is the AscNet-policy row above, not a shipped family.
     private static void GrantStartSkill(Mutation m, Theatre6RunState run, int family, int count)
     {
         int[] identifiers = StartSkillFamilies.GetValueOrDefault(family, Array.Empty<int>());
@@ -742,6 +751,7 @@ internal static partial class Theatre6Module
         {
             RecalculateAttrs(m, run, pushChanges: false);
             RecalculateScore(m, run);
+            TriggerEffects(m, run, BuffTriggerSkillLevelUp, amount: update.ReplaceSkills!.Count);
         }
 
         buff.TriggerCount++;

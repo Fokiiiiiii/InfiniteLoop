@@ -1,24 +1,24 @@
 # InfiniteLoop
 
-InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. This branch focuses on bringing AscNet forward to the current global PC/Steam client path and documenting the compatibility work needed for the 4.5-era client.
+InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. This branch tracks the global PC/Steam client and documents implemented behavior separately from unresolved compatibility gaps.
 
 This is research/dev infrastructure, not an official service. It expects a local client, a local AscNet process, and a local MongoDB database.
 
 ## Current target
 
-The current compatibility target in this tree is:
+The current server data/config target is **4.8**, not a claim of complete 4.8 gameplay compatibility:
 
 | Area | Value |
 | --- | --- |
 | Client package | `com.kurogame.pc.punishing.grayraven.en` |
-| Application version | `4.5.0` |
-| Document version | `4.5.12` |
-| Launch module version | `4.5.12` |
+| Application version | `4.8.0` |
+| Document version | `4.8.10` |
+| Launch module version | `4.8.10` |
 | Steam/PC channel | `205` |
 | Game server TCP port | `2335` by default |
 | SDK/HTTP URL used by the runner | `http://127.0.0.1:8080` by default |
 
-`Resources/Configs/version_config.json` carries the current `4.5.0 -> 4.5.12` version/hash tuple used by the current-client config endpoint.
+`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0 (launcher 1.0.4, patch 0.3.0).
 
 ## What changed in this branch
 
@@ -51,6 +51,43 @@ The current compatibility target in this tree is:
 - Added KRSDK cache repair/seeding helpers for local Steam bridge experiments.
 - Added `launch-pgr-ascnet.sh` as a macOS/CrossOver launch example. Its paths are workstation-specific; adjust them before reuse.
 
+### 4.8 data and feature changes
+
+Installed, SHA-verified client tables and Lua are the source for this update. `Resources/table/manifest.json` records per-table provenance and preserves earlier local-policy projections. This update adds no capture-backed runtime data.
+
+- Kurumi Tokisaki and Adelyde: Anabasis acquisition, normal progression, exhibition rewards, and training-item handling; training maximizes authored level/grade/eligible normal skills, not evolution or Leap.
+- Zafkiel and Kelpie CUB data, five weapons, Pesanteur memories, new coatings/portraits, and authored Harmony II upgrades. Memory resonance discounts now follow the two configured suits rather than the previous single-suit assumption.
+- Observer effects use `CharacterObsTransform` career/element rules, including Overlinker. Stage general-skill bans follow the authored stage flag.
+- Standard 4.8 draw catalogs, Crucible milestone claims, Date A Live acquired-copy task progression, and selected-lottery state. Unsupported collab currencies are not guessed.
+- Free-ticket rewards persist as serial ticket stock, not inventory items. Every paid or free draw freezes its rolled outcome, pity/history and debit plan in one durable write, then grants once through per-document reward receipts; login resumes frozen draws, and a retry cannot charge, grant or advance progress twice. Non-Fate collab banners spend the paid ticket family and combine earned tickets in the same cost plan; the Fate banner remains closed (below).
+- Updated notices, event calendars, multi-round sign-ins, the Farwatch File Passport season, and 487 Study stages, including new frame trials and Celica practice.
+- Chapter 43 (Anchored in Faith), its LifeTree/exhibition dependencies, Wrathful Monsoon boss trials, and Kurumi/Adelyde teaching trials, guides, affection tasks, trust gifts, and dorm interactions.
+- Festival and coating-trial progress is rebuilt from persisted stage clears rather than fixed login payloads. Teaching treasure claims recover partially persisted rewards at login, including after the event closes.
+- Coating self-choice gachas `50–53` use authored rewards, costs, limits, milestones, and calendar `51001`. Selection changes preserve each pool's progress; frozen draw/exchange intents recover without charging or granting twice. Scene rewards persist ownership and notify the client.
+- Music playlist reordering uses the original client's reversed wire/display order and persists across login.
+- Envelope invitation/open/bind/story mutations, task notifications, first-day grant, accumulated per-business-day catch-up and earned-but-unclaimed task reissue; server-local Team Recommendation boards with persisted, server-evaluated target progress.
+- FangKuai v2 Start/Sync/Settle state, scoring operands, rewards, and tasks; chapter calendars `50802–50804` inherit the authored parent window. The client owns board generation; snapshot checks do not prove native move history.
+- Equipment mutations push every affected slot in one `NotifyEquipDataList` before the response. Taking a weapon off, or moving one to another character that does not hand back the weapon it displaces, is rejected; login normalization gives a weaponless owned character its authored default weapon and frees incompatible wearables.
+
+Distributed sources do not carry every retail rule. These surfaces state their local policy explicitly:
+
+| Surface | AscNet policy (not retail parity) / remaining gap |
+| --- | --- |
+| Collab draws `5612`, `381`, `7068` | AscNet policy (not retail): open at the 4.8 maintenance end, 2026-09-24 05:00 UTC (`1790226000`), instead of retail 2026-09-29 10:00 UTC (`1790676000`); end unchanged. Groups 37/38 carry Tag `5` from client `DrawTabs` Id 5 (Collab / Kurumi Tokisaki Pool). Login pushes `NotifyDateALiveDraw` with `DateALiveActivity` draws that are currently open (`{1:[5612]}` in window, empty otherwise). Paid ticket family `50017–50019` and earned family `50021–50023` fund a single combined cost plan, and the banner presents the paid family's primary item. |
+| Collab Fate `5613` | Pity is published only as an inclusive `80–100` range and the threshold weights are not distributed, so this banner fails closed: not advertised, no draw infos served, requests rejected. The threshold law is still missing and no substitute distribution is invented. |
+| Circuit Calculus / Punishaar | All 19 requests implemented over the authored activity tables: shop blocks map onto remedy/shop groups, stock and level rules, empty starting deck, per-save persisted RNG, and earned-gold accounting (sale refunds excluded). The client Lua simulates the battle; finish-fight results are consistency-checked, not battle proof. |
+| Overclock Simulation / Transfinite Tower | Its six requests are implemented: chapter/floor progression, energy accounting with rollback refunds, MVP, and a server-local rank board whose rank rewards (including ChatBoard unlocks) are delivered through durable receipts resumed at login. |
+| Wreck-It Huhu / FangKuai | Chapter calendars `50802–50804` inherit the authored parent window (permanent when the parent has none); authored `PreStageId` progression still gates entry. |
+| Team Recommendation | "Global" standings are this server's persisted accounts, not a retail leaderboard: eligible authored base formations (all three members owned inside the quality-star window, each with one table-valid weapon, six awareness sites and at most one partner) rank by quality-star, then level, then lowest UID. Snapshots expose template IDs only. |
+| Envelope Enter | Every authored business day from the schedule start through today accrues one daily ticket grant under its own receipt; the first-ever entry day pays the authored first-day reward instead, and earned-but-unclaimed daily tasks are reissued under their period claim key. |
+| Cosmic Wonders `50302` / self-choice lottery `49501` | The 4.8 client contains Cosmic Wonders data, but no authoritative 4.8 event window: `50302` is not scheduled and its calendar remains closed. The separate 3.7 self-choice lottery `49501` retains its user-approved unbounded window because its client UI requires a positive end time. |
+| Simulated Battlefield `50402` / `50403` | Availability follows the 4.8 activity start after the 2026-09-24 05:00 UTC update through the explicitly dated shop expiry on 2026-11-05 05:00 UTC. Applying those same bounds to task calendar `50403` is an AscNet scheduling policy, supported by the paired-ID precedent in 4.7, not a claim of an independently recovered retail task end date. |
+| Theatre6 / Nirvatia | Default buff 10 authors starting-skill family 22, whose composition is not shipped. AscNet policy (not retail parity) resolves it through authored Theatre6BuildTag 31 "Dreamlure": the lowest-id level-1, in-pool Nirvatia skill carrying that tag. Characters without such skills still reject. Character-specific mission counters and the authored skill-level-up trigger are implemented. |
+
+The table decoder verified 16,113 typed tables; 4,461 ancillary raw assets remain undecoded, outside the imported gameplay dependencies.
+
+Focused verification on 2026-09-24: the `--non-fate-policy-only` compatibility harness passed against a private MongoDB. Ten PacketCodec scenarios completed 154 transactions without collector failures; eight bounded replays through the installed 4.8 client's original Lua passed 1,178 checks. The separate banner/equipment regression scenario completed 15 transactions and 50 client-consumer checks. Fixtures used synthetic accounts only, and dated scenarios injected the handler/scenario clock rather than rewriting production calendars. This is not a full-mode native playthrough: engine adapters, declared out-of-scope login pushes and synthetic skill-merge inputs remain explicit proof boundaries; native combat, rendered UI and movie playback are unverified. Throwaway collectors and private database files were removed after verification; the permanent compatibility harness remains in `AscNet.Test`.
+
 ### Game protocol and data compatibility
 
 This branch adds or fixes current-client server behavior for:
@@ -61,7 +98,7 @@ This branch adds or fixes current-client server behavior for:
 - Dorm commission system upgrades retain the current level until the saved start time plus the table-defined duration has elapsed. Relogs and restarts cannot finish them early; reconciliation completes each upgrade once and recovers previously stuck AscNet upgrades without restarting their timer or charging again.
 - Ultima Awakening checks claimed Exhibition milestones for the relevant construct. Eligible skills still require an unlock request, and learned skills survive character reloads.
 - Character login normalization reuses skill-upgrade, condition, and skill-level indexes within one roster pass; skill eligibility is still evaluated per character against current player state.
-- Observer activation (including Ishmael) derives from the actual deployed team and all applicable learned observation skills. Empty descriptive skill rows no longer hide activation effects; Tank/Amplifier/Breaker selection follows the client rules, including physical-member exclusions and catalog-based Breaker availability. Ordinary, guild and roguelike pre-fight builders share this logic; cached mode battle payloads retain the effects, and the base Observer career remains unchanged.
+- Observer activation derives from the deployed team, learned observation skills, and authored career/element transformations. Ordinary, guild and roguelike pre-fight builders share this logic; cached mode battle payloads retain the effects, and the base Observer career remains unchanged.
 - Current-client notice payloads.
 - Stage bookmark compatibility.
 - Board mutual push compatibility.
@@ -412,6 +449,7 @@ Run one focused check:
 ```bash
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --player-gender-compat-only
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --theatre-compat-only
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --version-48-compat-only
 ```
 
 Available focused switches:
@@ -440,6 +478,18 @@ Available focused switches:
 --theatre-compat-only
 --theatre6-compat-only
 --theatre6-visibility-only
+--version-48-compat-only
+--version-48-frames-only
+--version-48-draw-cub-compat-only
+--version-48-equipment-cosmetics-only
+--version-48-audio-only
+--date-alive-task-progress-only
+--team-recommend-only
+--fangkuai-only
+--punishaar-only
+--non-fate-policy-only
+--stage-general-skill-ban-only
+--transfinite-tower-boundary-only
 ```
 
 Build the main projects:

@@ -9,9 +9,8 @@ using MessagePack;
 namespace AscNet.GameServer.Handlers
 {
     /// <summary>
-    /// AudioPlayer (music CD) favorites and background playlist. State is durable per-player
-    /// (ordered lists), mutated then saved before a Code=0 response; no pushes. Table-driven
-    /// caps, default song, and valid song ids come from the authoritative MusicPlayer tables.
+    /// AudioPlayer playlists in wire order (reverse of the music player's displayed order).
+    /// State is durable per-player, saved before success. Caps and song ids come from tables.
     /// </summary>
     internal static class AudioPlayerModule
     {
@@ -118,9 +117,9 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             List<int> previous = songs.ToList();
-            songs.Insert(0, request.SongId);
+            songs.Add(request.SongId);
             if (FavoriteMaxCount > 0 && songs.Count > FavoriteMaxCount)
-                songs.RemoveRange(FavoriteMaxCount, songs.Count - FavoriteMaxCount);
+                songs.RemoveRange(0, songs.Count - FavoriteMaxCount);
             response.Code = TrySave(session.player, songs, previous) ? SuccessCode : ErrorCode;
             session.SendResponse(response, packet.Id);
         }
@@ -156,10 +155,10 @@ namespace AscNet.GameServer.Handlers
             {
                 if (songs.Contains(songId))
                     continue;
-                songs.Insert(0, songId);
+                songs.Add(songId);
                 mutated = true;
                 if (max > 0 && songs.Count > max)
-                    songs.RemoveRange(max, songs.Count - max);
+                    songs.RemoveRange(0, songs.Count - max);
             }
             if (mutated)
                 response.Code = TrySave(session.player, songs, previous) ? SuccessCode : ErrorCode;
@@ -198,6 +197,41 @@ namespace AscNet.GameServer.Handlers
                 ? SuccessCode
                 : ErrorCode;
             response.BackgroundSongs = new List<int>(songs);
+            session.SendResponse(response, packet.Id);
+        }
+
+        [RequestPacketHandler("MoveAudioPlayerBackgroundSongRequest")]
+        public static void MoveBackgroundSong(Session session, Packet.Request packet)
+        {
+            var request = packet.Deserialize<MoveAudioPlayerBackgroundSongRequest>();
+            var response = new MoveAudioPlayerBackgroundSongResponse();
+            List<int> songs = session.player.BackgroundSongs ??= new();
+            // The UI list is the reverse of the wire list: Index = count - luaIndex.
+            // MoveType 1 moves to the UI's top; 2 swaps with the next UI song.
+            if (request.Index < 0 || request.Index >= songs.Count
+                || songs[request.Index] != request.SongId
+                || !IsValidSongId(session.player, request.SongId)
+                || request.MoveType is not (1 or 2)
+                || (request.MoveType == 1 && request.Index == songs.Count - 1)
+                || (request.MoveType == 2 && request.Index == 0))
+            {
+                response.Code = ErrorCode;
+                session.SendResponse(response, packet.Id);
+                return;
+            }
+
+            List<int> previous = songs.ToList();
+            if (request.MoveType == 1)
+            {
+                songs.RemoveAt(request.Index);
+                songs.Add(request.SongId);
+            }
+            else
+            {
+                (songs[request.Index - 1], songs[request.Index]) =
+                    (songs[request.Index], songs[request.Index - 1]);
+            }
+            response.Code = TrySave(session.player, songs, previous) ? SuccessCode : ErrorCode;
             session.SendResponse(response, packet.Id);
         }
     }

@@ -136,6 +136,20 @@ namespace AscNet.GameServer
             {
                 if (Volatile.Read(ref disconnectState) == 0)
                 {
+                    if (request.Name is not ("LoginRequest" or "HandshakeRequest"))
+                    {
+                        if (player.MineSweeping?.Pending is not null && !Handlers.MineSweepingModule.RecoverPending(this))
+                        {
+                            string responseName = request.Name.EndsWith("Request", StringComparison.Ordinal)
+                                ? request.Name[..^7] + "Response" : request.Name + "Response";
+                            SendResponse(responseName, MessagePackSerializer.Serialize(new Dictionary<string, int> { ["Code"] = 1 }), request.Id);
+                            return;
+                        }
+                        if (request.Name != "ItemBuyAssetRequest" && player.PendingBuyAsset is not null)
+                            Handlers.ItemModule.ResumePendingBuyAsset(this);
+                        if (request.Name != "DrawDrawCardRequest" && player.DrawState?.PendingDraw is not null)
+                            Handlers.DrawModule.ResumePendingDraw(this);
+                    }
                     // Task handlers reconcile journals after identifying the owner, preserving Bianca's pending-intent guard.
                     // Other requests must recover and reset here before they can record new-period gameplay progress.
                     if (character is not null && inventory is not null && stage is not null
@@ -615,23 +629,25 @@ namespace AscNet.GameServer
             }
         }
 
-        public void DisconnectProtocol()
+        // persistState=false is the unresolved-write boundary: the in-memory player may disagree with the
+        // durable document, so the transport is closed without writing it.
+        public void DisconnectProtocol(bool persistState = true)
         {
             lock (Handlers.GuildModule.MembershipLock)
             {
                 Player? currentPlayer = player;
                 if (currentPlayer is null)
                 {
-                    DisconnectCore();
+                    DisconnectCore(persistState);
                     return;
                 }
 
                 lock (GetPlayerOperationLock(currentPlayer.PlayerData.Id))
-                    DisconnectCore();
+                    DisconnectCore(persistState);
             }
         }
 
-        private void DisconnectCore()
+        private void DisconnectCore(bool persistState = true)
         {
             if (!Server.Instance.Sessions.TryGetValue(id, out Session? registered)
                 || !ReferenceEquals(registered, this)
@@ -645,7 +661,8 @@ namespace AscNet.GameServer
             {
                 if (player is not null)
                     GuildDormRoomService.Revoke(player.PlayerData.Id);
-                Save();
+                if (persistState)
+                    Save();
             }
             catch (Exception exception)
             {

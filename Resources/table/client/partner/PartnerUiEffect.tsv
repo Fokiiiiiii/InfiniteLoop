@@ -128,3 +128,9 @@ Id	PartnerId	ModelType	EffectType	EffectRootName	EffectPath
 130	16400000	CombatModel	ControlByAnimationEvent	LampsBone12	Assets/Product/Effect/Prefab/FxPet3ChandelieronPrefab/Common/FxPet3ChandelieronUiStand03.prefab
 131	16410000	StandbyModel	Disappear	StarsBone00	Assets/Product/Effect/Prefab/FxPet3StarfishonPrefab/FxPet3StarfishonTrail.prefab
 132	16410000	CombatModel	Appear	HitCase	Assets/Product/Effect/Prefab/FxPet3StarfishonPrefab/FxPet3StarfishonBone13.prefab
+133	16430000	StandbyModel	Disappear	PiranhaBone00	Assets/Product/Effect/Prefab/FxPet3SailfishoffPrefab/Common/FxPet3SailfishoffChange01.prefab
+134	16430000	CombatModel	Appear	SharkBone00	Assets/Product/Effect/Prefab/FxPet3SailfishonPrefab/Common/FxPet3SailfishonEfChange01Trail.prefab
+135	16430000	CombatModel	Appear		Assets/Product/Effect/Prefab/FxPet3SailfishonPrefab/Common/FxPet3SailfishonEfChange01.prefab
+136	16430000	CombatModel	Disappear		Assets/Product/Effect/Prefab/FxPet3SailfishonPrefab/Common/FxPet3SailfishonEfChange02.prefab
+137	16430000	CombatModel	ControlByAnimationEvent		Assets/Product/Effect/Prefab/FxPet3SailfishonPrefab/Common/FxPet3SailfishonUiStand1.prefab
+138	16430000	CombatModel	ControlByAnimationEvent	SharkBone00	Assets/Product/Effect/Prefab/FxPet3SailfishonPrefab/Common/FxPet3SailfishonUiStand1Trail.prefab

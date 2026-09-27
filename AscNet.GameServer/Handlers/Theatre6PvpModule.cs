@@ -661,7 +661,7 @@ internal static class Theatre6PvpModule
         s.BattleRecords = s.BattleRecords.Take(Cfg("MaxBattleRecordCount")).ToList();
         // Authored Phantom Clash missions count completed non-promotion matches only
         // (parameter 2 = normal battle); promotion challenges never count.
-        if (!advanceBattle) Theatre6Module.RecordMetaProgress(m, "PvpBattle", 1, parameter: 2);
+        if (!advanceBattle) Theatre6Module.RecordMetaProgress(m, "PvpBattle", value: 1, parameter: 2, characterId: 0);
         // The battle is filed under the season it was authorised in, not under whatever authorisation
         // this request derived: expiry and give-up can run after the calendar closed, when the current
         // authorisation is already zero, and attributing the record or the defence outcome to season 0

@@ -11,36 +11,39 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 965	906	6	Thunderbolt Tutorial		client/activity/Activity
 966	906	7	Event Guide		client/activity/Activity
 900	908		Insatiable Research		client/activity/Activity
-400	49701		Steering By Light	1787097600	client/activity/Activity
-401	49304	20017	Simulated Battlefield	1787097600	client/activity/Activity
-402	49920	1300635	Blazing Rhapsody	1787097600	client/activity/Activity
-403	49601	89093	Rapid Pursuit		client/activity/Activity
-404	49101	11724	Waves in Wrath		client/activity/Activity
-405	49702	7209	Omniframe Target	1787097600	client/activity/Activity
-406	49702	7212	CUB Target	1787097600	client/activity/Activity
-407	49704	20020	New Coating - Blazing Rhythm	1787097600	client/activity/Activity
-408	49704	20020	New Coating - Sunlit Tides	1787097600	client/activity/Activity
-409	49904	20171	Tactical Assessment Manual	1787097600	client/activity/Activity
-410	49924	20235	Breakers Resurfaced	1787097600	client/activity/Activity
-411	49103	7107	Adaptation Fitting - Patrick	1787097600	client/activity/Activity
-412	49925	20392	Character Leap - Pyroath	1787097600	client/activity/Activity
-413	49102	10035	Blazing Rhythm	1787097600	client/activity/Activity
-414	49104	10035	Sunlit Tides	1787097600	client/activity/Activity
-415	49501	90069	Tainted Moonrise		client/activity/Activity
-416	49501	90070	Grandiose Glamor		client/activity/Activity
-426	49501	90071	Neon Dynamite		client/activity/Activity
-427	49501	90072	Nightfall Finale		client/activity/Activity
-417	48119	20182	Summer's Rhythm		client/activity/Activity
-418	49301	20266	Scarlet Arrival		client/activity/Activity
-428	49302	20091	Ripples of the Past		client/activity/Activity
-429	49105	10035	Drift Into Summer	1787097600	client/activity/Activity
-430	49111	10035	Graffiti Code	1787097600	client/activity/Activity
-431	49201	89113	Love's Leisure Hour	1787097600	client/activity/Activity
+400	50903		Anchored in Faith	1790208000	client/activity/Activity
+401	50403	20017	Simulated Battlefield	1790208000	client/activity/Activity
+402	50709	90073	Dream of Stagnant Cycle		client/activity/Activity
+403	50201	90074	Circuit Calculus	1790208000	client/activity/Activity
+404	50100	90077	Overclock Simulation		client/activity/Activity
+405	50947	89102	Shrouded Requiem	1790208000	client/activity/Activity
+406	50801	89049	Wreck-It Huhu		client/activity/Activity
+407	50501	11724	Wrathful Monsoon		client/activity/Activity
+408	50904	7218	Omniframe Target	1790208000	client/activity/Activity
+409	50904	7212	CUB Target	1790208000	client/activity/Activity
+410	50914	20393	Otherworld Character Target - Kurumi Tokisaki		client/activity/Activity
+411	50914	7220	Otherworld Armament Target - Zafkiel		client/activity/Activity
+412	50906	20020	New Coating - Calamity's End	1790208000	client/activity/Activity
+413	50906	20020	New Coating - Fading Reverie	1790208000	client/activity/Activity
+414	50915	20020	New Coating - Ember Ceremony		client/activity/Activity
+415	50916	20171	Tactical Assessment Manual	1790208000	client/activity/Activity
+416	50601	20395	Against the Flow of Time		client/activity/Activity
+417	50104	7107	Adaptation Fitting: Zafkiel		client/activity/Activity
+418	50602	20235	A Kindler's Watch	1790208000	client/activity/Activity
+419	50106	7107	Adaptation Fitting: Kelpie	1790208000	client/activity/Activity
+420	50103	10035	Ember Ceremony		client/activity/Activity
+421	50107	10035	Calamity's End	1790208000	client/activity/Activity
+422	50112	10035	Fading Reverie	1790208000	client/activity/Activity
+425	51001	20401	Night Sonata		client/activity/Activity
+426	51001	20402	Threads of Destiny		client/activity/Activity
+427	51001	20403	Love's Dawn		client/activity/Activity
+428	51001	20404	Tsubaki		client/activity/Activity
+430	50302	20140	Cosmic Wonders		client/activity/Activity
 1		11736	Leaf-Ferried Dreams		share/fuben/FubenActivity
 2		20015	Babel Tower: Dimming Surge		share/fuben/FubenActivity
 3		11761	Magpie's Fortune		share/fuben/FubenActivity
-4	49303	20017	Simulated Battlefield		share/fuben/FubenActivity
-5	49101	11724	Waves in Wrath		share/fuben/FubenActivity
+4	50402	20017	Simulated Battlefield		share/fuben/FubenActivity
+5	50502	11724	Wrathful Monsoon		share/fuben/FubenActivity
 6		82070	Operation Uniframe		share/fuben/FubenActivity
 8		80201	Path of Buried Wishes		share/fuben/FubenActivity
 9		87001	Co-op Mode		share/fuben/FubenActivity
@@ -50,7 +53,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 13			Palette Clash		share/fuben/FubenActivity
 14		89001	Blazing Trails		share/fuben/FubenActivity
 15		88005	Memory Rescue - Canvas Chronicle		share/fuben/FubenActivity
-16	49924	20235	Breakers Resurfaced		share/fuben/FubenActivity
+16	50602	20235	A Kindler's Watch		share/fuben/FubenActivity
 17		20104	Ultimate Brawl - Deadlocked		share/fuben/FubenActivity
 18		89008	Crafting Lulu		share/fuben/FubenActivity
 19		11795	Arcade Anima: Noan		share/fuben/FubenActivity
@@ -75,7 +78,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 38		89044	Alternate World: Spice and Salt		share/fuben/FubenActivity
 39		89045	Magic Square Bounce		share/fuben/FubenActivity
 40		89050	Pulao's Cultivation		share/fuben/FubenActivity
-41		89049	Wreck-It Shark-speare		share/fuben/FubenActivity
+41	50801	89049	Wreck-It Huhu		share/fuben/FubenActivity
 42		89052	Spring Gala		share/fuben/FubenActivity
 43		89058	Nexus Trek		share/fuben/FubenActivity
 44		89061	Trial of Simulacrums		share/fuben/FubenActivity
@@ -105,7 +108,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 68		90031	Viva la Nina: Rerun		share/fuben/FubenActivity
 69		90032	Slumberland: Rerun		share/fuben/FubenActivity
 70		90036	Dreams at Twilight		share/fuben/FubenActivity
-71	49601	89093	Rapid Pursuit		share/fuben/FubenActivity
+71		89093	Rapid Pursuit		share/fuben/FubenActivity
 72		89094	Shattered Mirage		share/fuben/FubenActivity
 73		89062	Earthy Camping		share/fuben/FubenActivity
 74		20292	Lost in Whitebloom: Rerun		share/fuben/FubenActivity
@@ -116,7 +119,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 83		20299	Her Merciful Gaze		share/fuben/FubenActivity
 84		90047	Hyperlink Array		share/fuben/FubenActivity
 85		20321	Behind the Curtain		share/fuben/FubenActivity
-86	49920	1300635	Blazing Rhapsody		share/fuben/FubenActivity
+86		1300635	Blazing Rhapsody		share/fuben/FubenActivity
 87		20342	Dreams at Twilight: Rerun		share/fuben/FubenActivity
 88		20343	A Love Story Across Time: Rerun		share/fuben/FubenActivity
 89		20344	Shape of Thunder: Rerun		share/fuben/FubenActivity
@@ -128,18 +131,22 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 95		1300640	Retro Arcade		share/fuben/FubenActivity
 96		20364	Path of Unclouded Hearts		share/fuben/FubenActivity
 97		89105	Huhu's Fantastic Garden		share/fuben/FubenActivity
-98	48820	89106	Tidal Wishes		share/fuben/FubenActivity
-99	49201	89113	Love's Leisure Hour		share/fuben/FubenActivity
-100	48801	90068	Dimensional Tuner		share/fuben/FubenActivity
-1	49901		ActivityBrief		client/activitybrief/ActivityBrief
-1	49401	536	3.4主线活动		client/activitybrief/ActivityBriefGroup
+98		89106	Tidal Wishes		share/fuben/FubenActivity
+99		89113	Love's Leisure Hour		share/fuben/FubenActivity
+100		90068	Dimensional Tuner		share/fuben/FubenActivity
+101	50202	90073	Dream of Stagnant Cycle		share/fuben/FubenActivity
+102	50201	90074	Circuit Calculus		share/fuben/FubenActivity
+103	50601	20395	Against the Flow of Time		share/fuben/FubenActivity
+104	50100	90077	Overclock Simulation		share/fuben/FubenActivity
+1	50909		ActivityBrief		client/activitybrief/ActivityBrief
+1	50401	537	3.4主线活动		client/activitybrief/ActivityBriefGroup
 2		8000	Side Event		client/activitybrief/ActivityBriefGroup
-3	49101	11724	3.4超难关		client/activitybrief/ActivityBriefGroup
+3	50501	11724	3.4超难关		client/activitybrief/ActivityBriefGroup
 4		20019	8/6-8/20		client/activitybrief/ActivityBriefGroup
 5		20117	Interlude 1		client/activitybrief/ActivityBriefGroup
 6		20015	Babel Tower		client/activitybrief/ActivityBriefGroup
 7		20018	Roguelike Ascension		client/activitybrief/ActivityBriefGroup
-8	49303	20017	Multi Clear		client/activitybrief/ActivityBriefGroup
+8	50402	20017	Multi Clear		client/activitybrief/ActivityBriefGroup
 9		11723	Regional Co-op		client/activitybrief/ActivityBriefGroup
 10		11722	Sniper Battle		client/activitybrief/ActivityBriefGroup
 11		11729	Short Story		client/activitybrief/ActivityBriefGroup
@@ -158,8 +165,8 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 24		11736	RPG Mode		client/activitybrief/ActivityBriefGroup
 25		20053	Event Draw		client/activitybrief/ActivityBriefGroup
 26		11738	Fake Ascension - Main Roleplay Event		client/activitybrief/ActivityBriefGroup
-27	49924	20235	3.4新角色试玩		client/activitybrief/ActivityBriefGroup
-28	49104	10035	涂装试玩关		client/activitybrief/ActivityBriefGroup
+27	50602	20235	3.4新角色试玩		client/activitybrief/ActivityBriefGroup
+28	50107	10035	涂装试玩关		client/activitybrief/ActivityBriefGroup
 29		15003	Mentorship System		client/activitybrief/ActivityBriefGroup
 30		11749	Nier Mode		client/activitybrief/ActivityBriefGroup
 31		11750	Micawberism Cloisters		client/activitybrief/ActivityBriefGroup
@@ -241,6 +248,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 108		89071	Simulated Trial Event		client/activitybrief/ActivityBriefGroup
 109		89074	Stroll Mode		client/activitybrief/ActivityBriefGroup
 110		90020	Inventory Sorting		client/activitybrief/ActivityBriefGroup
+111		89075	2048		client/activitybrief/ActivityBriefGroup
 112		89079	FPS		client/activitybrief/ActivityBriefGroup
 113		90010	Selection Stage		client/activitybrief/ActivityBriefGroup
 114		80203	Luna Pool Coating		client/activitybrief/ActivityBriefGroup
@@ -254,7 +262,7 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 122		90025	Pac-Man		client/activitybrief/ActivityBriefGroup
 123		89092	Roguelike 5		client/activitybrief/ActivityBriefGroup
 124		526	3.6 Second Half Main Event		client/activitybrief/ActivityBriefGroup
-125	49601	89093	Holographic Replay Bonuses		client/activitybrief/ActivityBriefGroup
+125		89093	Holographic Replay Bonuses		client/activitybrief/ActivityBriefGroup
 126		89094	Tactical Override		client/activitybrief/ActivityBriefGroup
 127		525	3.6上半主线		client/activitybrief/ActivityBriefGroup
 128		527	3.7主线活动		client/activitybrief/ActivityBriefGroup
@@ -267,30 +275,32 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 137		90047	relink		client/activitybrief/ActivityBriefGroup
 138		20363	卡池皮肤试玩		client/activitybrief/ActivityBriefGroup
 139		90018	情人节打牌		client/activitybrief/ActivityBriefGroup
-140		90055	Service Shop		client/activitybrief/ActivityBriefGroup
+140	50937	90055	Service Shop		client/activitybrief/ActivityBriefGroup
 141		90057	Service Mission		client/activitybrief/ActivityBriefGroup
 142		89090	Roguelike 4		client/activitybrief/ActivityBriefGroup
-143	49551	20385	大好感		client/activitybrief/ActivityBriefGroup
-144	49920	1300635	PGR Brothers		client/activitybrief/ActivityBriefGroup
+143	50651	20405	大好感		client/activitybrief/ActivityBriefGroup
+144		1300635	PGR Brothers		client/activitybrief/ActivityBriefGroup
 145		1300640	Minigame Collection		client/activitybrief/ActivityBriefGroup
-146	48601	89102	肉鸽6		client/activitybrief/ActivityBriefGroup
+146	50947	89102	Roguelike 6		client/activitybrief/ActivityBriefGroup
 147		89105	Grand Dyeing		client/activitybrief/ActivityBriefGroup
-148	48820	89106	夏日剧情活动		client/activitybrief/ActivityBriefGroup
+148		89106	夏日剧情活动		client/activitybrief/ActivityBriefGroup
 149		89094	Mini Modification		client/activitybrief/ActivityBriefGroup
-150	49201	89113	七夕开包		client/activitybrief/ActivityBriefGroup
-46004	48820	89106	Tidal Wishes		share/newactivitycalendar/NewActivityCalendarActivity
-46010	48801	90068	Dimensional Tuner		share/newactivitycalendar/NewActivityCalendarActivity
-47001	49702	20235	Breakers Resurfaced		share/newactivitycalendar/NewActivityCalendarActivity
-47002	49102	10035	Blazing Rhythm		share/newactivitycalendar/NewActivityCalendarActivity
-47003	49104	10035	Sunlit Tides		share/newactivitycalendar/NewActivityCalendarActivity
-47005	49920	1300635	Blazing Rhapsody		share/newactivitycalendar/NewActivityCalendarActivity
-47006	49101	11724	Waves in Wrath		share/newactivitycalendar/NewActivityCalendarActivity
-47007	49601	89093	Rapid Pursuit		share/newactivitycalendar/NewActivityCalendarActivity
-47008	49201	89113	Love's Leisure Hour		share/newactivitycalendar/NewActivityCalendarActivity
-47009	49551	20385	Journal of Promise		share/newactivitycalendar/NewActivityCalendarActivity
-47010	49301	20266	Scarlet Arrival		share/newactivitycalendar/NewActivityCalendarActivity
-47011	49302	20091	Ripples of the Past		share/newactivitycalendar/NewActivityCalendarActivity
-47012	49105	10035	Drift Into Summer		share/newactivitycalendar/NewActivityCalendarActivity
+150		89113	七夕开包		client/activitybrief/ActivityBriefGroup
+152	50201	90074	Circuit Calculus		client/activitybrief/ActivityBriefGroup
+153	50801	89049	破坏王		client/activitybrief/ActivityBriefGroup
+154	50601	20395	联动试玩		client/activitybrief/ActivityBriefGroup
+155	50202	90073	Collab Story		client/activitybrief/ActivityBriefGroup
+156	51001	20400	卡池复刻		client/activitybrief/ActivityBriefGroup
+157	50100	90077	Overclock Simulation		client/activitybrief/ActivityBriefGroup
+48001	50602	20235	A Kindler's Watch		share/newactivitycalendar/NewActivityCalendarActivity
+48003	50103	10035	Ember Ceremony		share/newactivitycalendar/NewActivityCalendarActivity
+48004	50107	10035	Calamity's End		share/newactivitycalendar/NewActivityCalendarActivity
+48006	50201	90074	Circuit Calculus		share/newactivitycalendar/NewActivityCalendarActivity
+48007	50100	90077	Overclock Simulation		share/newactivitycalendar/NewActivityCalendarActivity
+48008	50502	11724	Wrathful Monsoon		share/newactivitycalendar/NewActivityCalendarActivity
+48009	50801	89049	Wreck-It Huhu		share/newactivitycalendar/NewActivityCalendarActivity
+48011	50302	20140	Cosmic Wonders		share/newactivitycalendar/NewActivityCalendarActivity
+48012	50112	10035	Fading Reverie		share/newactivitycalendar/NewActivityCalendarActivity
 1030			Stars Ensnared		share/fuben/mainline2/MainLine2Main+Chapter
 2006			When Day Breaks		share/fuben/mainline2/MainLine2Main+Chapter
 2007			Soaring Beyond		share/fuben/mainline2/MainLine2Main+Chapter
@@ -318,9 +328,11 @@ Id	TimeId	SkipId	Name	ShowBeginTime	Source
 2015			The Dying Sun		share/fuben/mainline2/MainLine2Main+Chapter
 1041			Homecoming Voyage		share/fuben/mainline2/MainLine2Main+Chapter
 2016			Of Solitude and Stillness		share/fuben/mainline2/MainLine2Main+Chapter
-1042	49401		Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
-1142	49402		Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
-1242	49402		Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
+1042			Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
+1142			Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
+1242			Steering By Light		share/fuben/mainline2/MainLine2Main+Chapter
+1043	50401		Anchored in Faith		share/fuben/mainline2/MainLine2Main+Chapter
+1143	50401		Anchored in Faith		share/fuben/mainline2/MainLine2Main+Chapter
 1	711		Transfinite		share/fuben/transfinite/TransfiniteActivity
 2	42602		Transfinite		share/fuben/transfinite/TransfiniteActivity
 3	712		Transfinite		share/fuben/transfinite/TransfiniteActivity

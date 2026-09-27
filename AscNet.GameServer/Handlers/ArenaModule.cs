@@ -1,7 +1,6 @@
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
-using AscNet.Table.V2.share.chat;
 using AscNet.Table.V2.client.fuben.arena;
 using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.share.fuben.arena;
@@ -118,7 +117,6 @@ namespace AscNet.GameServer.Handlers
         private static readonly Lazy<List<ChallengeAreaTable>> Challenges = new(() => TableReaderV2.Parse<ChallengeAreaTable>());
         private static readonly Lazy<Dictionary<int, AreaStageTable>> AreaStages = new(() => TableReaderV2.Parse<AreaStageTable>().ToDictionary(x => x.Id));
         private static readonly Lazy<Dictionary<int, MarkTable>> Marks = new(() => TableReaderV2.Parse<MarkTable>().ToDictionary(x => x.MarkId));
-        private static readonly Lazy<Dictionary<int, ChatBoardTable>> ChatBoards = new(() => TableReaderV2.Parse<ChatBoardTable>().ToDictionary(x => x.Id));
         private static readonly Lazy<List<ArenaGroupFightEventTable>> FightEventGroups = new(() =>
             TableReaderV2.Parse<ArenaGroupFightEventTable>()
                 .OrderBy(group => group.Id)
@@ -357,22 +355,7 @@ namespace AscNet.GameServer.Handlers
                 }
                 else if (rewardType == RewardType.ChatBoard)
                 {
-                    if (!ChatBoards.Value.TryGetValue(good.TemplateId, out ChatBoardTable? chatBoard))
-                        throw new InvalidDataException($"Arena reward {rewardId} references unknown chat board {good.TemplateId}.");
-                    ChatBoardUnlockState? existing = session.player.UnlockedChatBoards.Find(unlock => unlock.Id == good.TemplateId);
-                    if (existing is null)
-                    {
-                        session.player.UnlockedChatBoards.Add(new ChatBoardUnlockState
-                        {
-                            Id = good.TemplateId,
-                            GetTime = rewardTime,
-                            EndTime = chatBoard.Duration > 0 ? checked(rewardTime + chatBoard.Duration) : 0
-                        });
-                    }
-                    else if (existing.EndTime != 0 && chatBoard.Duration > 0)
-                    {
-                        existing.EndTime = checked(Math.Max(rewardTime, existing.EndTime) + chatBoard.Duration);
-                    }
+                    RewardHandler.UnlockChatBoardReward(good.TemplateId, session.player, rewardTime);
                 }
                 else
                 {

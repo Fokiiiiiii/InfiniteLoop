@@ -3,6 +3,8 @@ using AscNet.Common.Database;
 using AscNet.Common.Util;
 using AscNet.GameServer.Game;
 using AscNet.Table.V2.share.newactivitycalendar;
+using AscNet.Table.V2.share.fuben.festival;
+using AscNet.Table.V2.share.fuben.experiment;
 
 namespace AscNet.GameServer.Handlers
 {
@@ -74,7 +76,47 @@ namespace AscNet.GameServer.Handlers
 
         private static Dictionary<string, object?> BuildAccumulateExpendPayload() => PayloadFromJson("""{"ActivityId":7}""");
         private static Dictionary<string, object?> BuildTurntablePayload() => PayloadFromJson("""{"TurntableData":{"ActivityId":4,"AccumulateDrawNum":0,"GainRewardInfos":[],"GainRecords":[],"GainAccumulateRewardIndexs":[]}}""");
-        private static Dictionary<string, object?> BuildFestivalPayload() => PayloadFromJson("""{"FestivalInfos":[{"Id":24,"StageInfos":[{"Id":30130507,"ChallengeCount":0},{"Id":30130508,"ChallengeCount":0},{"Id":30130512,"ChallengeCount":0},{"Id":30130510,"ChallengeCount":0},{"Id":30130511,"ChallengeCount":0},{"Id":30130513,"ChallengeCount":0},{"Id":30130509,"ChallengeCount":0},{"Id":30130514,"ChallengeCount":0}],"FubenEventInfos":null},{"Id":29,"StageInfos":[{"Id":30131155,"ChallengeCount":0},{"Id":30131150,"ChallengeCount":0},{"Id":30131151,"ChallengeCount":0},{"Id":30131152,"ChallengeCount":0},{"Id":30131156,"ChallengeCount":0},{"Id":30131157,"ChallengeCount":0},{"Id":30131153,"ChallengeCount":0},{"Id":30131158,"ChallengeCount":0},{"Id":30131154,"ChallengeCount":0},{"Id":30131159,"ChallengeCount":0}],"FubenEventInfos":null},{"Id":23,"StageInfos":[{"Id":30131113,"ChallengeCount":0},{"Id":30131114,"ChallengeCount":0},{"Id":30131115,"ChallengeCount":0}],"FubenEventInfos":null},{"Id":25,"StageInfos":[{"Id":30131124,"ChallengeCount":0},{"Id":30131125,"ChallengeCount":0}],"FubenEventInfos":null},{"Id":30,"StageInfos":[{"Id":30130310,"ChallengeCount":0},{"Id":30130311,"ChallengeCount":0},{"Id":30130312,"ChallengeCount":0},{"Id":30130313,"ChallengeCount":0},{"Id":30130314,"ChallengeCount":0},{"Id":30130315,"ChallengeCount":0},{"Id":30130316,"ChallengeCount":0},{"Id":30130317,"ChallengeCount":0},{"Id":30130318,"ChallengeCount":0},{"Id":30130319,"ChallengeCount":0}],"FubenEventInfos":null},{"Id":27,"StageInfos":[{"Id":30130212,"ChallengeCount":0},{"Id":30130213,"ChallengeCount":0}],"FubenEventInfos":null}]}""");
+        private static readonly Lazy<List<FestivalActivityTable>> FestivalActivities = new(() => TableReaderV2.Parse<FestivalActivityTable>());
+
+        // Client marks every listed stage Passed (xfubenfestivalactivitymanager.RefreshStagePassed), so only persisted clears are sent;
+        // closed/historical festivals keep their clears since the client only renders open chapters.
+        internal static Dictionary<string, object?> BuildFestivalPayload(Stage stage) => new()
+        {
+            ["FestivalInfos"] = FestivalActivities.Value
+                .Select(festival => (festival.Id, Stages: festival.StageId
+                    .Where(stageId => stageId > 0 && stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed)
+                    .Select(stageId => new Dictionary<string, object?> { ["Id"] = stageId, ["ChallengeCount"] = stage.Stages[stageId].PassTimesTotal })
+                    .ToList()))
+                .Where(festival => festival.Stages.Count > 0)
+                .Select(festival => new Dictionary<string, object?> { ["Id"] = festival.Id, ["StageInfos"] = festival.Stages, ["FubenEventInfos"] = null })
+                .ToList()
+        };
+
+        private static readonly Lazy<List<ExperimentLevelTable>> ExperimentLevels = new(() => TableReaderV2.Parse<ExperimentLevelTable>());
+
+        // FinishIds feeds CheckExperimentIsFinish (condition 11107, SkinTrial red dot): a level is finished once any authored stage is passed.
+        // ExperimentInfos (StarList reward claims) stays empty: no server star-reward flow exists.
+        internal static Dictionary<string, object?> BuildExperimentPayload(Stage stage) => new()
+        {
+            ["FinishIds"] = ExperimentLevels.Value
+                .Where(level => new[] { level.SingStageId, level.MultStageId }
+                    .Any(stageId => stageId > 0 && stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed))
+                .Select(level => level.Id)
+                .ToList(),
+            ["ExperimentInfos"] = Array.Empty<object>()
+        };
+
+        // In-session twin of FinishIds: XRpc.NotifyUpdateExperimentId {Id, Info?} appends Id once; call only on a stage's first clear.
+        internal static void PushNewlyFinishedExperiments(Session session, long clearedStageId)
+        {
+            foreach (ExperimentLevelTable level in ExperimentLevels.Value.Where(level => level.SingStageId == clearedStageId || level.MultStageId == clearedStageId))
+            {
+                bool finishedBefore = new[] { level.SingStageId, level.MultStageId }.Any(stageId => stageId > 0 && stageId != clearedStageId
+                    && session.stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed);
+                if (!finishedBefore)
+                    session.SendPush("NotifyUpdateExperimentId", MessagePackPayloads.Serialize(new Dictionary<string, object?> { ["Id"] = level.Id }));
+            }
+        }
         private static Dictionary<string, object?> BuildGame2048Payload() => PayloadFromJson("""{"Game2048DataDb":{"ActivityId":4,"StageContext":null,"StageFinish":[]}}""");
         private static Dictionary<string, object?> BuildGameCollectionPayload() => PayloadFromJson("""{"GameCollectionData":{"ActivityId":1,"GameData":{}}}""");
         private static Dictionary<string, object?> BuildGoldenMinerPayload() => PayloadFromJson("""{"StageDataDb":{"ActivityId":7,"StageScores":0,"TotalMaxScores":0,"TotalMaxScoresCharacter":0,"TotalMaxScoresHexes":null,"TodayPlayGame":0,"TotalPlayCount":0,"CurrentPlayStage":0,"CurrentState":0,"RedEnvelopeProgress":{},"CharacterId":0,"CharacterDbs":[],"FinishStageId":[],"ItemColumns":{},"BuffColumns":{},"UpgradeStrengthens":[],"MinerShopDbs":[],"ItemBuyRecord":{},"StageMapInfos":[{"StageId":1,"MapId":72215},{"StageId":2,"MapId":72814},{"StageId":3,"MapId":72810},{"StageId":4,"MapId":72821},{"StageId":5,"MapId":72830},{"StageId":6,"MapId":72840},{"StageId":7,"MapId":72852},{"StageId":8,"MapId":72860}],"HideTaskInfo":[],"HideStageCount":0,"TotalScore":0,"IsSaveFailed":false,"HexRecords":[],"HexUpgradeRecord":{},"HexHistory":[],"TotalHexCount":0,"FinishTeachMap":[],"IsFinishAllTeach":false,"RandMapIds":[72813,72814,72810,72821,72830,72840,72852,72860,72215],"CoreGenerateResults":[],"CommonGenerateResults":[],"CommonHexSelectCount":0,"CommonHexRefreshCount":0}}""");

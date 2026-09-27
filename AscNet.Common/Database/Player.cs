@@ -88,6 +88,11 @@ namespace AscNet.Common.Database
         [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
         public Dictionary<int, int> ConditionCounters { get; set; } = new();
 
+        // Business-day spend counters for source TaskTimeLimit.DayTaskId tasks; cleared on daily rollover.
+        [BsonElement("day_task_condition_counters")]
+        [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+        public Dictionary<int, int> DayTaskConditionCounters { get; set; } = new();
+
         [BsonElement("claimed_task_ids")]
         public List<int> ClaimedTaskIds { get; set; } = new();
 
@@ -397,7 +402,7 @@ namespace AscNet.Common.Database
         {
             try
             {
-                return collection.AsQueryable().FirstOrDefault(x => x.PlayerData.Id == id);
+                return collection.Find(x => x.PlayerData.Id == id).FirstOrDefault();
             }
             catch (Exception ex)
             {
@@ -707,6 +712,9 @@ namespace AscNet.Common.Database
 
         [BsonElement("unlocked_chat_boards")]
         public List<ChatBoardUnlockState> UnlockedChatBoards { get; set; } = new();
+
+        [BsonElement("chat_board_reward_claims")]
+        public List<string> ChatBoardRewardClaims { get; set; } = new();
 
         [BsonElement("purchase_buy_times")]
         [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]

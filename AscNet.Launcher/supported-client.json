@@ -1,16 +1,16 @@
 {
-  "applicationVersion": "4.7.0",
-  "patchVersion": "0.2.0",
+  "applicationVersion": "4.8.0",
+  "patchVersion": "0.3.0",
   "pgrBase": {
     "originals": ["fbb01424adb76a2b4ea206eb550977276b2e30e5b316a32e2b5af7d90ceba9fe"],
     "unityPlayers": ["5a913706320879d1c189053dafc8bc6e29bddc15f5a4564d4326be225d9c91e5"],
     "originalExportJump": [233, 174, 101, 44, 1]
   },
   "originals": {
-    "PGR.exe": ["56c02821711675403ffbd8a40c3bad0f4217b5adc30eb33c652379a8fda66f76"],
+    "PGR.exe": ["f8288391f51963c9ed4665aae0cd9fb6cad53b61da584e80dbd1f243b0573760"],
     "GameAssembly.dll": [
-      "036b2f823e89465cd0542c7736e9d763ef880d9a791c19d412dfe1f4d8fd5ed0",
-      "7dbdbc91ea9952b3e1d37b65817152326287c36e1cf82f6a83ad33d37c5d5eab"
+      "910a2988f5819641ba3d0b5fcbcb8659e088b5899e7f3b22f4098efcfe1c4d5e",
+      "ea70a4d72cd11fd9cfdaf9408ae79ab7e926ed1da8593a6d3c62db8f1283dbbd"
     ],
     "PGR_Data/Plugins/KRSDK.dll": [
       "2a1d8f5def0e3a0ccb712a471d7f0b2097d6444d701e399524663c87c1d34c88",
