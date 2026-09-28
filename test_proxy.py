@@ -185,6 +185,13 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertEqual(b"OK", flow.response.content)
         self.assertEqual("prod.twzspnslog.kurogame.com", flow.request.host)
 
+    def test_pgr_game_feedback_host_is_sunk(self):
+        flow = self.flow("/feedback", "prod.twzspnslog.pgr-game.com")
+
+        proxy.request(flow)
+
+        self.assertEqual(200, flow.response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

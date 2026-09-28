@@ -48,7 +48,8 @@ namespace AscNet.SDKServer.Controllers
             app.MapGet("/prod/client/notice/html/{fileName}", HandleNoticeHtmlRequest);
 
 
-            app.MapPost("/feedback", () => "1");
+            // Client log/feedback uploads (EN and TW) are accepted and discarded locally.
+            app.Map("/feedback", () => "1");
         }
 
         private static string HandleConfigRequest(HttpContext ctx)

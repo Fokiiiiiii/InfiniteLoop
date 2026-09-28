@@ -93,7 +93,7 @@ def _is_ascnet_gate_request(flow):
 
 
 def _is_feedback_request(flow):
-    return flow.request.pretty_host in {"prod.enzspnslog.kurogame.com", "prod.twzspnslog.kurogame.com"} and flow.request.path.split("?", 1)[0] == "/feedback"
+    return "zspnslog." in flow.request.pretty_host and flow.request.path.split("?", 1)[0] == "/feedback"
 
 def _is_wildcard_connect_request(flow):
     return flow.request.method == "CONNECT" and _is_local_wildcard_host(flow.request.pretty_host)

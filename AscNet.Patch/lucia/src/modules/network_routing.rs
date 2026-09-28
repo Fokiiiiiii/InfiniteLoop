@@ -27,6 +27,11 @@ pub(crate) fn redirected_url(origin: &str, url: &str) -> Option<String> {
         .find('/')
         .map(|offset| scheme + 3 + offset)?;
     let suffix = &url[path..];
+    // Client log/feedback uploads (EN/TW `*zspnslog.*` hosts) stay on the local server.
+    let host = url[scheme + 3..path].split(':').next().unwrap_or_default();
+    if host.contains("zspnslog.") && suffix.split(['?', '#']).next() == Some("/feedback") {
+        return Some(format!("{origin}{suffix}"));
+    }
     owned_path(suffix.strip_prefix("/prod/")?)
         .then(|| format!("{origin}{suffix}"))
 }
@@ -79,5 +84,15 @@ mod tests {
                 None
             );
         }
+
+        for url in [
+            "http://prod.twzspnslog.pgr-game.com:50000/feedback",
+            "http://prod.enzspnslog.kurogame.com/feedback?event=login",
+        ] {
+            let suffix = &url[url.find("/feedback").unwrap()..];
+            assert_eq!(redirected_url(ORIGIN, url), Some(format!("{ORIGIN}{suffix}")));
+        }
+        assert_eq!(redirected_url(ORIGIN, "http://prod.twzspnslog.pgr-game.com:50000/other"), None);
+        assert_eq!(redirected_url(ORIGIN, "https://cdn.example/feedback"), None);
     }
 }
