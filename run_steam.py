@@ -505,6 +505,7 @@ def main() -> int:
     launch_cmd = normalize_launch_cmd(args.launch_cmd)
 
     env = os.environ.copy()
+    env.setdefault("DOTNET_ROLL_FORWARD", "Major")
     env["ASCNET_PUBLIC_HTTP_ORIGIN"] = args.sdk_url.rstrip("/")
     gate_fallback = gate_fallback_username(args)
     if gate_fallback:
