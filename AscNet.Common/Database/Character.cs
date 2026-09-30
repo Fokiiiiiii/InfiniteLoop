@@ -643,7 +643,8 @@ namespace AscNet.Common.Database
             foreach (CharacterSkill skill in character.SkillList)
             {
                 int maxLevel = maxLevelBySkillId.GetValueOrDefault((int)skill.Id);
-                if (maxLevel <= 0)
+                // Evolution passives cap at levels 1-3; resonance only reduces normal skills.
+                if (maxLevel <= 3)
                     continue;
 
                 int effectiveMaxLevel = Math.Max(1, maxLevel - resonanceCount);
