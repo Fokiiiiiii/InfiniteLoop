@@ -1,6 +1,6 @@
 # AscNet Agent Guide
 
-AscNet is a research/private-server emulator for Punishing: Gray Raven. The runtime projects target .NET 8 and expect a local MongoDB instance; the legacy `AscNet.PcapParser` utility targets .NET Framework 4.8.1 and uses `packages.config`. Keep changes narrow and preserve existing behavior unless the task requires otherwise.
+AscNet is a research/private-server emulator for Punishing: Gray Raven. The runtime projects target .NET 10 and expect a local MongoDB instance; the legacy `AscNet.PcapParser` utility targets .NET Framework 4.8.1 and uses `packages.config`. Keep changes narrow and preserve existing behavior unless the task requires otherwise.
 
 ## Non-negotiable protocol rule
 
@@ -47,7 +47,7 @@ For all game-protocol work:
 
 ## Build, run, and test
 
-Prerequisites documented by the repository are .NET SDK 8, MongoDB at `127.0.0.1:27017` (or `mongod` for the runner), Python 3.10+, and mitmproxy/mitmdump for bridge mode.
+Prerequisites documented by the repository are .NET SDK 10, MongoDB at `127.0.0.1:27017` (or `mongod` for the runner), Python 3.10+, and mitmproxy/mitmdump for bridge mode.
 
 ```bash
 # Run the server after MongoDB is available
@@ -76,7 +76,7 @@ Focused harness switches are defined in `AscNet.Test/Program.cs`; `README.md` co
 ## Change discipline
 
 - Put game TCP behavior in `AscNet.GameServer/`, HTTP-facing behavior in `AscNet.SDKServer/`, and shared schemas/state/database concerns in `AscNet.Common/`; follow the existing module near the behavior being changed.
-- Keep nullable-reference handling compatible with the .NET 8 runtime projects, which enable nullable references and implicit usings; do not assume the legacy parser shares their framework or project conventions.
+- Keep nullable-reference handling compatible with the .NET 10 runtime projects, which enable nullable references and implicit usings; do not assume the legacy parser shares their framework or project conventions.
 - For protocol changes, test observable request/state-to-response behavior rather than implementation details. Include distinct-input coverage for any derived fields.
 - Do not commit packet captures of any kind. Also do not commit `.runtime/`, MongoDB files, proxy flow logs, `bin/`, `obj/`, client binaries, runtime logs, or captured credentials.
 - JP play is started from Steam after `run_steam.py --region jp --proxy-local` reports that the local bridge is ready; do not launch `PGR.exe` directly or modify the client installation.

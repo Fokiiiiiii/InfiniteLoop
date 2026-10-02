@@ -32,6 +32,7 @@ internal partial class Program
     private static void ValidateVersion47CharacterCompatibility()
     {
         PacketFactory.LoadPacketHandlers();
+        AssertEqual(28, Character.CharacterSkillMaxLevel(101201), "character skill client-safe cap");
 
         ValidateVersion47HeadEquipValidation();
         ValidateVersion47HeadTimeoutReconciliation();

@@ -752,6 +752,8 @@ namespace AscNet.Common.Database
                         .Select(skillId => (uint)skillId)
                         .ToArray());
         }
+        private const int CharacterSkillClientLevelCap = 28;
+
         private sealed class CharacterSkillTableIndexes
         {
             private Dictionary<int, IReadOnlyList<CharacterSkillUpgradeTable>>? upgradesBySkillId;
@@ -815,7 +817,7 @@ namespace AscNet.Common.Database
                     continue;
                 if (selectedSkill is not null)
                 {
-                    int maxLevel = tableIndexes.MaxLevelBySkillId.GetValueOrDefault((int)selectedSkill.Id);
+                    int maxLevel = Math.Min(CharacterSkillClientLevelCap, tableIndexes.MaxLevelBySkillId.GetValueOrDefault((int)selectedSkill.Id));
                     if (maxLevel > 0 && selectedSkill.Level > maxLevel)
                         normalizedSkills.Add(new CharacterSkill { Id = selectedSkill.Id, Level = maxLevel });
                     else
@@ -1233,11 +1235,12 @@ namespace AscNet.Common.Database
         /// </summary>
         public static int CharacterSkillMaxLevel(int skillId)
         {
-            return TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
+            int maxLevel = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
                 .Where(row => row.SkillId == skillId)
                 .Select(row => row.Level)
                 .DefaultIfEmpty()
                 .Max();
+            return Math.Min(CharacterSkillClientLevelCap, maxLevel);
         }
 
         public UpgradeCharacterSkillResult UpgradeCharacterSkillGroup(int skillGroupId, int count, IReadOnlyCollection<int> gatherRewards)

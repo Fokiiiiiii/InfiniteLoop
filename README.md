@@ -345,7 +345,7 @@ This also covers the earlier broken state where `Gender` may have been written b
 
 Minimum local tooling:
 
-- .NET SDK 8
+- .NET SDK 10
 - MongoDB reachable at `127.0.0.1:27017`, or `mongod` available for `run_steam.py --with-mongo`
 - Python 3.10 or newer for `run_steam.py`
 - mitmproxy/mitmdump for Steam/PC bridge mode
