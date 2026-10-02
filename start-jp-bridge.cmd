@@ -11,7 +11,7 @@ if errorlevel 1 (
 
 echo Starting the JP AscNet bridge.
 echo Leave this window open, wait for the ready message, then launch the game from Steam.
-%PYTHON% "%~dp0run_steam.py" --region jp --with-mongo --proxy-local --proxy-log "" --tcp-capture --no-smoke
+%PYTHON% "%~dp0run_steam.py" --region jp --with-mongo --mongod "%~dp0.runtime\mongo-migration\server\mongodb-win32-x86_64-windows-7.0.43\bin\mongod.exe" --mongo-dbpath ".runtime\mongo" --proxy-local --proxy-log "" --tcp-capture --no-smoke
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
