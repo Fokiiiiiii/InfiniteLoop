@@ -18,7 +18,9 @@ The current server data/config target is **4.8**, not a claim of complete 4.8 ga
 | Game server TCP port | `2335` by default |
 | SDK/HTTP URL used by the runner | `http://127.0.0.1:8080` by default |
 
-`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0, EN and TW (launcher 1.0.7, patch 0.3.0).
+`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0, EN, TW, KR, JP and CN (launcher 1.0.8, patch 0.4.0; CN: see `Docs/cn-sdk-support.md`).
+
+One instance serves every region: the package in the config request picks the `Packages` entry (document/launch version, hashes and its `Region` block of CDNs, channel, server-list label and config rows) in `version_config.json`, and each TCP session reports its own document version from the handshake. Tables, notices and gameplay stay the shared EN-derived set for all regions. KR and JP config tuples come from their live config.tab; KR/JP native hooks are statically checked only (see `AscNet.Launcher/docs/client-download.md`) until a KR/JP client run.
 
 ## What changed in this branch
 
@@ -291,8 +293,6 @@ Run the focused server compatibility harness:
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-only
 ```
 
-### Gender setup fix
-
 ### Babylonia (BigWorld) world core
 
 `AscNet.GameServer/Handlers/BigWorld/BigWorldModule*.cs` owns world enter/leave, instance levels, the engine save channel (`DlcWorldSaveData`, `DlcWorldSceneObjectData`, `DlcSceneObjectStateSet`, `DlcWorldEnterSucceed`, `BigWorldCurNpcPosUpdate`), scene-object collection, box counts, teleporters, guide/fov/custom-param/red-point/map-pin state and the StatusSync XRpc channel. Nothing is replayed from captures; the retail oracles live in `AscNet.Test/Fixtures/BigWorld` for tests only.
@@ -306,6 +306,8 @@ dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-
 ```bash
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --big-world-core-only
 ```
+
+### Gender setup fix
 
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
 
@@ -414,13 +416,15 @@ Common options:
 | `--gate-fallback-username <name>` | Map unknown Steam/KRSDK gate logins to an existing local account. |
 | `--no-ensure-account` | Skip local account creation/checking and disable implicit unknown-user fallback. |
 | `--seed-krsdk-cache` | Opt in to writing local AscNet account data into KRSDK cache files. |
-| `--krsdk-cache-dir <path>` | Override the KRSDK login-cache directory used for repair/seeding. |
+| `--krsdk-cache-dir <path>` | Override the KRSDK login-cache directory (default: `KR_<ProjectId>/<ProductId>` read from the installed client's `KRSDK.bin`). |
+| `--client-dir <path>` | Installed game directory used to auto-detect the region (default `$ASCNET_CLIENT_DIR`/`$PGR_ASCNET_DIR`, else the Steam path in `launch-pgr-ascnet.sh`). |
+| `--client-region en\|tw\|kr\|jp` | Override region detection; unreadable clients fall back to EN. |
 | `--no-proxy` | Run only AscNet; skip mitmproxy. |
 | `--no-smoke` | Skip config smoke checks before launching. |
 | `--proxy-log <path>` | Write redacted request/response diagnostics. |
 | `--launch-cmd ...` | Command to start after AscNet/proxy are ready. |
 
-On native Windows, pass the client's actual `%APPDATA%\KR_G143\A1855` directory with `--krsdk-cache-dir` when using KRSDK cache repair or `--seed-krsdk-cache`; the default path targets the macOS/CrossOver launch example.
+On native Windows, pass the client's actual `%APPDATA%\KR_<ProjectId>\<ProductId>` directory with `--krsdk-cache-dir` when using KRSDK cache repair or `--seed-krsdk-cache`; the default path targets the macOS/CrossOver launch example.
 
 The runner sets:
 

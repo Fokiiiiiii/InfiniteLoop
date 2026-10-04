@@ -23,20 +23,23 @@ namespace AscNet.GameServer
         public Stage stage = default!;
         public Fight? fight;
         public int? OpenedGuideGroupId;
+        // Regional build identity from HandshakeRequest; null until the client handshakes.
+        public string? ClientDocumentVersion;
+        public string? ClientApplicationVersion;
         public BossSinglePendingScore? PendingBossSingleScore;
         public HashSet<int> PendingBossSingleRolloverStageIds { get; } = [];
         public Inventory inventory = default!;
         public int? PendingEnterWorldChatRequestId;
         public int? PendingGetWorldChannelInfoRequestId;
+        // BigWorld: set by DlcWorldSaveData in online engine mode, drained by LoadCompleteRequest.
         public bool PendingBigWorldLoadCompleteXRpc;
         public bool PendingBigWorldStartFightNotify;
-        public readonly Dictionary<(uint EquipId, int Slot), ResonanceInfo> PendingEquipResonances = new();
-        // BigWorld: set by DlcWorldSaveData in online engine mode, drained by LoadCompleteRequest.
-        public int? AppliedTeamPrefabId;
-        public readonly Dictionary<uint, (uint FashionId, int WeaponFashionId)> RandomFashionRolls = new();
         // BigWorld world the session is inside (0 = not in BigWorld) and when its fight snapshot was built.
         public int BigWorldWorldId;
         public DateTime BigWorldFightStartedAt;
+        public readonly Dictionary<(uint EquipId, int Slot), ResonanceInfo> PendingEquipResonances = new();
+        public int? AppliedTeamPrefabId;
+        public readonly Dictionary<uint, (uint FashionId, int WeaponFashionId)> RandomFashionRolls = new();
         internal Dictionary<int, (int Value, int State)>? TaskSnapshotProgress;
         internal bool GuildIdentityReady;
         public readonly Logger log;
@@ -296,10 +299,10 @@ namespace AscNet.GameServer
                                 {
                                     case Packet.ContentType.Request:
                                         Packet.Request request = MessagePackSerializer.Deserialize<Packet.Request>(packet.Content, Packet.InboundOptions);
+                                        ProbeBigWorldPacket("in", request.Name ?? string.Empty, request.Content ?? [], request.Id, 0);
                                         RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(request.Name);
                                         if (requestPacketHandler is not null)
                                         {
-                                        ProbeBigWorldPacket("in", request.Name ?? string.Empty, request.Content ?? [], request.Id, 0);
                                             // TODO: with new logger this will be unnecessary
                                             if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");

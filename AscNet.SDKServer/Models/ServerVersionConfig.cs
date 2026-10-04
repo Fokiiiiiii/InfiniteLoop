@@ -22,5 +22,10 @@ namespace AscNet.SDKServer.Models
 
         [JsonProperty("Packages", NullValueHandling = NullValueHandling.Ignore)]
         public Dictionary<string, ServerVersionConfig>? Packages { get; set; }
+
+        // A region's authoritative config.tab, in order. "{origin}" in a Value marks an AscNet-owned row
+        // (server list, pay callbacks) and is replaced with the public origin; every other row is served verbatim.
+        [JsonProperty("ConfigRows", NullValueHandling = NullValueHandling.Ignore)]
+        public List<RemoteConfig>? ConfigRows { get; set; }
     }
 }

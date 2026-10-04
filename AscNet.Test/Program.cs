@@ -80,6 +80,18 @@ namespace AscNet.Test
             try
             {
                 UseResourceWorkingDirectory();
+                if (args.Contains("--cn-sdk-config-only"))
+                {
+                    ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
+                    ValidateCnSdkConfiguration().GetAwaiter().GetResult();
+                    ValidateRegionalConfigTab();
+                    return;
+                }
+                if (args.Contains("--cn-sdk-login-only"))
+                {
+                    ValidateCnSdkLogin().GetAwaiter().GetResult();
+                    return;
+                }
                 if (args.Contains("--big-world-skygarden-only"))
                 {
                     RunBigWorldSkyGardenCompatibility();
@@ -563,6 +575,11 @@ namespace AscNet.Test
                     ValidatePortraitCompatibility();
                     return;
                 }
+                if (args.Contains("--client-version-compat-only"))
+                {
+                    ValidateClientVersionRequestCompatibility();
+                    return;
+                }
                 if (args.Contains("--version-46-bootstrap-only"))
                 {
                     ValidateVersion46BootstrapCompatibility();
@@ -707,6 +724,11 @@ namespace AscNet.Test
                     ValidateSignInDailyRewardCompatibility();
                     return;
                 }
+                if (args.Contains("--big-world-street-only"))
+                {
+                    ValidateBigWorldStreet();
+                    return;
+                }
                 if (args.Contains("--scene-command-only"))
                 {
                     ValidateSceneCommandCompatibility();
@@ -724,16 +746,17 @@ namespace AscNet.Test
                     return;
                 }
                 if (args.Contains("--session-idle-timeout-compat-only"))
-                if (args.Contains("--big-world-street-only"))
-                {
-                    ValidateBigWorldStreet();
-                    return;
-                }
                 {
                     AssertIdleClientSessionTimesOut();
                     return;
                 }
 
+
+                if (args.Contains("--big-world-character-only"))
+                {
+                    ValidateBigWorldCharacter();
+                    return;
+                }
 
                 if (args.Contains("--stage-bookmark-compat-only"))
                 {
@@ -752,12 +775,6 @@ namespace AscNet.Test
                     ValidateNotifyLoginCurrentClientCompatibilityShape();
                     ValidateMainLine2LoginDataBsonCompatibility();
                     ValidateMainLine2ReceiveMainTreasureCompatibility();
-                if (args.Contains("--big-world-character-only"))
-                {
-                    ValidateBigWorldCharacter();
-                    return;
-                }
-
                     return;
                 }
 
@@ -1279,6 +1296,8 @@ namespace AscNet.Test
                 ValidateGuildWarPopupActionCompatibility();
                 ValidateVersion47ConcertStartCompatibility();
                 ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
+                ValidateCnSdkConfiguration().GetAwaiter().GetResult();
+                ValidateCnSdkLogin().GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -5335,7 +5354,7 @@ namespace AscNet.Test
                 throw new InvalidDataException("AccountModule.DoLogin omitted NotifyClientVersion.");
             JObject versionPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(versionPush.Content));
             AssertEqual(currentDocumentVersion, versionPayload.Value<string>("Version"),
-                "NotifyClientVersion uses current document version");
+                "NotifyClientVersion uses the shared EN default for a session that never handshook (per-session regions are covered by ClientVersionRequest compatibility)");
             AssertEqual(false, versionPayload.Value<bool>("KickOut"), "NotifyClientVersion does not eject older clients");
 
             AssertPushSubsequence(
@@ -6163,33 +6182,74 @@ namespace AscNet.Test
 
         private static void ValidateClientVersionRequestCompatibility()
         {
-            const long playerId = 88_006;
-            using LoopbackSessionHarness harness = new(
-                CreateDrawCompatibilityCharacter(playerId),
-                CreateDrawCompatibilityPlayer(playerId),
-                CreateDrawCompatibilityInventory(playerId, []),
-                "login-account-client-version-compat-test");
-
-            const int clientVersionPacketId = 13_009;
-            InvokeRegisteredRequestHandler(
-                nameof(ClientVersionRequest),
-                harness.Session,
-                clientVersionPacketId,
-                new ClientVersionRequest { Version = "4.5.0" });
-            ClientVersionResponse response = ReadResponsePayload<ClientVersionResponse>(
-                harness,
-                clientVersionPacketId,
-                nameof(ClientVersionResponse),
-                "ClientVersionRequest response");
-
+            ValidateRegionalConfigTab();
             JObject versions = JsonSnapshot.LoadObject("Configs/version_config.json");
             JProperty current = versions.Properties().MaxBy(entry => Version.Parse(entry.Name))!;
-            string documentVersion = current.Value.Value<string>("DocumentVersion")!;
-            AssertEqual(0, response.Code, "ClientVersionResponse Code");
-            AssertEqual(documentVersion, response.Version, "ClientVersionResponse document version from current config");
-            if (response.Version == current.Name)
+            string enDocumentVersion = current.Value.Value<string>("DocumentVersion")!;
+            string krDocumentVersion = current.Value["Packages"]!["com.kurogame.punishing.grayraven.kr"]!.Value<string>("DocumentVersion")!;
+            if (enDocumentVersion == krDocumentVersion)
+                throw new InvalidDataException("Regional regression needs EN and KR document versions to differ.");
+
+            // Three sessions on one process: EN and KR clients that handshake, plus a legacy session that never does.
+            long nextPlayerId = 88_006;
+            LoopbackSessionHarness NewHarness(string name)
+            {
+                long playerId = nextPlayerId++;
+                return new(
+                    CreateDrawCompatibilityCharacter(playerId),
+                    CreateDrawCompatibilityPlayer(playerId),
+                    CreateDrawCompatibilityInventory(playerId, []),
+                    name);
+            }
+
+            using LoopbackSessionHarness en = NewHarness("login-account-client-version-en");
+            using LoopbackSessionHarness kr = NewHarness("login-account-client-version-kr");
+            using LoopbackSessionHarness legacy = NewHarness("login-account-client-version-legacy");
+
+            int packetId = 13_000;
+            void Handshake(LoopbackSessionHarness harness, string documentVersion)
+            {
+                int id = ++packetId;
+                InvokeRegisteredRequestHandler(nameof(HandshakeRequest), harness.Session, id,
+                    new HandshakeRequest { DocumentVersion = documentVersion, Sha1 = "", ApplicationVersion = "4.8.0" });
+                ReadResponsePayload<HandshakeResponse>(harness, id, nameof(HandshakeResponse), "HandshakeRequest response");
+            }
+
+            ClientVersionResponse RequestVersion(LoopbackSessionHarness harness)
+            {
+                int id = ++packetId;
+                InvokeRegisteredRequestHandler(nameof(ClientVersionRequest), harness.Session, id, new ClientVersionRequest { Version = "4.5.0" });
+                return ReadResponsePayload<ClientVersionResponse>(harness, id, nameof(ClientVersionResponse), "ClientVersionRequest response");
+            }
+
+            string NotifiedVersion(LoopbackSessionHarness harness)
+            {
+                RequiredMethod(RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"), "SendEmptyStartupPush",
+                    BindingFlags.Static | BindingFlags.NonPublic, [typeof(AscNet.GameServer.Session), typeof(string)])
+                    .Invoke(null, [harness.Session, "NotifyClientVersion"]);
+                Packet.Push push = TowerReadPush(harness, "NotifyClientVersion");
+                JObject payload = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
+                AssertEqual(false, payload.Value<bool>("KickOut"), "NotifyClientVersion does not eject older clients");
+                return payload.Value<string>("Version")!;
+            }
+
+            Handshake(en, enDocumentVersion);
+            Handshake(kr, krDocumentVersion);
+
+            // Interleave so a process-wide cached value would leak between regions.
+            ClientVersionResponse krResponse = RequestVersion(kr);
+            ClientVersionResponse enResponse = RequestVersion(en);
+            ClientVersionResponse legacyResponse = RequestVersion(legacy);
+            AssertEqual(0, krResponse.Code, "ClientVersionResponse Code");
+            AssertEqual(krDocumentVersion, krResponse.Version, "KR session ClientVersionResponse uses its handshake document version");
+            AssertEqual(enDocumentVersion, enResponse.Version, "EN session ClientVersionResponse uses its handshake document version");
+            AssertEqual(enDocumentVersion, legacyResponse.Version, "session without handshake falls back to the shared EN document version");
+            AssertEqual(krDocumentVersion, NotifiedVersion(kr), "KR session NotifyClientVersion document version");
+            AssertEqual(enDocumentVersion, NotifiedVersion(en), "EN session NotifyClientVersion document version");
+            AssertEqual(enDocumentVersion, NotifiedVersion(legacy), "legacy session NotifyClientVersion document version");
+            if (krResponse.Version == current.Name)
                 throw new InvalidDataException("ClientVersionResponse must return the document version, not the application version.");
-            AssertEqual(false, response.KickOut, "older-client request does not force restart");
+            AssertEqual(false, krResponse.KickOut, "older-client request does not force restart");
         }
 
         private static void ValidateLoginAccountNoticeFixtures()

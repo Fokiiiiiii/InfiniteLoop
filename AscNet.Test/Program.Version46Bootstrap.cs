@@ -232,7 +232,7 @@ internal partial class Program
     {
         Type controller = Type.GetType("AscNet.SDKServer.Controllers.ConfigController, AscNet.SDKServer", throwOnError: true)!;
         MethodInfo handle = RequiredMethod(controller, "HandleConfigRequest", BindingFlags.Static | BindingFlags.NonPublic, [typeof(HttpContext)]);
-        Dictionary<string, string> Serve(string package, string? cdnKey)
+        string ServeRaw(string package, string? cdnKey)
         {
             DefaultHttpContext context = new();
             context.Request.Scheme = "http";
@@ -241,7 +241,11 @@ internal partial class Program
             context.Request.RouteValues["version"] = "4.8.0";
             if (cdnKey is not null)
                 context.Request.RouteValues["cdnKey"] = cdnKey;
-            return ((string)handle.Invoke(null, [context])!)
+            return (string)handle.Invoke(null, [context])!;
+        }
+        Dictionary<string, string> Serve(string package, string? cdnKey)
+        {
+            return ServeRaw(package, cdnKey)
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.TrimEnd('\r').Split('\t'))
                 .Where(cells => cells.Length >= 3)
@@ -268,7 +272,48 @@ internal partial class Program
             AssertEqual("http://prod-encdn-aliyun.kurogame.net/prod", en["SecondaryCdns"], "EN SecondaryCdns");
             AssertEqual("5", en["Channel"], "EN Channel");
             AssertEqual("c5d4baac85a6e37b8109ea43dc045d31", en["IndexMd5"], "EN keeps its live IndexMd5");
+
+            // KR and JP are served from the same process, interleaved with EN/TW. Each must reproduce its real
+            // config.tab row-for-row; only the AscNet-owned rows (server list, pay callbacks) may differ, and only by origin.
+            AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.punishing.grayraven.kr", cdnKey), "kr", "KR",
+                ["PayCallbackUrl", "ServerListStr", "AndroidPayCallbackUrl", "IosPayCallbackUrl", "OneStorePayCallbackUrl", "PcPayCallbackUrl", "ChannelServerListStr"]);
+            AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.punishing.grayraven.jp", cdnKey), "jp", "JP",
+                ["PayCallbackUrl", "ServerListStr", "AndroidPayCallbackUrl", "IosPayCallbackUrl", "GooglePointOrderUrl", "PcPayCallbackUrl", "ChannelServerListStr"]);
+
+            AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.haru.kuro", cdnKey), "cn", "CN",
+                ["PayCallbackUrl", "ServerListStr", "ChannelServerListStr"]);
+            Dictionary<string, string> cn = Serve("com.kurogame.haru.kuro", cdnKey);
+            AssertEqual(false, cn.ContainsKey("IndexMd5"), "CN omits unpublished IndexMd5");
+            if (!cn["ServerListStr"].EndsWith("/api/Login/Login-cn", StringComparison.Ordinal))
+                throw new InvalidDataException("CN gate lost its region discriminator.");
+
+            // KR/JP rows must not leak back into the EN defaults served afterwards.
+            Dictionary<string, string> enAgain = Serve("com.kurogame.punishing.grayraven.en", cdnKey);
+            AssertEqual("1", enAgain["DownloadMethod"], "EN DownloadMethod after JP/KR requests");
+            AssertEqual("empty", enAgain["PicComposition"], "EN PicComposition after JP/KR requests");
+            AssertEqual("2048", enAgain["MemoryLimit"], "EN MemoryLimit after JP/KR requests");
+            AssertEqual(false, enAgain.ContainsKey("DisableGuide"), "EN does not inherit KR-only rows");
         }
+    }
+
+    private static void AssertRegionTabMatchesRetail(string served, string region, string label, string[] ownedKeys)
+    {
+        string[] retail = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Region", $"{region}.tab")).Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        string[] actual = served.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        AssertEqual(retail.Length, actual.Length, $"{label} config.tab row count");
+        List<string> owned = new();
+        for (int i = 0; i < retail.Length; i++)
+        {
+            // The capture's own login/pay hosts are the only values AscNet replaces.
+            string expected = System.Text.RegularExpressions.Regex.Replace(retail[i], @"http://(prod-pay-(kr|jp)\.pgr-game\.com|101\.33\.70\.36:55556|8\.209\.200\.222:2333)", "http://127.0.0.1:8080");
+            // CN lists the official gate plus raw-IP mirrors per login channel; AscNet serves one isolated Login-cn gate for each.
+            expected = System.Text.RegularExpressions.Regex.Replace(expected, @"https://haru-gf-login\.kurogame\.com/api/Login/Login(;http://\d+\.\d+\.\d+\.\d+/api/Login/Login)*", "http://127.0.0.1:8080/api/Login/Login-cn");
+            expected = expected.Replace("http://haru-gf-pay.kurogame.com", "http://127.0.0.1:8080");
+            AssertEqual(expected, actual[i], $"{label} config.tab line {i}");
+            if (expected != retail[i])
+                owned.Add(retail[i].Split('\t')[0]);
+        }
+        AssertEqual(string.Join(",", ownedKeys), string.Join(",", owned), $"{label} AscNet-owned rows");
     }
 
     private static void ValidateVersion46ConfigurationMetadata()

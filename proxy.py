@@ -62,17 +62,28 @@ def _log_flow(prefix, flow):
         handle.write(line)
 
 
+# Region CDN host prefixes. A new region (e.g. JP) is added here only.
+REGION_CDN_PREFIXES = ("prod-encdn-", "prod-twcdn-", "prod-krcdn-", "prod-jpcdn-")
+# Regions whose config.tab passes through to the real CDN (local AscNet only reproduces EN's).
+AUTHORITATIVE_CONFIG_PREFIXES = ("prod-twcdn-", "prod-krcdn-", "prod-jpcdn-")
+# CN (com.kurogame.haru.kuro) uses its own CDN hosts and also passes through; its gates map to the isolated Login-cn route.
+CN_CONFIG_HOSTS = {"prod-zspns-txcdn.kurogame.com", "prod-zspnsalicdn.kurogame.com", "prod-zspnstxcdn.kurogame.com"}
+CN_GATE_PATH = "/api/Login/Login-cn"
+
+
 def _is_ascnet_host(host):
     return host and (
-        host in {"sdkapi.kurogame-service.com", "sdkapi.kurogame-service.xyz"}
-        or (host.startswith(("prod-encdn-", "prod-twcdn-")) and host.endswith(".kurogame.net"))
+        host in {"sdkapi.kurogame-service.com", "sdkapi.kurogame-service.xyz", "sdkapi2.kurogame-service.com"}
+        or (host.startswith(REGION_CDN_PREFIXES) and host.endswith(".kurogame.net"))
     )
+
+
 def _is_pgr_game_popup_notice_request(flow):
     host = flow.request.pretty_host
     path = flow.request.path.split("?", 1)[0]
     return (
         host
-        and host.startswith(("prod-encdn-", "prod-twcdn-"))
+        and host.startswith(REGION_CDN_PREFIXES)
         and host.endswith(".pgr-game.com")
         and path.startswith("/prod/client/notice/config/")
         and path.endswith("/PopUpPicNotice.json")
@@ -89,7 +100,7 @@ def _is_upstream_notice_html_request(flow):
 
 
 def _is_ascnet_gate_request(flow):
-    return flow.request.path.split("?", 1)[0] == "/api/Login/Login"
+    return flow.request.path.split("?", 1)[0] in {"/api/Login/Login", CN_GATE_PATH}
 
 
 def _is_feedback_request(flow):
@@ -104,15 +115,39 @@ def _is_wildcard_ascnet_request(flow):
     return _is_local_wildcard_host(flow.request.pretty_host) and path.startswith(("/api/", "/prod/", "/sdkcom/"))
 
 
-def _is_tw_config_request(flow):
+def _is_config_tab_request(flow, prefixes):
+    # The client bootstraps from hard-coded PrimaryCdns on *.pgr-game.com (prod-<region>cdn-ak) and falls back to
+    # *.kurogame.net; both must reach the local rewrite or the real login server wins.
     host = flow.request.pretty_host
     path = flow.request.path.split("?", 1)[0]
     return (
-        host.startswith("prod-twcdn-")
-        and host.endswith(".kurogame.net")
+        host.startswith(prefixes)
+        and host.endswith((".kurogame.net", ".pgr-game.com"))
         and path.startswith("/prod/client/config/")
         and path.endswith("/standalone/config.tab")
     )
+
+
+def _is_cn_config_request(flow):
+    path = flow.request.path.split("?", 1)[0]
+    return (
+        flow.request.pretty_host in CN_CONFIG_HOSTS
+        and path.startswith("/prod/client/config/")
+        and "/com.kurogame.haru.kuro/" in path
+        and path.endswith("/standalone/config.tab")
+    )
+
+
+def _is_authoritative_config_request(flow):
+    return _is_config_tab_request(flow, AUTHORITATIVE_CONFIG_PREFIXES) or _is_cn_config_request(flow)
+
+
+def _is_cn_sdk_request(flow):
+    return flow.request.pretty_host == "sdkapi.kurogame.com" and flow.request.path.split("?", 1)[0].startswith("/sdkcom/")
+
+
+def _is_cn_telemetry_request(flow):
+    return flow.request.pretty_host == "sdkapi.kurogame.com" and flow.request.path.split("?", 1)[0] == "/ad-service/v1/sendEvent"
 
 
 def _ascnet_origin():
@@ -122,25 +157,32 @@ def _ascnet_origin():
     return f"{scheme}://{host}:{port}"
 
 
-def _rewrite_login_url(value, target_origin):
-    # ServerListStr/ChannelServerListStr are `label#url` / `default#label#url`.
-    # Keep labels and metadata, replace only the final URL's origin with the
-    # local AscNet target while preserving its path.
-    head, sep, url = value.rpartition("#")
-    parsed = urlparse(url)
-    if not (sep and parsed.scheme and parsed.hostname):
-        return value
-    suffix = parsed.path + (f"?{parsed.query}" if parsed.query else "")
-    return head + sep + target_origin + suffix
+def _rewrite_login_url(value, target_origin, login_path=None):
+    # ServerListStr/ChannelServerListStr are `|`-separated entries of `label#url` / `default#label#url`
+    # (CN: `channel#label#url;url;...`). Keep labels and metadata, replace every URL's origin with the local
+    # AscNet target. The path is preserved unless login_path pins it (CN gates carry no query: the client appends one).
+    entries = []
+    for entry in value.split("|"):
+        head, sep, urls = entry.rpartition("#")
+        rewritten = []
+        for url in urls.split(";"):
+            parsed = urlparse(url)
+            if sep and parsed.scheme and parsed.hostname:
+                url = target_origin + (login_path or parsed.path + (f"?{parsed.query}" if parsed.query else ""))
+            rewritten.append(url)
+        entries.append(head + sep + ";".join(rewritten))
+    return "|".join(entries)
 
 
-def _rewrite_tw_config_body(body, target_origin):
+def _rewrite_config_body(body, target_origin, login_path=None):
     lines = body.split("\n")
     out = []
     for line in lines:
         cols = line.split("\t")
         if len(cols) >= 3 and cols[0] in {"ServerListStr", "ChannelServerListStr"}:
-            cols[2] = _rewrite_login_url(cols[2], target_origin)
+            # A CRLF-terminated final column keeps its terminator outside the rewritten value.
+            ending = "\r" if cols[2].endswith("\r") else ""
+            cols[2] = _rewrite_login_url(cols[2].rstrip("\r"), target_origin, login_path) + ending
         out.append("\t".join(cols))
     return "\n".join(out)
 
@@ -170,7 +212,7 @@ def http_connect(flow: http.HTTPFlow) -> None:
 def request(flow: http.HTTPFlow) -> None:
     _log_flow("REQ", flow)
 
-    if _is_feedback_request(flow):
+    if _is_feedback_request(flow) or _is_cn_telemetry_request(flow):
         flow.response = http.Response.make(200, b"OK", {"Content-Type": "text/plain"})
         _log_flow("SINK", flow)
         return
@@ -181,15 +223,16 @@ def request(flow: http.HTTPFlow) -> None:
         _log_flow("PASS", flow)
         return
 
-    # TW config carries authoritative upstream metadata (doc/launch version,
+    # TW/KR/JP/CN config carries authoritative upstream metadata (doc/launch version,
     # channel, CDN list) that local AscNet does not reproduce. Let it pass
     # through to the real CDN unchanged; response() rewrites only the login
     # endpoints to the local target.
-    if _is_tw_config_request(flow):
+    if _is_authoritative_config_request(flow):
         _log_flow("PASS", flow)
         return
 
-    if not (_is_ascnet_host(flow.request.pretty_host) or _is_pgr_game_popup_notice_request(flow)
+    if not (_is_ascnet_host(flow.request.pretty_host) or _is_cn_sdk_request(flow) or _is_pgr_game_popup_notice_request(flow)
+            or _is_config_tab_request(flow, REGION_CDN_PREFIXES)
             or _is_ascnet_gate_request(flow) or _is_wildcard_ascnet_request(flow)):
         return
 
@@ -208,10 +251,10 @@ def request(flow: http.HTTPFlow) -> None:
 def response(flow: http.HTTPFlow) -> None:
     _log_flow("RSP", flow)
 
-    # TW config was passed through upstream unchanged. Rewrite only the login
+    # Authoritative config was passed through upstream unchanged. Rewrite only the login
     # endpoint URLs to the local target so the client reaches local AscNet,
     # keeping all authoritative metadata (version, channel, CDNs, labels).
-    if not _is_tw_config_request(flow) or flow.response is None:
+    if not _is_authoritative_config_request(flow) or flow.response is None:
         return
 
     body = flow.response.content
@@ -219,7 +262,7 @@ def response(flow: http.HTTPFlow) -> None:
         return
 
     text = body.decode("utf-8", errors="replace")
-    rewritten = _rewrite_tw_config_body(text, _ascnet_origin())
+    rewritten = _rewrite_config_body(text, _ascnet_origin(), CN_GATE_PATH if _is_cn_config_request(flow) else None)
     if rewritten != text:
         flow.response.content = rewritten.encode("utf-8")
-        _log_flow("TW-CONFIG-REWRITE", flow)
+        _log_flow("CONFIG-REWRITE", flow)

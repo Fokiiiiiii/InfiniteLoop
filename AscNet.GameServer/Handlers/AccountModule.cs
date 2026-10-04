@@ -157,6 +157,10 @@ namespace AscNet.GameServer.Handlers
                 ?? throw new InvalidDataException($"Configs/version_config.json: {latestVersion} has no DocumentVersion.");
         });
         internal static string CurrentDocumentVersion => CurrentDocumentVersionValue.Value;
+        // The handshake document version is the client's own regional build (EN 4.8.10, KR 4.8.12, ...);
+        // sessions that never handshook (or sent an empty one) get the shared EN default.
+        internal static string DocumentVersionFor(Session session) =>
+            string.IsNullOrEmpty(session.ClientDocumentVersion) ? CurrentDocumentVersion : session.ClientDocumentVersion;
         private const long DefaultChatBoardId = 25000001;
         private const int ChangeAssistCharIdRejectedCode = 20002006;
 
@@ -182,7 +186,9 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("HandshakeRequest")]
         public static void HandshakeRequestHandler(Session session, Packet.Request packet)
         {
-            _ = packet.Deserialize<HandshakeRequest>();
+            HandshakeRequest request = packet.Deserialize<HandshakeRequest>();
+            session.ClientDocumentVersion = request.DocumentVersion;
+            session.ClientApplicationVersion = request.ApplicationVersion;
             // TODO: make this somehow universal, look into better architecture to handle packets
             // and automatically log their deserialized form
 
@@ -359,7 +365,7 @@ namespace AscNet.GameServer.Handlers
         public static void ClientVersionRequestHandler(Session session, Packet.Request packet)
         {
             _ = packet.Deserialize<ClientVersionRequest>();
-            session.SendResponse(new ClientVersionResponse(), packet.Id);
+            session.SendResponse(new ClientVersionResponse { Version = DocumentVersionFor(session) }, packet.Id);
         }
 
         [RequestPacketHandler("SetServerBeanRequest")]
@@ -1089,11 +1095,6 @@ namespace AscNet.GameServer.Handlers
             {
                 ["IgnoreChannelIds"] = Array.Empty<object>()
             }),
-            ["NotifyClientVersion"] = SerializeStartupPayload(new Dictionary<string, object?>
-            {
-                ["Version"] = CurrentDocumentVersion,
-                ["KickOut"] = false
-            }),
             ["NotifyNewActivityCalendarData"] = SerializeStartupPayload(BuildNewActivityCalendarPayload()),
             ["NotifyAccumulateExpendData"] = SerializeStartupPayload(BuildAccumulateExpendPayload()),
             ["NotifyReviewConfig"] = SerializeStartupPayload(new Dictionary<string, object?>
@@ -1185,6 +1186,15 @@ namespace AscNet.GameServer.Handlers
             if (name == "NotifySelfChoiceLottoData")
             {
                 session.SendPush(name, SerializeStartupPayload(BuildSelfChoiceLottoPayload(session.player)));
+                return;
+            }
+            if (name == "NotifyClientVersion")
+            {
+                session.SendPush(name, SerializeStartupPayload(new Dictionary<string, object?>
+                {
+                    ["Version"] = DocumentVersionFor(session),
+                    ["KickOut"] = false
+                }));
                 return;
             }
             if (SupportedStartupPushPayloads.TryGetValue(name, out byte[]? supportedPayload))

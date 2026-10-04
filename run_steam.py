@@ -25,21 +25,92 @@ else:
 from typing import BinaryIO, Iterable
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_KRSDK_CACHE_DIR = Path.home() / "Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix/drive_c/users/Sikarugir/AppData/Roaming/KR_G143/A1855"
+_SIKARUGIR_USER = Path.home() / "Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix/drive_c/users/Sikarugir"
+_SIKARUGIR_APPDATA = _SIKARUGIR_USER / "AppData/Roaming"
+_SIKARUGIR_LOCALLOW = _SIKARUGIR_USER / "AppData/LocalLow"
+DEFAULT_CLIENT_DIR = "/Volumes/Lucia/Steam Games/SteamLibrary/steamapps/common/Punishing Gray Raven"  # same default as launch-pgr-ascnet.sh
+# region -> (KR_ProjectId, KR_ProductId from KRSDK.bin, Unity productName from globalgamemanagers). Used when no client is installed to read.
+# KRSDK cache dir = %APPDATA%/KR_<project>/<product>; game profile dir = LocalLow/kurogame/<productName>.
+REGION_IDENTITIES = {
+    "en": ("G143", "A1855", "PGR"),
+    "tw": ("G279", "A1760", "戰雙帕彌什"),
+    "kr": ("G286", "A1794", "퍼니싱"),
+    "jp": ("G282", "A1778", "パニグレ"),
+}
+
+
+def read_client_identity(client_dir: Path) -> tuple[str, str, str] | None:
+    """(project, product, productName) from an installed client's KRSDK.bin and globalgamemanagers, or None if KRSDK.bin is unreadable.
+    productName falls back to the region table when globalgamemanagers is absent (e.g. a partial download)."""
+    try:
+        sdk = dict(line.split("=", 1) for line in (client_dir / "PGR_Data/Plugins/KRSDKRes/KRSDK.bin").read_text(encoding="utf-8").splitlines() if "=" in line)
+        project, product = sdk["KR_ProjectId"].strip(), sdk["KR_ProductId"].strip()
+    except (OSError, KeyError, ValueError, UnicodeDecodeError):
+        return None
+    try:
+        ggm = (client_dir / "PGR_Data/globalgamemanagers").read_bytes()
+        # PlayerSettings: length-prefixed companyName then productName, each padded to 4 bytes.
+        at = ggm.index(b"\x08\x00\x00\x00kurogame") + 12
+        size = int.from_bytes(ggm[at:at + 4], "little")
+        return project, product, ggm[at + 4:at + 4 + size].decode("utf-8")
+    except (OSError, ValueError, UnicodeDecodeError):
+        return project, product, next((ident[2] for ident in REGION_IDENTITIES.values() if ident[0] == project), "")
+
+
+def resolve_region(client_dir: Path | None, override: str | None) -> tuple[str, tuple[str, str, str], str]:
+    """(region, identity, source). Identity comes from the client when readable, else the region table; region from override, else the client's ProjectId, else en."""
+    found = read_client_identity(client_dir) if client_dir else None
+    region = override or next((name for name, ident in REGION_IDENTITIES.items() if found and ident[0] == found[0]), "en")
+    if found and not override or found and found[0] == REGION_IDENTITIES[region][0]:
+        return region, found, "client"
+    return region, REGION_IDENTITIES[region], "table"
+
+
+def krsdk_cache_dir(identity: tuple[str, str, str]) -> Path:
+    return _SIKARUGIR_APPDATA / f"KR_{identity[0]}" / identity[1]
+
+
+def local_low_dir(identity: tuple[str, str, str]) -> Path:
+    return _SIKARUGIR_LOCALLOW / "kurogame" / identity[2]
+
+
 LOCAL_KRSDK_OAUTH_CODE = "ascnet-local-oauth-code"
+
+
+def _smoke_target(label: str, cdn_key: str, package: str, document_version: str, channel: int, primary_cdn: str, index_sha1: str, *extra: str):
+    """(label, config path, rows the served config.tab must contain). Each region has its own document version/CDN."""
+    return (
+        label,
+        f"/prod/client/config/{cdn_key}/{package}/4.8.0/standalone/config.tab",
+        [
+            "ApplicationVersion\tstring\t4.8.0",
+            f"DocumentVersion\tstring\t{document_version}",
+            f"LaunchModuleVersion\tstring\t{document_version}",
+            f"Channel\tint\t{channel}",
+            f"PrimaryCdns\tstring\t{primary_cdn}",
+            f"IndexSha1\tstring\t{index_sha1}",
+            "PcPayCallbackUrl\tstring\t",
+            "IsPCPayEnable\tbool\t1",
+            *extra,
+        ],
+    )
+
+
 CONFIG_SMOKE_TARGETS = [
-    (
-        "global-client",
-        "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.punishing.grayraven.en/4.6.0/standalone/config.tab",
-        "Channel\tint\t5",
-    ),
-    (
-        "steam-pc-package",
-        "/prod/client/config/9jY3H6OqsppPLu31/com.kurogame.pc.punishing.grayraven.en/4.6.0/standalone/config.tab",
-        "Channel\tint\t205",
-    ),
+    _smoke_target("en-plain", "YHcyljDAVMYA6tK8", "com.kurogame.punishing.grayraven.en", "4.8.10", 5,
+                  "http://prod-encdn-ak.pgr-game.com/prod", "b22b87996db98720100e39586167440a005ea531",
+                  "IndexMd5\tstring\tc5d4baac85a6e37b8109ea43dc045d31"),
+    _smoke_target("en-pc", "YHcyljDAVMYA6tK8", "com.kurogame.pc.punishing.grayraven.en", "4.8.10", 205,
+                  "http://prod-encdn-ak.pgr-game.com/prod", "b22b87996db98720100e39586167440a005ea531"),
+    _smoke_target("tw", "B7OBn4RZic1fijNJ", "com.kurogame.punishing.grayraven.tw", "4.8.10", 5,
+                  "http://prod-twcdn-ak.pgr-game.com/prod", "b683b400819a9095ec5ae0945cd95064809aa82f"),
+    _smoke_target("kr", "jqlCmYRizwT76uvX", "com.kurogame.punishing.grayraven.kr", "4.8.12", 5,
+                  "http://prod-krcdn-ak.pgr-game.com/prod", "302471642082e7ad34f3ea5892ed251a33b3bda6",
+                  "ServerListStr\tstring\t한국정식서버#", "DisableGuide\tint\t1"),
+    _smoke_target("jp", "xZx901LhZhT6G2HG", "com.kurogame.punishing.grayraven.jp", "4.8.12", 5,
+                  "http://prod-jpcdn-ak.pgr-game.com/prod", "3fd1e80f3bac8ce39fe82cd1616e798a957b19c0",
+                  "IndexMd5\tstring\tempty", "ServerListStr\tstring\t日本サーバー#"),
 ]
-CURRENT_DOCUMENT_VERSION = "4.6.7"
 LOCAL_SDK_HTTP = None
 
 
@@ -82,8 +153,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-ensure-account", action="store_true", help="Do not create/check a local account or implicitly map unknown Steam/KRSDK users to one.")
     parser.add_argument(
         "--krsdk-cache-dir",
-        default=os.environ.get("ASCNET_KRSDK_CACHE_DIR", str(DEFAULT_KRSDK_CACHE_DIR)),
-        help="KRSDK cache directory to repair and optionally seed. Empty disables cache maintenance. Default: %(default)s",
+        default=os.environ.get("ASCNET_KRSDK_CACHE_DIR"),
+        help="KRSDK cache directory to repair and optionally seed. Empty disables cache maintenance. Default: KR_<ProjectId>/<ProductId> derived from the installed client's KRSDK.bin.",
+    )
+    parser.add_argument(
+        "--client-dir",
+        default=os.environ.get("ASCNET_CLIENT_DIR") or os.environ.get("PGR_ASCNET_DIR") or DEFAULT_CLIENT_DIR,
+        help="Installed game directory whose KRSDK.bin/globalgamemanagers identify the region. Default: %(default)s",
+    )
+    parser.add_argument(
+        "--client-region",
+        choices=sorted(REGION_IDENTITIES),
+        default=os.environ.get("ASCNET_CLIENT_REGION"),
+        help="Override the region auto-detected from --client-dir (falls back to en if the client is unreadable).",
     )
     parser.add_argument("--seed-krsdk-cache", action="store_true", help="Opt in to writing a local AscNet account into KRSDKUserCache.json/KRSDKUserLauncherCache.json. Usually not needed for Steam; live KRSDK login plus gate fallback is safer.")
     parser.add_argument("--no-seed-krsdk-cache", action="store_true", help="Legacy guard: do not write KRSDKUserCache.json/KRSDKUserLauncherCache.json.")
@@ -240,11 +322,11 @@ def popen(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.Po
 
 
 def smoke_check(sdk_url: str, timeout: float) -> None:
-    for label, path, channel_assertion in CONFIG_SMOKE_TARGETS:
-        smoke_config_target(sdk_url, timeout, label, path, channel_assertion)
+    for label, path, required in CONFIG_SMOKE_TARGETS:
+        smoke_config_target(sdk_url, timeout, label, path, required)
 
 
-def smoke_config_target(sdk_url: str, timeout: float, label: str, path: str, channel_assertion: str) -> None:
+def smoke_config_target(sdk_url: str, timeout: float, label: str, path: str, required: list[str]) -> None:
     url = sdk_url.rstrip("/") + path
     deadline = time.monotonic() + timeout
     last_error: Exception | None = None
@@ -253,15 +335,6 @@ def smoke_config_target(sdk_url: str, timeout: float, label: str, path: str, cha
         try:
             with local_sdk_open(url, timeout=2.0) as response:
                 body = response.read().decode("utf-8", errors="replace")
-            required = [
-                "ApplicationVersion\tstring\t4.6.0",
-                f"DocumentVersion\tstring\t{CURRENT_DOCUMENT_VERSION}",
-                f"LaunchModuleVersion\tstring\t{CURRENT_DOCUMENT_VERSION}",
-                channel_assertion,
-                "KuroPayCallbackUrl\tstring\t",
-                "PcPayCallbackUrl\tstring\t",
-                "IsPCPayEnable\tbool\t1",
-            ]
             missing = [needle for needle in required if needle not in body]
             if missing:
                 raise RuntimeError(f"{label} smoke response is missing: " + ", ".join(missing))
@@ -562,7 +635,10 @@ def main() -> int:
     elif not can_connect(args.mongo_host, args.mongo_port):
         print(f"MongoDB not reachable on {args.mongo_host}:{args.mongo_port}; config endpoints work, but login/player APIs will fail until MongoDB is running.", flush=True)
 
-    cache_dir = Path(args.krsdk_cache_dir).expanduser() if args.krsdk_cache_dir else None
+    region, identity, source = resolve_region(Path(args.client_dir).expanduser(), args.client_region)
+    print(f"Client region {region} ({source}): KRSDK cache {krsdk_cache_dir(identity)}, profile {local_low_dir(identity)}", flush=True)
+    cache_dir_arg = krsdk_cache_dir(identity) if args.krsdk_cache_dir is None else args.krsdk_cache_dir
+    cache_dir = Path(cache_dir_arg).expanduser() if cache_dir_arg else None
     if cache_dir and not args.no_repair_krsdk_cache and not args.seed_krsdk_cache:
         repair_krsdk_login_cache(cache_dir)
 

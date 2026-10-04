@@ -62,7 +62,9 @@ namespace AscNet.SDKServer.Controllers
             versionConfig = versionConfig.Packages?.GetValueOrDefault(package) ?? versionConfig;
 
             List<RemoteConfig> remoteConfigs = new();
-            if (currentClient)
+            if (versionConfig.ConfigRows is not null)
+                remoteConfigs.AddRange(versionConfig.ConfigRows.Select(row => new RemoteConfig { Key = row.Key, Type = row.Type, Value = row.Value.Replace("{origin}", publicHttpOrigin) }));
+            else if (currentClient)
                 AddCurrentClientConfig(remoteConfigs, package, version, versionConfig, publicHttpOrigin);
             else
                 AddLegacyClientConfig(remoteConfigs, package, version, versionConfig, publicHttpOrigin);
@@ -390,9 +392,9 @@ namespace AscNet.SDKServer.Controllers
             return package switch
             {
                 "com.kurogame.haru.kuro" => (
+                    "http://prod-zspns-txcdn.kurogame.com/prod",
                     "http://prod-zspnsalicdn.kurogame.com/prod",
-                    "http://prod-zspnstxcdn.kurogame.com/prod",
-                    2),
+                    5),
                 "com.kurogame.punishing.grayraven.en" or "com.kurogame.gplay.punishing.grayraven.en" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",

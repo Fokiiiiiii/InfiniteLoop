@@ -176,6 +176,55 @@ class ProxyRoutingTests(unittest.TestCase):
         self.assertIn("Channel\tint\t5\n", text)
         self.assertIn("PrimaryCdns\tstring\thttp://prod-twcdn-ak.pgr-game.com/prod\n", text)
 
+    def test_kr_jp_config_pass_through_and_rewrite_every_server_entry(self):
+        for host, key, pkg, label in [
+            ("prod-krcdn-volcdn.kurogame.net", "jqlCmYRizwT76uvX", "kr", "한국정식서버"),
+            ("prod-jpcdn-ak.kurogame.net", "xZx901LhZhT6G2HG", "jp", "日本サーバー"),
+            # Hard-coded PrimaryCdns in the regional clients are *.pgr-game.com.
+            ("prod-krcdn-ak.pgr-game.com", "jqlCmYRizwT76uvX", "kr", "한국정식서버"),
+            ("prod-jpcdn-ak.pgr-game.com", "xZx901LhZhT6G2HG", "jp", "日本サーバー"),
+        ]:
+            flow = self.flow(
+                f"/prod/client/config/{key}/com.kurogame.punishing.grayraven.{pkg}/4.8.0/standalone/config.tab", host)
+            with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:8080"}, clear=False):
+                proxy.request(flow)
+                self.assertEqual(host, flow.request.host)
+                self.assertNotIn("X-Forwarded-Host", flow.request.headers)
+                flow.response = SimpleNamespace(status_code=200, content=(
+                    "DocumentVersion\tstring\t4.8.12\n"
+                    f"ServerListStr\tstring\t{label}#http://1.2.3.4:1/api/Login/Login|b#http://5.6.7.8:2/api/Login/Login\n"
+                    f"ChannelServerListStr\tstring\tdefault#{label}#http://1.2.3.4:1/api/Login/Login\n").encode("utf-8"))
+                proxy.response(flow)
+            text = flow.response.content.decode("utf-8")
+            self.assertIn(f"ServerListStr\tstring\t{label}#http://127.0.0.1:8080/api/Login/Login|b#http://127.0.0.1:8080/api/Login/Login\n", text)
+            self.assertIn(f"ChannelServerListStr\tstring\tdefault#{label}#http://127.0.0.1:8080/api/Login/Login\n", text)
+            self.assertIn("DocumentVersion\tstring\t4.8.12\n", text)
+
+    def test_en_config_on_pgr_game_primary_cdn_routes_to_ascnet(self):
+        flow = self.flow(
+            "/prod/client/config/YHcyljDAVMYA6tK8/com.kurogame.punishing.grayraven.en/4.8.0/standalone/config.tab",
+            "prod-encdn-ak.pgr-game.com")
+        with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+            proxy.request(flow)
+        self.assertEqual(9, flow.request.port)
+
+    def test_every_krsdk_bin_api_host_routes_to_ascnet(self):
+        # KR_SDKAPI_URL / KR_PlayerAddress(Second) are identical in the EN, KR and JP KRSDK.bin.
+        for host in ("sdkapi.kurogame-service.com", "sdkapi2.kurogame-service.com", "sdkapi.kurogame-service.xyz"):
+            flow = self.flow("/sdkcom/v2/sys/conf.lg", host)
+            with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+                proxy.request(flow)
+            self.assertEqual(9, flow.request.port, host)
+
+    def test_kr_jp_notice_metadata_routes_to_ascnet(self):
+        for host, key, pkg in [("prod-krcdn-volcdn.kurogame.net", "jqlCmYRizwT76uvX", "kr"), ("prod-jpcdn-aliyun.kurogame.net", "xZx901LhZhT6G2HG", "jp")]:
+            flow = self.flow(
+                f"/prod/client/notice/{key}/com.kurogame.punishing.grayraven.{pkg}/4.8.0/standalone/LoginNotice.json", host)
+            with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:9"}, clear=False):
+                proxy.request(flow)
+            self.assertEqual(9, flow.request.port)
+            self.assertEqual(host, flow.request.headers["X-Forwarded-Host"])
+
     def test_tw_feedback_with_query_is_sunk(self):
         flow = self.flow("/feedback?event=login", "prod.twzspnslog.kurogame.com")
 
@@ -191,6 +240,48 @@ class ProxyRoutingTests(unittest.TestCase):
         proxy.request(flow)
 
         self.assertEqual(200, flow.response.status_code)
+
+    def test_cn_config_preserves_metadata_and_rewrites_every_gate(self):
+        for host in ("prod-zspns-txcdn.kurogame.com", "prod-zspnsalicdn.kurogame.com"):
+            with self.subTest(host=host):
+                flow = self.flow("/prod/client/config/key/com.kurogame.haru.kuro/4.8.0/standalone/config.tab", host)
+                body = ("DocumentVersion\tstring\t4.8.12\r\n"
+                        "ServerListStr\tstring\t星火服#https://gate.example/api/Login/Login\r\n"
+                        "ChannelServerListStr\tstring\t18#星火服#https://gate.example/api/Login/Login;http://backup.example/api/Login/Login|19#星火服#http://another.example/api/Login/Login?x=1\r\n")
+                with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:8080"}):
+                    proxy.request(flow)
+                    self.assertEqual(host, flow.request.host)
+                    flow.response = SimpleNamespace(status_code=200, content=body.encode(), headers={})
+                    proxy.response(flow)
+                result = flow.response.content.decode()
+                self.assertIn("DocumentVersion\tstring\t4.8.12\r\n", result)
+                self.assertEqual(4, result.count("http://127.0.0.1:8080/api/Login/Login-cn"))
+                self.assertNotIn("?", result)
+                gate_url = result.split("ServerListStr\tstring\t", 1)[1].split("\r\n", 1)[0].split("#")[-1]
+                self.assertEqual("http://127.0.0.1:8080/api/Login/Login-cn?loginType=5&userId=1&token=test", gate_url + "?loginType=5&userId=1&token=test")
+                self.assertNotIn("gate.example", result)
+
+    def test_cn_patch_and_agreement_stay_upstream(self):
+        for host, path in (("prod-zspns-txcdn.kurogame.com", "/prod/client/patch/key/com.kurogame.haru.kuro/4.8.0/standalone/4.8.12/launch/index"),
+                           ("pro-cdn-sdk.kurogame.com", "/pro/G148/19/agreement.json?pkgid=A1393")):
+            flow = self.flow(path, host)
+            proxy.request(flow)
+            self.assertEqual(host, flow.request.host)
+            self.assertIsNone(flow.response)
+
+    def test_cn_sdk_routes_and_telemetry_is_sunk(self):
+        gate = self.flow("/api/Login/Login-cn?loginType=5&userId=1&token=test", "gate.example")
+        with patch.dict(os.environ, {"ASCNET_PROXY_TARGET": "http://127.0.0.1:8080"}):
+            proxy.request(gate)
+        self.assertEqual("127.0.0.1", gate.request.host)
+        self.assertEqual("/api/Login/Login-cn?loginType=5&userId=1&token=test", gate.request.path)
+        flow = self.flow("/sdkcom/v2/sys/conf.lg", "sdkapi.kurogame.com")
+        proxy.request(flow)
+        self.assertEqual("sdkapi.kurogame.com", flow.request.headers["X-Forwarded-Host"])
+        for host, path in (("prod-zspnslog.zspms-game.com", "/feedback"), ("sdkapi.kurogame.com", "/ad-service/v1/sendEvent")):
+            flow = self.flow(path, host)
+            proxy.request(flow)
+            self.assertEqual(200, flow.response.status_code)
 
 
 if __name__ == "__main__":

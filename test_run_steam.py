@@ -199,5 +199,44 @@ class UnixBuildLockTests(unittest.TestCase):
             self.assertEqual(0, second.exitcode)
 
 
+class ClientRegionTests(unittest.TestCase):
+    # Identities read from each region's official KRSDK.bin / globalgamemanagers (CDN or installed client).
+    REGIONS = {
+        "en": ("G143", "A1855", "PGR", "KR_G143/A1855"),
+        "tw": ("G279", "A1760", "戰雙帕彌什", "KR_G279/A1760"),
+        "kr": ("G286", "A1794", "퍼니싱", "KR_G286/A1794"),
+        "jp": ("G282", "A1778", "パニグレ", "KR_G282/A1778"),
+    }
+
+    def client(self, root, project, product, name):
+        plugins = Path(root, "PGR_Data/Plugins/KRSDKRes")
+        plugins.mkdir(parents=True)
+        (plugins / "KRSDK.bin").write_text(f"KR_GameVersion=4.8.0\nKR_ProductId={product}\nKR_ProjectId={project}\n", encoding="utf-8")
+        raw = name.encode()
+        Path(root, "PGR_Data/globalgamemanagers").write_bytes(
+            b"\x01" * 9 + b"\x08\x00\x00\x00kurogame" + len(raw).to_bytes(4, "little") + raw + b"\x00" * (-len(raw) % 4) + b"tail"
+        )
+        return Path(root)
+
+    def test_each_region_is_detected_and_paths_derived(self):
+        for region, (project, product, name, cache) in self.REGIONS.items():
+            with self.subTest(region=region), tempfile.TemporaryDirectory() as root:
+                identity = (project, product, name)
+                self.assertEqual((region, identity, "client"), run_steam.resolve_region(self.client(root, *identity), None))
+                self.assertEqual(identity, run_steam.REGION_IDENTITIES[region])
+                self.assertEqual(run_steam._SIKARUGIR_APPDATA / cache, run_steam.krsdk_cache_dir(identity))
+                self.assertEqual(run_steam._SIKARUGIR_LOCALLOW / "kurogame" / name, run_steam.local_low_dir(identity))
+
+    def test_unreadable_client_falls_back_to_table_or_override(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.assertEqual(("en", run_steam.REGION_IDENTITIES["en"], "table"), run_steam.resolve_region(Path(root), None))
+            self.assertEqual(("jp", run_steam.REGION_IDENTITIES["jp"], "table"), run_steam.resolve_region(Path(root), "jp"))
+
+    def test_override_beats_a_mismatching_client(self):
+        with tempfile.TemporaryDirectory() as root:
+            client = self.client(root, "G279", "A1760", "戰雙帕彌什")
+            self.assertEqual(("kr", run_steam.REGION_IDENTITIES["kr"], "table"), run_steam.resolve_region(client, "kr"))
+
+
 if __name__ == "__main__":
     unittest.main()
