@@ -599,6 +599,18 @@ namespace AscNet.Test
                     ValidatePartnerComposeCompatibility();
                     return;
                 }
+                if (args.Contains("--partner-decompose-compat-only"))
+                {
+                    ValidatePartnerDecomposeCompatibilitySuite();
+                    return;
+                }
+                if (args.Contains("--partner-decompose-real-mongo-only"))
+                {
+                    ValidatePartnerDecomposeRealMongoDurability();
+                    return;
+                }
+
+
 
                 string? liveResonanceUid = args.FirstOrDefault(value =>
                     value.StartsWith("--verify-live-resonance-uid=", StringComparison.Ordinal));
@@ -848,6 +860,12 @@ namespace AscNet.Test
                     ValidateStudyProgressionCompatibility();
                     return;
                 }
+                if (args.Contains("--teaching-treasure-compat-only"))
+                {
+                    ValidateVersion48TeachingTreasureClaims();
+                    return;
+                }
+
 
                 if (args.Contains("--fight-settle-retreat-compat-only"))
                 {
@@ -1124,6 +1142,8 @@ namespace AscNet.Test
                 ValidateRobotDeploymentFashionCompatibility();
                 ValidateSegmentCheckFightCompatibility();
                 ValidateFightRestartCompatibility();
+                ValidatePartnerDecomposeCompatibilitySuite();
+
                 ValidateCharacterProgressionPersistenceCompatibility();
                 ValidateCharacterSkillGroupTableBackedCompatibility();
                 ValidateCharacterEnhanceSkillTableBackedCompatibility();
@@ -18004,7 +18024,7 @@ namespace AscNet.Test
             public bool ThrowAfterReplaceOne { get; set; }
             public Action<TDocument>? BeforeReplaceOne { get; set; }
             public long ReplaceOneMatchedCount { get; set; } = 1;
-            public byte[]? LastSuccessfulReplacementBson { get; private set; }
+            public byte[]? LastSuccessfulReplacementBson { get; set; }
             public Queue<long> CountDocumentsResults { get; } = new();
             public IReadOnlyList<TDocument>? FindResults { get; set; }
             public int? LastFindLimit { get; private set; }
