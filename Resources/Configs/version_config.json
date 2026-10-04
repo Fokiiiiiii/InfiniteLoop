@@ -92,10 +92,10 @@
     "LaunchIndexSha1": "1591a0ac3f4ed08dbd98430b9b1b2d968da1ef15",
     "Packages": {
       "com.kurogame.punishing.grayraven.tw": {
-        "DocumentVersion": "4.8.10",
-        "LaunchModuleVersion": "4.8.10",
-        "IndexSha1": "b683b400819a9095ec5ae0945cd95064809aa82f",
-        "LaunchIndexSha1": "3d7e0c4479062d60fc6c8311ef8022ac1976eed6"
+        "DocumentVersion": "4.8.12",
+        "LaunchModuleVersion": "4.8.12",
+        "IndexSha1": "887f009ff8660e8175ca836cd77682be1fc6a14b",
+        "LaunchIndexSha1": "e82247e760ba66611975d7126ccef2a734f28742"
       },
       "com.kurogame.punishing.grayraven.kr": {
         "DocumentVersion": "4.8.12",

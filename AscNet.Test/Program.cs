@@ -6186,11 +6186,14 @@ namespace AscNet.Test
             JObject versions = JsonSnapshot.LoadObject("Configs/version_config.json");
             JProperty current = versions.Properties().MaxBy(entry => Version.Parse(entry.Name))!;
             string enDocumentVersion = current.Value.Value<string>("DocumentVersion")!;
-            // The server echoes the client's own handshake version; use any regional package that currently differs from EN.
-            string krDocumentVersion = ((JObject)current.Value["Packages"]!).Properties()
-                .Select(package => package.Value.Value<string>("DocumentVersion")!)
+            // The server echoes the client's own handshake version; all 4.8.0 regions share one today, so use any
+            // configured document version (current packages or older tuples) that differs from the EN default.
+            string krDocumentVersion = versions.Properties()
+                .SelectMany(entry => new[] { (JObject)entry.Value }
+                    .Concat(((JObject?)entry.Value["Packages"])?.Properties().Select(package => (JObject)package.Value) ?? []))
+                .Select(entry => entry.Value<string>("DocumentVersion")!)
                 .FirstOrDefault(version => version != enDocumentVersion)
-                ?? throw new InvalidDataException("Regional regression needs a package whose document version differs from EN.");
+                ?? throw new InvalidDataException("Regional regression needs a document version that differs from EN.");
 
             // Three sessions on one process: EN and KR clients that handshake, plus a legacy session that never does.
             long nextPlayerId = 88_006;

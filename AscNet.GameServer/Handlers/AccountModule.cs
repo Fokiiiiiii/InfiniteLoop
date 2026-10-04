@@ -157,7 +157,7 @@ namespace AscNet.GameServer.Handlers
                 ?? throw new InvalidDataException($"Configs/version_config.json: {latestVersion} has no DocumentVersion.");
         });
         internal static string CurrentDocumentVersion => CurrentDocumentVersionValue.Value;
-        // The handshake document version is the client's own regional build (EN 4.8.12, TW 4.8.10, ...);
+        // The handshake document version is the client's own regional build (4.8.12 for every 4.8.0 region today);
         // sessions that never handshook (or sent an empty one) get the shared EN default.
         internal static string DocumentVersionFor(Session session) =>
             string.IsNullOrEmpty(session.ClientDocumentVersion) ? CurrentDocumentVersion : session.ClientDocumentVersion;

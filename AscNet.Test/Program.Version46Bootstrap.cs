@@ -255,10 +255,10 @@ internal partial class Program
         foreach (string? cdnKey in new[] { null, "B7OBn4RZic1fijNJ" })
         {
             Dictionary<string, string> tw = Serve("com.kurogame.punishing.grayraven.tw", cdnKey);
-            AssertEqual("4.8.10", tw["DocumentVersion"], "TW 4.8 DocumentVersion");
-            AssertEqual("4.8.10", tw["LaunchModuleVersion"], "TW 4.8 LaunchModuleVersion");
-            AssertEqual("b683b400819a9095ec5ae0945cd95064809aa82f", tw["IndexSha1"], "TW 4.8 IndexSha1");
-            AssertEqual("3d7e0c4479062d60fc6c8311ef8022ac1976eed6", tw["LaunchIndexSha1"], "TW 4.8 LaunchIndexSha1");
+            AssertEqual("4.8.12", tw["DocumentVersion"], "TW 4.8 DocumentVersion");
+            AssertEqual("4.8.12", tw["LaunchModuleVersion"], "TW 4.8 LaunchModuleVersion");
+            AssertEqual("887f009ff8660e8175ca836cd77682be1fc6a14b", tw["IndexSha1"], "TW 4.8 IndexSha1");
+            AssertEqual("e82247e760ba66611975d7126ccef2a734f28742", tw["LaunchIndexSha1"], "TW 4.8 LaunchIndexSha1");
             AssertEqual("http://prod-twcdn-ak.pgr-game.com/prod", tw["PrimaryCdns"], "TW PrimaryCdns");
             AssertEqual("http://prod-twcdn-aliyun.kurogame.net/prod", tw["SecondaryCdns"], "TW SecondaryCdns");
             AssertEqual("5", tw["Channel"], "TW Channel");
