@@ -738,7 +738,7 @@ namespace AscNet.GameServer.Handlers.BigWorld
         internal static bool InSceneSolid(int levelId, double x, double y, double z, double margin)
         {
             var level = Levels.Value[levelId];
-            foreach (var box in SceneBoxes.Value[(level.SectorName.ToLowerInvariant(), Path.GetFileNameWithoutExtension(level.Prefab))])
+            foreach (var box in SceneBoxes.Value[((level.SectorName ?? string.Empty).ToLowerInvariant(), Path.GetFileNameWithoutExtension(level.Prefab))])
             {
                 // Offset into box space: rotate by the inverse (conjugate) quaternion, v + w t + q x t with t = 2 q x v.
                 double vx = x - box.PosX, vy = y - box.PosY, vz = z - box.PosZ, qx = -box.QuatX, qy = -box.QuatY, qz = -box.QuatZ;

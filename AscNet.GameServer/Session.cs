@@ -299,8 +299,9 @@ namespace AscNet.GameServer
                                 {
                                     case Packet.ContentType.Request:
                                         Packet.Request request = MessagePackSerializer.Deserialize<Packet.Request>(packet.Content, Packet.InboundOptions);
-                                        ProbeBigWorldPacket("in", request.Name ?? string.Empty, request.Content ?? [], request.Id, 0);
-                                        RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(request.Name);
+                                        string requestName = request.Name ?? string.Empty;
+                                        ProbeBigWorldPacket("in", requestName, request.Content ?? [], request.Id, 0);
+                                        RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(requestName);
                                         if (requestPacketHandler is not null)
                                         {
                                             // TODO: with new logger this will be unnecessary

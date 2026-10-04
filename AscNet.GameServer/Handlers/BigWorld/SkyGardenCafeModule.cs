@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
@@ -41,7 +40,6 @@ namespace AscNet.GameServer.Handlers.BigWorld
 
         private static int ConfigInt(string key) => int.Parse(Config.Value[key]);
 
-        [ModuleInitializer]
         internal static void RegisterConditions()
         {
             // XSkyGardenCafeAgency:CheckStageStar / CheckStageRound.

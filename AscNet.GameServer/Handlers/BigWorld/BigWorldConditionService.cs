@@ -26,9 +26,17 @@ namespace AscNet.GameServer.Handlers.BigWorld
             TableReaderV2.Parse<DlcQuestObjectiveTable>().ToDictionary(row => row.Id, row => row.QuestId));
 
         // Types whose state belongs to a SkyGarden/Character slice (cafe 10203xxx, street 10202xxx,
-        // drone 10204001, DIY part 23102). The owning slice registers its evaluator at startup.
+        // drone 10204001, DIY part 23102). The owning slices register their evaluators on first use.
         private static readonly ConcurrentDictionary<int, Func<Player, IReadOnlyList<int>, bool>> Registered = new();
         private static readonly ConcurrentDictionary<int, byte> LoggedUnsupported = new();
+
+        static BigWorldConditionService()
+        {
+            SkyGardenCafeModule.RegisterConditions();
+            SkyGardenDroneModule.RegisterConditions();
+            SkyGardenStreetModule.RegisterConditions();
+            BigWorldCharacterModule.RegisterConditions();
+        }
 
         internal static void Register(int type, Func<Player, IReadOnlyList<int>, bool> check)
         {

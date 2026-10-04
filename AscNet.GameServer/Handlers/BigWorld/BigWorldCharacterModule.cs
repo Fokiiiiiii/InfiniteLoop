@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
@@ -161,7 +160,6 @@ namespace AscNet.GameServer.Handlers.BigWorld
             return Enumerable.Range(1, FullTeamEntityCount).Select(pos => int.Parse(config[$"DefaultTeamPos{pos}"])).ToArray();
         });
 
-        [ModuleInitializer]
         internal static void RegisterConditions()
         {
             // XBigWorldCommanderDIYAgency:CheckPartUnlockCondition: owned count of Params[2..] >= Params[1].

@@ -54,7 +54,7 @@ namespace AscNet.GameServer.Handlers.BigWorld
             .ToDictionary(row => row.Key, row => row.Value));
         // Level config groups live in the sector bundle sceneconfig/<Level.SectorName lower>.ab; group ids repeat across
         // sectors (ConfigGroup_5001: District B in skygarden, Commandant's Lounge in skygarden_sushe), so rows key on both.
-        internal static (string Sector, int GroupId) GroupKey(LevelTable level, int groupId) => (level.SectorName.ToLowerInvariant(), groupId);
+        internal static (string Sector, int GroupId) GroupKey(LevelTable level, int groupId) => ((level.SectorName ?? string.Empty).ToLowerInvariant(), groupId);
 
         // levelId -> placeId -> native scene object (Level.SectorName + ConfigGroups -> LevelSceneObject.Sector + ConfigGroupId).
         private static readonly Lazy<Dictionary<int, Dictionary<int, LevelSceneObjectTable>>> LevelSceneObjects = new(() =>

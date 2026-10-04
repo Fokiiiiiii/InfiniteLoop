@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
@@ -32,7 +31,6 @@ namespace AscNet.GameServer.Handlers.BigWorld
         private static readonly Lazy<Dictionary<int, SgDroneGameStarTargetTable>> Targets = new(() =>
             TableReaderV2.Parse<SgDroneGameStarTargetTable>().ToDictionary(row => row.Id));
 
-        [ModuleInitializer]
         internal static void RegisterConditions()
         {
             // XSkyGardenDroneGameAgency:OnCheckStageTargetAchieved(stageId, targetId).

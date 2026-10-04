@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using AscNet.Common.Database;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
@@ -228,7 +227,6 @@ namespace AscNet.GameServer.Handlers.BigWorld
         #endregion
 
         #region Conditions
-        [ModuleInitializer]
         internal static void RegisterConditions()
         {
             // XSkyGardenShoppingStreetAgency:InitConditionCheck (834-868). Params[0] of compare types follows XTool.CommonVariableCompare.
