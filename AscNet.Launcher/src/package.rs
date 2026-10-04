@@ -19,7 +19,35 @@ const REQUIRED_FILES: [(&str, &str); 4] = [
     ("PGR_Data/Plugins/KRSDK.dll", "KRSDK.dll"),
     ("libraries.txt", "libraries.txt"),
 ];
-const REQUIRED_ORIGINALS: [&str; 3] = ["PGR.exe", "GameAssembly.dll", "PGR_Data/Plugins/KRSDK.dll"];
+pub const KRSDK: &str = "PGR_Data/Plugins/KRSDK.dll";
+const KRSDK_EX: &str = "PGR_Data/Plugins/KRSDKEx.dll";
+const KRSDK_CURL: &str = "PGR_Data/Plugins/libkrsdkcurl.dll";
+const REQUIRED_ORIGINALS: [&str; 5] = ["PGR.exe", "GameAssembly.dll", KRSDK, KRSDK_EX, KRSDK_CURL];
+
+/// Global (EN/TW/KR/JP) clients ship `KRSDK.dll`, which the patch replaces; the CN client ships the official
+/// `KRSDKEx.dll` + `libkrsdkcurl.dll`, which are only validated (lucia redirects their HTTP calls in-process).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Region {
+    Global,
+    Cn,
+}
+
+/// Classifies the folder by its SDK files; a CN folder must also carry the allowlisted SDK pair.
+pub fn client_region(application_version: &str, originals: &BTreeMap<String, Vec<String>>, game: &Path) -> Result<Region> {
+    if game.join(KRSDK).exists() {
+        return Ok(Region::Global);
+    }
+    if !game.join(KRSDK_EX).exists() {
+        bail!("unsupported client: neither {KRSDK} nor {KRSDK_EX} found");
+    }
+    for path in [KRSDK_EX, KRSDK_CURL] {
+        let hash = sha256_file(&game.join(path)).ok();
+        if !hash.as_ref().is_some_and(|h| originals.get(path).is_some_and(|allowed| allowed.contains(h))) {
+            bail!("{}", unsupported_client(application_version, path, hash.as_deref()));
+        }
+    }
+    Ok(Region::Cn)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -48,7 +76,8 @@ impl Manifest {
 pub struct PgrBaseBuild {
     pub originals: Vec<String>,
     pub unity_players: Vec<String>,
-    pub original_export_jump: [u8; 5],
+    /// Stock export-entry bytes seen across builds (global, CN); recovery tries each against `originals`.
+    pub original_export_jumps: Vec<[u8; 5]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +105,10 @@ struct SupportedClient {
     patch_version: Option<String>,
     #[serde(default)]
     pgr_base: Option<PgrBaseBuild>,
+    /// Official-client sources, validated by `download::sources` (the patch package never reads them).
+    #[serde(default)]
+    #[allow(dead_code)]
+    downloads: Option<serde_json::Value>,
 }
 
 pub fn refresh_supported_client(directory: &Path, source: &Path) -> Result<()> {
@@ -97,14 +130,17 @@ pub fn check_supported_client(source: &Path, game: &Path) -> Result<()> {
     for path in ["PGR.exe", "GameAssembly.dll"] {
         let hash = sha256_file(&game.join(path)).ok();
         if !metadata.originals.get(path).is_some_and(|allowed| hash.as_ref().is_some_and(|h| allowed.contains(h))) {
-            bail!("{}", unsupported_client(&metadata.application_version, path));
+            bail!("{}", unsupported_client(&metadata.application_version, path, hash.as_deref()));
         }
     }
+    client_region(&metadata.application_version, &metadata.originals, game)?;
     Ok(())
 }
 
-pub fn unsupported_client(application_version: &str, path: &str) -> String {
-    format!("{path} is not the supported {application_version} client — update the game if it is older, or the launcher if the game is newer")
+/// Names the observed hash so players can compare it with the allowlist (EN/TW/KR/JP/CN share one list).
+pub fn unsupported_client(application_version: &str, path: &str, observed: Option<&str>) -> String {
+    let observed = observed.map_or("file missing or unreadable".to_owned(), |hash| format!("SHA-256 {hash}"));
+    format!("{path} is not the supported {application_version} client ({observed}) — update the game if it is older, or the launcher if the game is newer")
 }
 
 fn parse_supported_client(bytes: &[u8]) -> Result<SupportedClient> {
@@ -189,8 +225,8 @@ fn validate_supported_client(metadata: &SupportedClient) -> Result<()> {
         }
     }
     if let Some(build) = &metadata.pgr_base {
-        if build.original_export_jump[0] != 0xe9 {
-            bail!("PGRBase stock export preimage must be a relative jump");
+        if build.original_export_jumps.is_empty() || build.original_export_jumps.iter().any(|jump| jump[0] != 0xe9) {
+            bail!("PGRBase stock export preimages must be a non-empty list of relative jumps");
         }
         for hashes in [&build.originals, &build.unity_players] {
             if hashes.is_empty() {
@@ -361,7 +397,9 @@ mod tests {
                 "originals": {
                     "PGR.exe": ["00".repeat(32)],
                     "GameAssembly.dll": ["11".repeat(32), "33".repeat(32)],
-                    "PGR_Data/Plugins/KRSDK.dll": ["22".repeat(32)]
+                    "PGR_Data/Plugins/KRSDK.dll": ["22".repeat(32)],
+                    "PGR_Data/Plugins/KRSDKEx.dll": ["44".repeat(32)],
+                    "PGR_Data/Plugins/libkrsdkcurl.dll": ["55".repeat(32)]
                 }
             }))
             .unwrap(),
@@ -379,13 +417,17 @@ mod tests {
         fs::write(game.join("GameAssembly.dll"), b"asm").unwrap();
         let metadata = root.join("supported-client.json");
         let error = check_supported_client(&metadata, &game).unwrap_err().to_string();
-        assert_eq!(error, "PGR.exe is not the supported 4.7.0 client — update the game if it is older, or the launcher if the game is newer");
+        assert_eq!(error, format!("PGR.exe is not the supported 4.7.0 client (SHA-256 {}) — update the game if it is older, or the launcher if the game is newer", sha256_file(&game.join("PGR.exe")).unwrap()));
+        assert!(check_supported_client(&metadata, &game.join("missing")).unwrap_err().to_string().contains("(file missing or unreadable)"));
         let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&metadata).unwrap()).unwrap();
         value["originals"]["PGR.exe"] = serde_json::json!([sha256_file(&game.join("PGR.exe")).unwrap()]);
         fs::write(&metadata, serde_json::to_vec(&value).unwrap()).unwrap();
         assert!(check_supported_client(&metadata, &game).unwrap_err().to_string().starts_with("GameAssembly.dll is not"));
         value["originals"]["GameAssembly.dll"] = serde_json::json!([sha256_file(&game.join("GameAssembly.dll")).unwrap()]);
         fs::write(&metadata, serde_json::to_vec(&value).unwrap()).unwrap();
+        assert!(check_supported_client(&metadata, &game).unwrap_err().to_string().contains("neither"));
+        fs::create_dir_all(game.join("PGR_Data/Plugins")).unwrap();
+        fs::write(game.join(KRSDK), b"sdk").unwrap();
         check_supported_client(&metadata, &game).unwrap();
         fs::remove_dir_all(root).unwrap();
     }
@@ -414,6 +456,8 @@ mod tests {
             "910a2988f5819641ba3d0b5fcbcb8659e088b5899e7f3b22f4098efcfe1c4d5e",
             "ea70a4d72cd11fd9cfdaf9408ae79ab7e926ed1da8593a6d3c62db8f1283dbbd",
             "9defd05a6c7e6c3172bdc8f55bf9b7e70fba4ba355c92348f0996a82d56654ba",
+            "ccb048f28e779237a6dc07841e0bb96857c6903dc3ec21cdbec3fde71c3d8b33",
+            "48d5374b26608d57d2bf34a81350578285a3cb3c02957615336901990c3efb82",
         ] {
             assert!(package.manifest.accepts_original("GameAssembly.dll", Some(hash)));
             assert!(!package.manifest.accepts_original("PGR.exe", Some(hash)));
@@ -422,6 +466,30 @@ mod tests {
         assert!(!package.manifest.accepts_original("GameAssembly.dll", Some(&"00".repeat(32))));
         assert!(!package.manifest.accepts_original("GameAssembly.dll", None));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn kr_and_jp_retail_identities_are_accepted_from_bundled_metadata() {
+        let root = package();
+        fs::write(root.join("supported-client.json"), include_bytes!("../supported-client.json")).unwrap();
+        let manifest = load_package(&root).unwrap().manifest;
+        // SHA-256 of the 4.8.0 retail files (KR G286/50011, JP G282/50007); KRSDK.dll/PGRBase/UnityPlayer are shared.
+        let kr = ("2cd82d51830b2e8ac373162aa2fbb9106ad3760906685abb51611770e1eb310e", "ccb048f28e779237a6dc07841e0bb96857c6903dc3ec21cdbec3fde71c3d8b33");
+        let jp = ("2dd7b482516c0be745fb4e258f3523fb41e02ae16b82e5baae96e0b50c90c026", "48d5374b26608d57d2bf34a81350578285a3cb3c02957615336901990c3efb82");
+        for (exe, assembly) in [kr, jp] {
+            assert!(manifest.accepts_original("PGR.exe", Some(exe)));
+            assert!(manifest.accepts_original("GameAssembly.dll", Some(assembly)));
+            assert!(!manifest.accepts_original("PGR.exe", Some(assembly)));
+            assert!(!manifest.accepts_original("GameAssembly.dll", Some(exe)));
+        }
+        assert!(manifest.accepts_original(
+            "PGR_Data/Plugins/KRSDK.dll",
+            Some("59a1d02def4c18ece4467cc4cf7b1da264055f1f09be94dafc61c6765b37465f")
+        ));
+        let base = manifest.pgr_base.unwrap();
+        assert!(base.originals.contains(&"fbb01424adb76a2b4ea206eb550977276b2e30e5b316a32e2b5af7d90ceba9fe".into()));
+        assert!(base.unity_players.contains(&"5a913706320879d1c189053dafc8bc6e29bddc15f5a4564d4326be225d9c91e5".into()));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -468,15 +536,93 @@ mod tests {
         let path = root.join("supported-client.json");
         let mut metadata: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         for build in [
-            serde_json::json!({"originals": [], "unityPlayers": ["11".repeat(32)], "originalExportJump": [233, 0, 0, 0, 0]}),
-            serde_json::json!({"originals": ["00".repeat(32)], "unityPlayers": [], "originalExportJump": [233, 0, 0, 0, 0]}),
-            serde_json::json!({"originals": ["00".repeat(32)], "unityPlayers": ["11".repeat(32)], "originalExportJump": [144, 0, 0, 0, 0]}),
+            serde_json::json!({"originals": [], "unityPlayers": ["11".repeat(32)], "originalExportJumps": [[233, 0, 0, 0, 0]]}),
+            serde_json::json!({"originals": ["00".repeat(32)], "unityPlayers": [], "originalExportJumps": [[233, 0, 0, 0, 0]]}),
+            serde_json::json!({"originals": ["00".repeat(32)], "unityPlayers": ["11".repeat(32)], "originalExportJumps": [[233, 0, 0, 0, 0], [144, 0, 0, 0, 0]]}),
+            serde_json::json!({"originals": ["00".repeat(32)], "unityPlayers": ["11".repeat(32)], "originalExportJumps": []}),
         ] {
             metadata["pgrBase"] = build;
             fs::write(&path, serde_json::to_vec(&metadata).unwrap()).unwrap();
             assert!(load_package(&root).is_err());
         }
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cn_retail_identities_are_accepted_from_bundled_metadata_and_lookalikes_rejected() {
+        let root = package();
+        fs::write(root.join("supported-client.json"), include_bytes!("../supported-client.json")).unwrap();
+        let manifest = load_package(&root).unwrap().manifest;
+        let cn = [
+            ("PGR.exe", "489e674af8c981c083a022b1b268d9fec27f4f2d93f9f1ccb655ad0c0b9a3179"),
+            ("GameAssembly.dll", "af68b08ff132a4ea598c057752491b5854f7ccf8944140225ca0d5ed492c8873"),
+            (KRSDK_EX, "fa6c877d5f4ebba42728c8765c2fe40bb9cc0995fde7219bc663cdedd727e0a9"),
+            (KRSDK_CURL, "c5278160ce6b91af59e8a8d317632564be8c95922248f21cc2768701f7fddc91"),
+        ];
+        for (path, hash) in cn {
+            assert!(manifest.accepts_original(path, Some(hash)), "{path}");
+            let mut lookalike = hash.to_owned();
+            lookalike.replace_range(63.., if hash.ends_with('0') { "1" } else { "0" });
+            assert!(!manifest.accepts_original(path, Some(&lookalike)), "{path}");
+            // A CN hash is only valid in its own slot.
+            for (other, _) in cn.iter().filter(|(other, _)| *other != path) {
+                assert!(!manifest.accepts_original(other, Some(hash)), "{path} in {other}");
+            }
+            assert!(!manifest.accepts_original(KRSDK, Some(hash)), "{path} in KRSDK.dll");
+        }
+        let base = manifest.pgr_base.unwrap();
+        assert!(base.originals.contains(&"6c2abc3486218a2ee21ecbe55540e3f2083022a339a2e10b698eaa4293f9102d".into()));
+        assert_eq!(base.original_export_jumps, [[233, 174, 101, 44, 1], [233, 11, 27, 0, 1]]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sdk_original_keys_are_exactly_the_three_sdk_slots() {
+        let root = package();
+        let path = root.join("supported-client.json");
+        let base: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let mut broken = vec![];
+        for key in [KRSDK, KRSDK_EX, KRSDK_CURL] {
+            let mut missing = base.clone();
+            missing["originals"].as_object_mut().unwrap().remove(key);
+            let mut empty = base.clone();
+            empty["originals"][key] = serde_json::json!([]);
+            broken.extend([missing, empty]);
+        }
+        let mut extra = base.clone();
+        extra["originals"]["PGR_Data/Plugins/other.dll"] = serde_json::json!(["66".repeat(32)]);
+        broken.push(extra);
+        for metadata in broken {
+            fs::write(&path, serde_json::to_vec(&metadata).unwrap()).unwrap();
+            assert!(load_package(&root).is_err());
+        }
+        fs::write(&path, serde_json::to_vec(&base).unwrap()).unwrap();
+        load_package(&root).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn region_follows_the_sdk_files_and_cn_sdk_pair_must_be_allowlisted() {
+        let game = std::env::temp_dir().join(format!("ascnet-region-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(game.join("PGR_Data/Plugins")).unwrap();
+        let originals = |ex: &[u8], curl: &[u8]| -> BTreeMap<String, Vec<String>> {
+            let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+            BTreeMap::from([(KRSDK_EX.into(), vec![hash(ex)]), (KRSDK_CURL.into(), vec![hash(curl)])])
+        };
+        let neither = client_region("4.8.0", &originals(b"ex", b"curl"), &game).unwrap_err().to_string();
+        assert!(neither.contains("neither") && neither.contains("KRSDK.dll") && neither.contains("KRSDKEx.dll"), "{neither}");
+        fs::write(game.join(KRSDK_EX), b"ex").unwrap();
+        fs::write(game.join(KRSDK_CURL), b"curl").unwrap();
+        assert_eq!(client_region("4.8.0", &originals(b"ex", b"curl"), &game).unwrap(), Region::Cn);
+        let observed = sha256_file(&game.join(KRSDK_CURL)).unwrap();
+        let error = client_region("4.8.0", &originals(b"ex", b"other"), &game).unwrap_err().to_string();
+        assert!(error.starts_with("PGR_Data/Plugins/libkrsdkcurl.dll is not the supported 4.8.0 client") && error.contains(&observed), "{error}");
+        fs::remove_file(game.join(KRSDK_CURL)).unwrap();
+        assert!(client_region("4.8.0", &originals(b"ex", b"curl"), &game).unwrap_err().to_string().contains("file missing"));
+        // KRSDK.dll wins: a global client needs no CN pair.
+        fs::write(game.join(KRSDK), b"sdk").unwrap();
+        assert_eq!(client_region("4.8.0", &BTreeMap::new(), &game).unwrap(), Region::Global);
+        fs::remove_dir_all(game).unwrap();
     }
 
     #[test]

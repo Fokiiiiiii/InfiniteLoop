@@ -1,3 +1,4 @@
+use crate::exports::sdk_identity;
 use crate::globals::{SendPtr, ALLOCATED_STRINGS, LANGUAGE};
 use std::ffi::CString;
 use std::os::{raw::c_char, windows::ffi::OsStrExt};
@@ -12,37 +13,15 @@ use windows::{
     },
 };
 
-pub(crate) fn packaged_sdk_config() -> Result<std::collections::HashMap<String, String>, String> {
-    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
-    let path = exe
-        .parent()
-        .ok_or_else(|| "game executable has no parent directory".to_string())?
-        .join("PGR_Data/Plugins/KRSDKRes/KRSDK.bin");
-    let text = std::fs::read_to_string(&path)
-        .map_err(|error| format!("{}: {error}", path.display()))?;
-
-    Ok(text
-        .lines()
-        .filter_map(|line| line.trim_end_matches('\r').split_once('='))
-        .map(|(key, value)| (key.to_string(), value.to_string()))
-        .collect())
-}
-
-fn packaged_config() -> Result<serde_json::Value, String> {
-    let config = packaged_sdk_config()?;
-    let get = |key: &str| {
-        config
-            .get(key)
-            .cloned()
-            .ok_or_else(|| format!("packaged SDK config is missing {key}"))
-    };
+fn packaged_config(config: &std::collections::HashMap<String, String>) -> Result<serde_json::Value, String> {
+    let id = sdk_identity::identity(config)?;
 
     Ok(serde_json::json!({
-        "channelId": get("KR_ChannelID")?,
-        "channelName": get("KR_ChannelName")?,
-        "channelOp": get("KR_ChannelOp")?,
-        "gameId": get("KR_ProjectId")?,
-        "pkgId": get("KR_ProductId")?
+        "channelId": id.channel_id,
+        "channelName": id.channel_name,
+        "channelOp": id.channel_op,
+        "gameId": id.project_id,
+        "pkgId": id.product_id
     }))
 }
 
@@ -67,28 +46,33 @@ fn initialize_routing() -> Result<(), &'static str> {
                     None,
                     LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32,
                 )
-                .map_err(|_| "could not load client-root lucia.dll")?
+                .map_err(|_| "could not load lucia.dll from beside PGR.exe (missing, blocked by antivirus, or not an AscNet build)")?
             }
         };
         let initialize =
             GetProcAddress::<HMODULE, PCSTR>(module, s!("ascnet_patch_initialize"))
-                .ok_or("lucia.dll is missing ascnet_patch_initialize")?;
+                .ok_or("lucia.dll beside PGR.exe does not export ascnet_patch_initialize (outdated or foreign lucia.dll; reinstall the client patch)")?;
         let initialize: unsafe extern "system" fn() -> i32 = std::mem::transmute(initialize);
         (initialize() == 1)
             .then_some(())
-            .ok_or("lucia.dll routing initialization failed")
+            .ok_or("lucia.dll loaded but its routing initialization failed (see the [lucia] FAILED line in ascnet-patch.log)")
     }
 }
 
 #[no_mangle]
 pub extern "C" fn kurosdk_getConfigInfo() -> *mut c_char {
     println!("[KRSDK] *** kurosdk_getConfigInfo called ***");
-    if let Err(error) = initialize_routing() {
-        eprintln!("[KRSDK] {error}");
-        return std::ptr::null_mut();
+    let packaged = sdk_identity::read_packaged();
+    crate::diag::log(&sdk_identity::region_line("KRSDK", &packaged));
+    match initialize_routing() {
+        Ok(()) => crate::diag::log(&crate::diag::ok_line("KRSDK", "lucia.dll routing initialization", "")),
+        Err(error) => {
+            crate::diag::log(&crate::diag::failed_line("KRSDK", "lucia.dll routing initialization", error));
+            return std::ptr::null_mut();
+        }
     }
-    let config = packaged_config().unwrap_or_else(|error| {
-        eprintln!("[KRSDK] Failed to read packaged config: {error}");
+    let config = packaged.and_then(|config| packaged_config(&config)).unwrap_or_else(|error| {
+        crate::diag::log(&crate::diag::failed_line("KRSDK", "kurosdk_getConfigInfo packaged config", &error));
         serde_json::json!({})
     });
 

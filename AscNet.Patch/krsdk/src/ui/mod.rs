@@ -4,7 +4,6 @@ pub mod register_dialog;
 
 use crate::globals::send_callback;
 use crate::types::UserSession;
-use crate::exports::config::packaged_sdk_config;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use windows::Win32::Foundation::HWND;
@@ -13,7 +12,7 @@ pub static PARENT_HWND: Lazy<Mutex<Option<HWND>>> = Lazy::new(|| Mutex::new(None
 pub static SESSION: Lazy<Mutex<Option<UserSession>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn finish_login(session: UserSession) {
-    let account_channel_id = match packaged_sdk_config()
+    let account_channel_id = match crate::exports::sdk_identity::read_packaged()
         .and_then(|config| {
             config
                 .get("KR_ChannelID")
@@ -22,7 +21,7 @@ pub fn finish_login(session: UserSession) {
         }) {
         Ok(channel_id) => channel_id,
         Err(error) => {
-            eprintln!("[KRSDK] Failed to read login channel: {error}");
+            crate::diag::log(&crate::diag::failed_line("KRSDK", "login channel from KRSDK.bin", &error));
             return;
         }
     };

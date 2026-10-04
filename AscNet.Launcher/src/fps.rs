@@ -15,7 +15,6 @@ const LOGICAL_ASSET: &str = "assets/temp/lua/matrix.ab";
 const TEXT_ASSET: &[u8] = b"XUiMain.lua";
 const MARKER: &str = "PgrNativeFpsTimer";
 const KEY: &[u8; 16] = b"XxecodrPeGaka2e6";
-const ANCHOR: &str = "    CS.XInputManager.SetCurInputMap(CS.XInputMapId.System)";
 const START: &str = "function XUiMain:OnStart()";
 const MAX_BUNDLE_SIZE: u64 = 512 * 1024 * 1024;
 const MAX_BLOCKS: usize = 65_536;
@@ -61,7 +60,7 @@ struct BackupMetadata<'a> {
     replacement_sha256: &'a str,
 }
 
-pub fn inspect(game: &Path) -> Result<Option<i32>> {
+fn inspect(game: &Path) -> Result<Option<i32>> {
     let active = resolve(game)?;
     let bytes = read_bounded(&active.path)?;
     let decoded = decode(&bytes)?;
@@ -69,48 +68,36 @@ pub fn inspect(game: &Path) -> Result<Option<i32>> {
     owned_fps(std::str::from_utf8(content).context("XUiMain.lua is not UTF-8")?)
 }
 
-pub fn apply(game: &Path, fps: i32) -> Result<()> {
-    if fps <= 0 {
-        bail!("FPS must be positive");
-    }
-    mutate(game, Some(fps))
-}
-
-pub fn disable(game: &Path) -> Result<()> {
-    mutate(game, None)
-}
-
-fn mutate(game: &Path, wanted: Option<i32>) -> Result<()> {
+/// One-time migration from the retired bundle FPS patch (FPS is now applied natively by lucia):
+/// removes the old Lua hook from the document-scope matrix bundle, keeping a backup.
+/// Returns the FPS value the hook had, or `None` when the bundle is clean.
+pub fn remove_legacy_hook(game: &Path) -> Result<Option<i32>> {
+    let Some(fps) = inspect(game)? else {
+        return Ok(None);
+    };
     if install::game_running()? {
-        bail!("refusing FPS changes while PGR.exe is running");
+        bail!("the old bundle FPS patch ({fps} FPS) is still installed; close PGR.exe and press Check to remove it");
     }
     let game = fs::canonicalize(game)
         .with_context(|| format!("invalid game directory: {}", game.display()))?;
     let active = resolve(&game)?;
     if active.scope != "document" {
-        bail!("refusing to patch packaged resource bundle; start the game once to create its document override");
+        bail!("refusing to modify packaged resource bundle");
     }
     let original = read_bounded(&active.path)?;
     let decoded = decode(&original)?;
     let (content_offset, content) = text_asset(&decoded.payload)?;
     let text = std::str::from_utf8(content).context("XUiMain.lua is not UTF-8")?;
-    let current = owned_fps(text)?;
-    if current == wanted {
-        return Ok(());
-    }
-    let changed = change_lua(text, wanted)?;
-    let replacement = fit_same_size(content, &changed)?;
+    let replacement = fit_same_size(content, &remove_hook(text)?)?;
     let output = rewrite(&original, decoded, content_offset, replacement)?;
 
     // Reject an updater race before creating a provenance record or committing.
     if sha256(&read_bounded(&active.path)?) != sha256(&original) {
-        bail!(
-            "matrix bundle changed while preparing the FPS patch; retry after the update finishes"
-        );
+        bail!("matrix bundle changed while removing the old FPS patch; retry after the update finishes");
     }
     save_backup(&game, &active.path, &original, &output)?;
     write_atomic(&active.path, &output)?;
-    Ok(())
+    Ok(Some(fps))
 }
 
 fn resolve(game: &Path) -> Result<Active> {
@@ -486,43 +473,12 @@ fn parse_hook(line: &str) -> Result<i32> {
     Ok(fps)
 }
 
-fn hook(fps: i32) -> String {
-    format!("    if not XUiMain.PgrNativeFpsTimer then local f=function() CS.UnityEngine.Application.targetFrameRate={fps} end f() XUiMain.PgrNativeFpsTimer=XScheduleManager.ScheduleForever(f,2000) end")
-}
-
-fn change_lua(text: &str, wanted: Option<i32>) -> Result<String> {
-    let current = owned_fps(text)?;
-    match (current, wanted) {
-        (Some(_), Some(fps)) => {
-            let mut lines = text
-                .split_inclusive('\n')
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            let index = lines.iter().position(|l| l.contains(MARKER)).unwrap();
-            let ending = if lines[index].ends_with("\r\n") {
-                "\r\n"
-            } else if lines[index].ends_with('\n') {
-                "\n"
-            } else {
-                ""
-            };
-            lines[index] = hook(fps) + ending;
-            Ok(lines.concat())
-        }
-        (None, Some(fps)) => {
-            let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
-            let count = text.match_indices(ANCHOR).count();
-            if count != 1 {
-                bail!("expected exactly one XUiMain input-map anchor, found {count}");
-            }
-            Ok(text.replacen(ANCHOR, &(ANCHOR.to_owned() + newline + &hook(fps)), 1))
-        }
-        (Some(_), None) => Ok(text
-            .split_inclusive('\n')
-            .filter(|line| !line.contains(MARKER))
-            .collect()),
-        (None, None) => Ok(text.to_owned()),
-    }
+fn remove_hook(text: &str) -> Result<String> {
+    owned_fps(text)?;
+    Ok(text
+        .split_inclusive('\n')
+        .filter(|line| !line.contains(MARKER))
+        .collect())
 }
 
 fn fit_same_size(original: &[u8], changed: &str) -> Result<Vec<u8>> {
@@ -895,28 +851,30 @@ fn le_u32(data: &[u8], at: usize) -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const ANCHOR: &str = "    CS.XInputManager.SetCurInputMap(CS.XInputMapId.System)";
+    fn legacy_hook(fps: i32) -> String {
+        format!("    if not XUiMain.PgrNativeFpsTimer then local f=function() CS.UnityEngine.Application.targetFrameRate={fps} end f() XUiMain.PgrNativeFpsTimer=XScheduleManager.ScheduleForever(f,2000) end")
+    }
     #[test]
     fn malformed_hook_is_never_removed() {
         let text = "PgrNativeFpsTimer = somebody_else\n";
         assert!(owned_fps(text).is_err());
-        assert!(change_lua(text, None).is_err());
+        assert!(remove_hook(text).is_err());
     }
     #[test]
-    fn safe_padding_round_trip_preserves_other_bytes() {
+    fn legacy_hook_is_detected_and_removed_without_touching_other_bytes() {
         let stock = format!("{ANCHOR}\n{}{START}\nkeep\n", " ".repeat(256));
-        let applied = change_lua(&stock, Some(240)).unwrap();
-        let fitted = fit_same_size(stock.as_bytes(), &applied).unwrap();
-        let patched = std::str::from_utf8(&fitted).unwrap();
-        assert_eq!(owned_fps(patched).unwrap(), Some(240));
-        let disabled = change_lua(patched, None).unwrap();
-        let restored = fit_same_size(&fitted, &disabled).unwrap();
-        assert_eq!(
-            owned_fps(std::str::from_utf8(&restored).unwrap()).unwrap(),
-            None
-        );
-        assert!(std::str::from_utf8(&restored)
-            .unwrap()
-            .ends_with("function XUiMain:OnStart()\nkeep\n"));
+        assert_eq!(owned_fps(&stock).unwrap(), None);
+        let hooked = stock.replacen(ANCHOR, &format!("{ANCHOR}\n{}", legacy_hook(240)), 1);
+        let hooked = hooked.replacen(&" ".repeat(legacy_hook(240).len() + 1), "", 1);
+        assert_eq!(hooked.len(), stock.len());
+        assert_eq!(owned_fps(&hooked).unwrap(), Some(240));
+        let restored = fit_same_size(hooked.as_bytes(), &remove_hook(&hooked).unwrap()).unwrap();
+        assert_eq!(restored.len(), stock.len());
+        let restored = std::str::from_utf8(&restored).unwrap();
+        assert_eq!(owned_fps(restored).unwrap(), None);
+        assert!(restored.starts_with(ANCHOR));
+        assert!(restored.ends_with("function XUiMain:OnStart()\nkeep\n"));
     }
     #[test]
     fn corrupt_lengths_are_rejected() {

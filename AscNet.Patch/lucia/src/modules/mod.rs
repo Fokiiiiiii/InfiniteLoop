@@ -12,9 +12,16 @@ use windows::{
     },
 };
 
+mod cn_sdk;
+mod fps;
+mod il2cpp;
 mod network;
+mod nofade;
 
+pub use cn_sdk::{identity_line as cn_identity_line, is_cn_client, CnSdk};
 pub use network::Http;
+pub use fps::spawn_if_enabled as spawn_fps_if_enabled;
+pub use nofade::spawn_if_enabled as spawn_nofade_if_enabled;
 
 #[derive(Default)]
 pub struct ModuleManager {
@@ -44,6 +51,7 @@ impl ModuleManager {
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub enum ModuleType {
     Http,
+    CnSdk,
 }
 
 pub trait MhyModule {

@@ -36,11 +36,12 @@ dependencies = [
 
 [[package]]
 name = "ascnet-launcher"
-version = "1.0.7"
+version = "1.0.8"
 dependencies = [
  "aes",
  "anyhow",
  "ctr",
+ "flate2",
  "lz4_flex",
  "reqwest",
  "semver",

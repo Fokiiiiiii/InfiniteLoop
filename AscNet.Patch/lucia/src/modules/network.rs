@@ -13,7 +13,12 @@ use anyhow::{anyhow, bail, Context, Result};
 use ilhook::x64::Registers;
 
 use super::{MhyContext, MhyModule, ModuleType};
+use crate::diag;
 use crate::util::{c_string, executable, game_assembly_code, get_export, read_csharp_string, readable, GAME_ASSEMBLY_BASE};
+
+macro_rules! plog {
+    ($($arg:tt)*) => { diag::log(&format!($($arg)*)) };
+}
 
 const UNITY_WEB_REQUEST_ASSEMBLY: &str = "UnityEngine.UnityWebRequestModule.dll";
 const WEB_REQUEST_NAMESPACE: &str = "UnityEngine.Networking";
@@ -24,6 +29,7 @@ static ORIGIN: OnceLock<String> = OnceLock::new();
 static STRING_NEW: OnceLock<unsafe extern "system" fn(*const i8) -> usize> = OnceLock::new();
 static TRACE: OnceLock<bool> = OnceLock::new();
 static TRACE_CALLS: AtomicUsize = AtomicUsize::new(0);
+static PACKAGE_LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 const TRACE_CALL_LIMIT: usize = 64;
 
 pub struct Http;
@@ -113,17 +119,17 @@ unsafe fn trace_remote_config_metadata(
         let image_name = c_string(image_get_name(image)).unwrap_or_else(|| "<unnamed>".into());
         let class = class_from_name(image, empty.as_ptr(), class_name.as_ptr());
         if !class.is_null() {
-            println!("[lucia] remote-config metadata image={image_name} type=XRemoteConfig");
+            diag::log(&diag::ok_line("lucia", "lookup XRemoteConfig", &format!("assembly={image_name} class=XRemoteConfig")));
             if selected.is_none() || image_name == "Assembly-CSharp.dll" {
                 selected = Some((class, image_name == "Assembly-CSharp.dll"));
             }
         }
     }
     let Some((class, preferred)) = selected else {
-        println!("[lucia] remote-config metadata type=XRemoteConfig status=not-found");
+        diag::log(&diag::failed_line("lucia", "lookup XRemoteConfig (ASCNET_PATCH_TRACE=1 only)", &format!("class `XRemoteConfig` (global namespace) not found in any of {assembly_count} loaded IL2CPP assemblies; this client build may have renamed it; routing is unaffected")));
         return Ok(());
     };
-    println!("[lucia] remote-config metadata selected assembly_csharp={preferred}");
+    plog!("[lucia] remote-config metadata selected assembly_csharp={preferred}");
 
     let class_get_fields: ClassGetFields = export("il2cpp_class_get_fields")?;
     let field_get_name: FieldGetName = export("il2cpp_field_get_name")?;
@@ -140,7 +146,7 @@ unsafe fn trace_remote_config_metadata(
         let flags = field_get_flags(field);
         let field_type = resolved_type_name(type_name, free, field_get_type(field))
             .unwrap_or_else(|| "<invalid>".into());
-        println!("[lucia] remote-config field name={name} flags=0x{flags:X} type={field_type}");
+        plog!("[lucia] remote-config field name={name} flags=0x{flags:X} type={field_type}");
         if (name == "LoadConfigUrl" || name == "ServerListStr")
             && flags & 0x10 != 0
             && field_type == "System.String"
@@ -159,12 +165,12 @@ unsafe fn trace_remote_config_metadata(
                     }
                 })
                 .unwrap_or_else(|| "<null-or-unreadable>".into());
-            println!("[lucia] remote-config {name}={observed}");
+            plog!("[lucia] remote-config {name}={observed}");
         }
         if name == "HasGetRemoteConfig" && flags & 0x10 != 0 && field_type == "System.Boolean" {
             let mut value = 0u8;
             field_static_get_value(field, (&mut value as *mut u8).cast());
-            println!("[lucia] remote-config HasGetRemoteConfig={}", value != 0);
+            plog!("[lucia] remote-config HasGetRemoteConfig={}", value != 0);
         }
     }
 
@@ -198,7 +204,7 @@ unsafe fn trace_remote_config_metadata(
         let rva = method_rva(method)
             .map(|value| format!("0x{value:X}"))
             .unwrap_or_else(|| "<unavailable>".into());
-        println!(
+        plog!(
             "[lucia] remote-config method name={name} flags=0x{flags:X} signature=({parameters})->{return_type} rva={rva}"
         );
     }
@@ -227,18 +233,18 @@ unsafe fn trace_remote_config_metadata(
             let return_type = resolved_type_name(type_name, free, get_return(method))
                 .unwrap_or_else(|| "<invalid>".into());
             if return_type != "System.Boolean" {
-                println!("[lucia] remote-config nested={nested_name} method=MoveNext status=unexpected-return type={return_type}");
+                plog!("[lucia] remote-config nested={nested_name} method=MoveNext status=unexpected-return type={return_type}");
                 continue;
             }
             let flags = method_flags(method, std::ptr::null_mut());
             let rva = method_rva(method)
                 .map(|value| format!("0x{value:X}"))
                 .unwrap_or_else(|| "<unavailable>".into());
-            println!("[lucia] remote-config nested={nested_name} method={name} flags=0x{flags:X} signature=()->{return_type} rva={rva}");
+            plog!("[lucia] remote-config nested={nested_name} method={name} flags=0x{flags:X} signature=()->{return_type} rva={rva}");
         }
     }
 
-    println!("[lucia] remote-config observation boundary=resolver-domain-ready; if LoadConfigUrl is null, next named boundary is InitLoadConfigUrl/LoadConfigUrl/ParseRemoteConfig");
+    plog!("[lucia] remote-config observation boundary=resolver-domain-ready; if LoadConfigUrl is null, next named boundary is InitLoadConfigUrl/LoadConfigUrl/ParseRemoteConfig");
     Ok(())
 }
 
@@ -270,14 +276,21 @@ unsafe fn resolve_url_hook() -> Result<usize> {
     let method_flags: MethodGetFlags = export("il2cpp_method_get_flags")?;
     let free: Il2CppFree = export("il2cpp_free")?;
 
+    diag::log(&diag::ok_line("lucia", "il2cpp exports", "12 il2cpp_* exports resolved from GameAssembly.dll"));
+    let mut waited = 0u32;
     let domain = loop {
         let domain = domain_get();
         if !domain.is_null() {
             let mut count = 0;
             let assemblies = domain_get_assemblies(domain, &mut count);
             if !assemblies.is_null() && count != 0 {
+                diag::log(&diag::ok_line("lucia", "il2cpp domain ready", &format!("assemblies={count} waited_ms={}", waited * 100)));
                 break domain;
             }
+        }
+        waited += 1;
+        if waited == 600 {
+            diag::log(&diag::failed_line("lucia", "il2cpp domain ready", "il2cpp_domain_get/il2cpp_domain_get_assemblies still returned no assemblies after 60s; the game has not finished IL2CPP startup (still waiting)"));
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     };
@@ -287,26 +300,27 @@ unsafe fn resolve_url_hook() -> Result<usize> {
     let class_name = CString::new(WEB_REQUEST_CLASS)?;
     let method_name = CString::new(WEB_REQUEST_METHOD)?;
     let assembly = assembly_open(domain, assembly_name.as_ptr());
-    if assembly.is_null() { bail!("assembly `{UNITY_WEB_REQUEST_ASSEMBLY}` is unavailable") }
+    if assembly.is_null() { bail!("il2cpp_domain_assembly_open could not open assembly `{UNITY_WEB_REQUEST_ASSEMBLY}` (not in this client's IL2CPP metadata)") }
     let image = assembly_get_image(assembly);
-    if image.is_null() { bail!("assembly image is unavailable") }
+    if image.is_null() { bail!("il2cpp_assembly_get_image returned null for `{UNITY_WEB_REQUEST_ASSEMBLY}`") }
     let class = class_from_name(image, namespace.as_ptr(), class_name.as_ptr());
-    if class.is_null() { bail!("type `{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}` is unavailable") }
+    if class.is_null() { bail!("il2cpp_class_from_name: type `{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}` not found in `{UNITY_WEB_REQUEST_ASSEMBLY}` (module layout differs from 4.8.0 PGR)") }
+    diag::log(&diag::ok_line("lucia", "lookup assembly+class", &format!("{UNITY_WEB_REQUEST_ASSEMBLY}!{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}")));
     let method = class_get_method(class, method_name.as_ptr(), 1);
-    if method.is_null() || param_count(method) != 1 { bail!("method `{WEB_REQUEST_METHOD}(string)` is unavailable") }
-    if method_flags(method, std::ptr::null_mut()) & 0x10 != 0 { bail!("method `{WEB_REQUEST_METHOD}` is static") }
+    if method.is_null() || param_count(method) != 1 { bail!("method `{WEB_REQUEST_METHOD}(System.String)` of `{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}` not found in `{UNITY_WEB_REQUEST_ASSEMBLY}` (class exists but this Unity build has no one-argument overload; client Unity version differs from 4.8.0 PGR)") }
+    if method_flags(method, std::ptr::null_mut()) & 0x10 != 0 { bail!("method `{WEB_REQUEST_METHOD}` is static; expected an instance method (client Unity version differs)") }
     let actual = resolved_type_name(type_name, free, get_param(method, 0))
         .unwrap_or_else(|| "<invalid>".into());
-    if actual != "System.String" { bail!("parameter 0 is `{actual}`, expected `System.String`") }
+    if actual != "System.String" { bail!("`{WEB_REQUEST_METHOD}` parameter 0 is `{actual}`, expected `System.String` (client Unity version differs)") }
     let actual_return = resolved_type_name(type_name, free, get_return(method))
         .unwrap_or_else(|| "<invalid>".into());
-    if actual_return != "System.Void" { bail!("return type is `{actual_return}`, expected `System.Void`") }
+    if actual_return != "System.Void" { bail!("`{WEB_REQUEST_METHOD}` returns `{actual_return}`, expected `System.Void` (client Unity version differs)") }
     if !readable(method as usize, std::mem::size_of::<usize>()) {
-        bail!("MethodInfo is not readable")
+        bail!("MethodInfo of `{WEB_REQUEST_METHOD}` is not readable memory")
     }
     let target = *(method as *const usize);
     if !game_assembly_code(target) {
-        bail!("MethodInfo methodPointer 0x{target:X} is not executable GameAssembly code")
+        bail!("`{WEB_REQUEST_METHOD}` methodPointer 0x{target:X} is not executable code inside GameAssembly.dll (method is stripped or resolved to a Unity player stub)")
     }
     Ok(target)
 }
@@ -343,6 +357,11 @@ unsafe fn trace_metadata() -> Result<()> {
     )
 }
 
+/// The origin native routing was initialized with; `None` until the Http module is enabled.
+pub(super) fn routing_origin() -> Option<&'static str> {
+    ORIGIN.get().map(String::as_str)
+}
+
 fn origin() -> Result<&'static str> {
     let value = std::env::var("ASCNET_PATCH_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
     let value = value.trim_end_matches('/');
@@ -358,7 +377,7 @@ fn redirected_url(url: &str) -> Option<String> {
     network_routing::redirected_url(ORIGIN.get().unwrap(), url)
 }
 
-fn safe_url(url: &str) -> String {
+pub(super) fn safe_url(url: &str) -> String {
     let Some((scheme, rest)) = url.split_once("://") else {
         return "<relative-or-invalid-url>".into();
     };
@@ -380,7 +399,7 @@ fn trace_call(boundary: &str, url: Option<&str>) {
     {
         return;
     }
-    println!(
+    plog!(
         "[lucia] {boundary} call url={}",
         url.map(|value| {
             if value.contains("://") { safe_url(value) } else { value.split(['?', '#']).next().unwrap_or("").chars().take(512).collect() }
@@ -398,16 +417,16 @@ impl MhyModule for MhyContext<Http> {
         if !executable(string_new_address) { bail!("il2cpp_string_new export is not executable") }
         STRING_NEW.set(std::mem::transmute(string_new_address)).map_err(|_| anyhow!("string allocator already initialized"))?;
 
-        println!("[lucia] verified {WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}.{WEB_REQUEST_METHOD}(System.String) -> System.Void at 0x{target:X}");
-        println!("[lucia] routing config/notice requests to {origin}");
+        diag::log(&diag::ok_line("lucia", &format!("lookup {UNITY_WEB_REQUEST_ASSEMBLY}!{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}::{WEB_REQUEST_METHOD}(System.String)->System.Void"), &format!("method at 0x{target:X}")));
+        diag::log(&diag::ok_line("lucia", "routing origin", origin));
         if std::env::var("ASCNET_PATCH_PROBE").as_deref() == Ok("1") {
-            println!("[lucia] probe-only mode; no hook installed");
+            diag::log(&diag::ok_line("lucia", "hook install skipped", "ASCNET_PATCH_PROBE=1 probe-only mode, no hook installed"));
         } else {
-            self.interceptor.attach(target, Http::on_internal_set_url)?;
-            println!("[lucia] InternalSetUrl hook installed at 0x{target:X}");
+            self.interceptor.attach(target, Http::on_internal_set_url).with_context(|| format!("installing the {WEB_REQUEST_METHOD} detour failed (ilhook could not patch the prologue at 0x{target:X}; another injector/overlay may have hooked it; send the log and list of overlays/injectors)"))?;
+            diag::log(&diag::ok_line("lucia", "hook install", &format!("{WEB_REQUEST_NAMESPACE}.{WEB_REQUEST_CLASS}::{WEB_REQUEST_METHOD} detour at 0x{target:X}")));
         }
         if let Err(error) = trace_metadata() {
-            eprintln!("[lucia] optional metadata diagnostics failed: {error:#}");
+            diag::log(&diag::failed_line("lucia", "optional XRemoteConfig trace diagnostics (ASCNET_PATCH_TRACE=1)", &format!("{error:#}; routing is unaffected")));
         }
         Ok(())
     }
@@ -420,13 +439,18 @@ impl Http {
     unsafe extern "win64" fn on_internal_set_url(reg: *mut Registers, _: usize) {
         let original = read_csharp_string((*reg).rdx as usize);
         trace_call("InternalSetUrl", original.as_deref());
+        if let Some((key, package)) = original.as_deref().and_then(network_routing::client_package) {
+            if !PACKAGE_LOGGED.swap(true, Ordering::Relaxed) {
+                diag::log(&diag::ok_line("lucia", "first client config request", &format!("package={package} cdn_key={key}")));
+            }
+        }
         let Some(original) = original else { return };
         let Some(replacement) = redirected_url(&original) else { return };
         let Ok(replacement) = CString::new(replacement) else { return };
         let Some(string_new) = STRING_NEW.get() else { return };
         let new_pointer = string_new(replacement.as_ptr());
         if new_pointer != 0 {
-            println!(
+            plog!(
                 "[lucia] routed {} -> {}",
                 safe_url(&original),
                 safe_url(&replacement.to_string_lossy())

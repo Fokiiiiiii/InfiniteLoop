@@ -1,6 +1,6 @@
 [package]
 name = "ascnet-launcher"
-version = "1.0.7"
+version = "1.0.8"
 edition = "2021"
 
 [dependencies]
@@ -14,12 +14,14 @@ lz4_flex = "0.11"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 uuid = { version = "1", features = ["v4"] }
 semver = "1"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 windows = { version = "0.57", features = [
     "Wdk_Storage_FileSystem",
     "Win32_System_IO",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
+    "Win32_Globalization",
     "Win32_Graphics_Gdi",
     "Win32_Media_MediaFoundation",
     "Win32_Media_Audio",

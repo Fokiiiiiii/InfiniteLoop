@@ -1,4 +1,4 @@
-use crate::package::{compare_versions, sha256_file, validate_server_origin, PatchPackage};
+use crate::package::{client_region, compare_versions, sha256_file, validate_server_origin, PatchPackage, Region, KRSDK};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -11,7 +11,8 @@ use uuid::Uuid;
 const STATE_DIR: &str = ".ascnet-launcher";
 const STATE_FILE: &str = "state.json";
 const JOURNAL_FILE: &str = "journal.json";
-const ORIGINAL_KEYS: [&str; 3] = ["PGR.exe", "GameAssembly.dll", "PGR_Data/Plugins/KRSDK.dll"];
+/// Unmanaged client binaries, validated on disk and tracked in state; the SDK slot is region-specific (`KRSDK`).
+const ORIGINAL_KEYS: [&str; 2] = ["PGR.exe", "GameAssembly.dll"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatchState {
@@ -72,9 +73,30 @@ struct PreparedPgrBase {
     observed: String,
 }
 
+/// Global clients ship KRSDK.dll (replaced by the patch); CN ones never have it (`prepare_pgrbase` validated the SDK pair).
+fn is_global(client: &Path) -> bool {
+    client.join(KRSDK).exists()
+}
+
+/// Stock PGRBase.dll candidate for `current`: the first known stock export entry whose recovery hashes into `originals`.
+fn recover_stock(build: &crate::package::PgrBaseBuild, current: &[u8], game: &[u8], unity: &[u8]) -> Result<Vec<u8>> {
+    use sha2::{Digest, Sha256};
+    for jump in &build.original_export_jumps {
+        let original = crate::pgrbase::original(current, game, unity, jump)?;
+        if build.originals.contains(&format!("{:x}", Sha256::digest(&original))) {
+            return Ok(original);
+        }
+    }
+    bail!("unsupported PGRBase.dll: exact stock reconstruction hash does not match")
+}
+
+/// Applies the folder's region to the file list (CN drops the KRSDK.dll payload) and adds the generated PGRBase.dll.
 fn prepare_pgrbase(client: &Path, package: &PatchPackage) -> Result<(PatchPackage, Option<PreparedPgrBase>)> {
     use sha2::{Digest, Sha256};
     let mut package = package.clone();
+    if client_region(&package.manifest.application_version, &package.manifest.originals, client)? == Region::Cn {
+        package.manifest.files.retain(|file| file.path != KRSDK);
+    }
     let Some(build) = &package.manifest.pgr_base else {
         if read_state(client)?.is_some_and(|state| state.files.contains_key("PGRBase.dll")) {
             bail!("this package cannot update a managed PGRBase startup patch; use restore or a package with verified PGRBase metadata");
@@ -87,8 +109,9 @@ fn prepare_pgrbase(client: &Path, package: &PatchPackage) -> Result<(PatchPackag
         Ok(fs::read(path)?)
     };
     let game = read_client("PGR.exe")?;
-    if !package.manifest.accepts_original("PGR.exe", Some(&format!("{:x}", Sha256::digest(&game)))) {
-        bail!("{}", crate::package::unsupported_client(&package.manifest.application_version, "PGR.exe"));
+    let observed = format!("{:x}", Sha256::digest(&game));
+    if !package.manifest.accepts_original("PGR.exe", Some(&observed)) {
+        bail!("{}", crate::package::unsupported_client(&package.manifest.application_version, "PGR.exe", Some(&observed)));
     }
     let unity = read_client("UnityPlayer.dll")?;
     if !build.unity_players.contains(&format!("{:x}", Sha256::digest(&unity))) {
@@ -97,10 +120,7 @@ fn prepare_pgrbase(client: &Path, package: &PatchPackage) -> Result<(PatchPackag
     let current = read_client("PGRBase.dll")?;
     let observed = format!("{:x}", Sha256::digest(&current));
     if !build.originals.contains(&observed) {
-        let original = crate::pgrbase::original(&current, &game, &unity, &build.original_export_jump)?;
-        if !build.originals.contains(&format!("{:x}", Sha256::digest(&original))) {
-            bail!("unsupported PGRBase.dll: exact stock reconstruction hash does not match");
-        }
+        recover_stock(build, &current, &game, &unity)?;
     }
     // Keep any verified pre-existing Wine NOP; AscNet only installs the startup stub.
     let patched = crate::pgrbase::patch(&current, &game, &unity)?;
@@ -128,10 +148,10 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
             "an interrupted transaction must be recovered by install or restore".into(),
         ));
     }
-    for key in [ORIGINAL_KEYS[0], ORIGINAL_KEYS[1]] {
+    for key in ORIGINAL_KEYS {
         let actual = file_hash(&client.join(key))?;
         if !package.manifest.accepts_original(key, actual.as_deref()) {
-            return Ok(PatchState::Unsupported(crate::package::unsupported_client(&package.manifest.application_version, key)));
+            return Ok(PatchState::Unsupported(crate::package::unsupported_client(&package.manifest.application_version, key, actual.as_deref())));
         }
     }
 
@@ -149,9 +169,15 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
         }
         // PGR.exe/GameAssembly.dll are never modified or backed up, only validated on disk
         // above; client updates may replace them, so only KRSDK's saved original must match.
-        if !package
-            .manifest
-            .accepts_original(ORIGINAL_KEYS[2], state.originals.get(ORIGINAL_KEYS[2]).map(String::as_str))
+        // A CN client has no KRSDK slot at all: state from the other region is not reusable.
+        let global = is_global(client);
+        if global != state.originals.contains_key(KRSDK) || (!global && state.files.contains_key(KRSDK)) {
+            return Ok(PatchState::RepairRequired("saved launcher state belongs to a different client region".into()));
+        }
+        if global
+            && !package
+                .manifest
+                .accepts_original(KRSDK, state.originals.get(KRSDK).map(String::as_str))
         {
             return Ok(PatchState::Unsupported(
                 "saved retail originals do not match this release".into(),
@@ -192,7 +218,7 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
         ));
     }
 
-    if let Some((_path, legacy)) = find_legacy(&client, package)? {
+    if let Some((_path, legacy)) = find_legacy(client, package)? {
         let mut all_target = true;
         let mut all_installed = true;
         let mut all_original = true;
@@ -218,10 +244,11 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
         ));
     }
 
-    let krsdk = ORIGINAL_KEYS[2];
-    if !package
-        .manifest
-        .accepts_original(krsdk, file_hash(&client.join(krsdk))?.as_deref())
+    let krsdk = KRSDK;
+    if is_global(client)
+        && !package
+            .manifest
+            .accepts_original(krsdk, file_hash(&client.join(krsdk))?.as_deref())
     {
         return Ok(PatchState::Unsupported(
             "KRSDK.dll is neither a supported retail original nor a verified managed patch".into(),
@@ -572,7 +599,7 @@ pub fn install(
     if observed == PatchState::AdoptionRequired {
         let mut adopted = prior.context("verified legacy backup disappeared during adoption")?;
         adopted.release_version = package.manifest.version.clone();
-        for key in [ORIGINAL_KEYS[0], ORIGINAL_KEYS[1]] {
+        for key in ORIGINAL_KEYS {
             adopted.originals.insert(key.into(), sha256_file(&client.join(key))?);
         }
         for file in &package.manifest.files {
@@ -590,10 +617,11 @@ pub fn install(
     }
     let mut originals = prior.as_ref().map(|state| state.originals.clone()).unwrap_or_default();
     for key in ORIGINAL_KEYS {
+        originals.insert(key.into(), sha256_file(&client.join(key))?);
+    }
+    if is_global(&client) && !originals.contains_key(KRSDK) {
         // Saved KRSDK original is preserved; unmanaged client binaries track the verified disk copy.
-        if key != ORIGINAL_KEYS[2] || !originals.contains_key(key) {
-            originals.insert(key.into(), sha256_file(&client.join(key))?);
-        }
+        originals.insert(KRSDK.into(), sha256_file(&client.join(KRSDK))?);
     }
     let id = Uuid::new_v4().to_string();
     let backup_parent = state_root.join("backups");
@@ -846,20 +874,41 @@ fn remove_rollback_directory(path: &Path) {
     let _ = fs::remove_dir_all(path);
 }
 
+/// Whether a `PGR.exe` process exists. A ToolHelp process snapshot: cheap enough for the UI thread to poll
+/// (the launcher's music follows the game), unlike spawning `tasklist.exe`.
 pub fn game_running() -> Result<bool> {
     #[cfg(windows)]
     {
-        let output = crate::local::hide_console(&mut Command::new("tasklist.exe"))
-            .args(["/FI", "IMAGENAME eq PGR.exe", "/FO", "CSV", "/NH"])
-            .output()
-            .context("querying running processes")?;
-        if !output.status.success() {
-            bail!("tasklist failed; refusing to assume the game is stopped");
+        use windows::Win32::Foundation::{CloseHandle, ERROR_NO_MORE_FILES, HANDLE};
+        use windows::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+        };
+        struct Snapshot(HANDLE);
+        impl Drop for Snapshot {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = CloseHandle(self.0);
+                }
+            }
         }
-        Ok(String::from_utf8_lossy(&output.stdout).lines().any(|line| {
-            line.trim_start_matches('\u{feff}')
-                .starts_with("\"PGR.exe\",")
-        }))
+        let snapshot = Snapshot(
+            unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }.context("querying running processes")?,
+        );
+        let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut next = unsafe { Process32FirstW(snapshot.0, &mut entry) };
+        loop {
+            match next {
+                Ok(()) => {
+                    let length = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
+                    if String::from_utf16_lossy(&entry.szExeFile[..length]).eq_ignore_ascii_case("PGR.exe") {
+                        return Ok(true);
+                    }
+                }
+                Err(e) if e.code() == ERROR_NO_MORE_FILES.to_hresult() => return Ok(false),
+                Err(e) => return Err(e).context("listing running processes; refusing to assume the game is stopped"),
+            }
+            next = unsafe { Process32NextW(snapshot.0, &mut entry) };
+        }
     }
     #[cfg(not(windows))]
     {
@@ -867,7 +916,7 @@ pub fn game_running() -> Result<bool> {
     }
 }
 
-pub fn launch(client: &Path, origin: &str) -> Result<()> {
+pub fn launch(client: &Path, origin: &str, no_camera_fade: bool, fps: Option<i32>) -> Result<()> {
     let _lock = OperationLock::acquire()?;
     if game_running()? {
         bail!("PGR.exe is already running");
@@ -878,10 +927,35 @@ pub fn launch(client: &Path, origin: &str) -> Result<()> {
     if !executable.is_file() {
         bail!("PGR.exe is missing");
     }
+    let mut command = launch_command(&client, executable, origin, no_camera_fade, fps);
+    if running_under_wine() {
+        let old = std::env::var("WINEDLLOVERRIDES").unwrap_or_default();
+        let merged = if old.is_empty() {
+            "version=n,b".into()
+        } else {
+            format!("{old};version=n,b")
+        };
+        command.env("WINEDLLOVERRIDES", merged);
+    }
+    command.spawn().context("launching PGR.exe")?;
+    Ok(())
+}
+
+/// Region-neutral: every supported client (EN/TW/KR/JP/CN) gets the same environment (CN's gate path comes from AscNet's config.tab).
+/// `ASCNET_PATCH_NOFADE=1` (lucia disables the camera/character proximity fade) and
+/// `ASCNET_PATCH_FPS=<n>` (lucia sets Application.targetFrameRate) are set only on request.
+fn launch_command(client: &Path, executable: PathBuf, origin: String, no_camera_fade: bool, fps: Option<i32>) -> Command {
     let mut command = Command::new(executable);
-    command
-        .current_dir(&client)
-        .env("ASCNET_PATCH_ORIGIN", origin);
+    command.current_dir(client).env("ASCNET_PATCH_ORIGIN", origin);
+    if no_camera_fade {
+        command.env("ASCNET_PATCH_NOFADE", "1");
+    } else {
+        command.env_remove("ASCNET_PATCH_NOFADE");
+    }
+    match fps {
+        Some(fps) => command.env("ASCNET_PATCH_FPS", fps.to_string()),
+        None => command.env_remove("ASCNET_PATCH_FPS"),
+    };
     for key in [
         "ASCNET_PATCH_TRACE",
         "ASCNET_PATCH_PROBE",
@@ -896,17 +970,7 @@ pub fn launch(client: &Path, origin: &str) -> Result<()> {
     ] {
         command.env_remove(key);
     }
-    if running_under_wine() {
-        let old = std::env::var("WINEDLLOVERRIDES").unwrap_or_default();
-        let merged = if old.is_empty() {
-            "version=n,b".into()
-        } else {
-            format!("{old};version=n,b")
-        };
-        command.env("WINEDLLOVERRIDES", merged);
-    }
-    command.spawn().context("launching PGR.exe")?;
-    Ok(())
+    command
 }
 #[cfg(windows)]
 fn running_under_wine() -> bool {
@@ -1217,6 +1281,15 @@ fn read_state(client: &Path) -> Result<Option<State>> {
         serde_json::from_reader(File::open(path)?).context("invalid launcher state")?,
     ))
 }
+/// Files this launcher patched in `client` (relative path -> installed SHA-256, plus whether a transaction
+/// journal is pending). Lets the official-client downloader keep patched files instead of "repairing" them.
+pub fn managed_files(client: &Path) -> Result<(BTreeMap<String, String>, bool)> {
+    let pending = client.join(STATE_DIR).join(JOURNAL_FILE).exists();
+    let files = read_state(client)?
+        .map(|state| state.files.into_iter().map(|(path, file)| (path, file.installed)).collect())
+        .unwrap_or_default();
+    Ok((files, pending))
+}
 fn verify_saved_backups(client: &Path, state: &State) -> Result<()> {
     verify_saved_backups_at(client, state, &client.join(STATE_DIR))
 }
@@ -1314,6 +1387,10 @@ fn recover_if_needed(client: &Path) -> Result<()> {
 }
 
 fn find_legacy(client: &Path, package: &PatchPackage) -> Result<Option<(PathBuf, LegacyManifest)>> {
+    // Legacy backups only ever described the global KRSDK.dll replacement.
+    if !is_global(client) {
+        return Ok(None);
+    }
     let root = client
         .parent()
         .context("client has no parent")?
@@ -1338,7 +1415,7 @@ fn find_legacy(client: &Path, package: &PatchPackage) -> Result<Option<(PathBuf,
         }
         if !package
             .manifest
-            .accepts_original(ORIGINAL_KEYS[2], manifest.pinned_client.get(ORIGINAL_KEYS[2]).map(String::as_str))
+            .accepts_original(KRSDK, manifest.pinned_client.get(KRSDK).map(String::as_str))
         {
             continue;
         }
@@ -1485,6 +1562,34 @@ mod tests {
         let p = std::env::temp_dir().join(format!("ascnet-install-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&p).unwrap();
         p
+    }
+    #[test]
+    fn launch_command_sets_origin_clears_overrides_and_is_region_neutral() {
+        let client = temp();
+        for (key, value) in [("ASCNET_PATCH_TRACE", "1"), ("HTTPS_PROXY", "http://proxy"), ("KEEP_ME", "x")] {
+            std::env::set_var(key, value);
+        }
+        std::env::set_var("ASCNET_PATCH_NOFADE", "1");
+        std::env::set_var("ASCNET_PATCH_FPS", "30");
+        for region in ["kr", "jp", "cn"] {
+            let dir = client.join(region);
+            let command = launch_command(&dir, dir.join("PGR.exe"), "http://127.0.0.1:5000".into(), false, None);
+            let envs: BTreeMap<_, _> = command.get_envs().collect();
+            assert_eq!(command.get_program(), dir.join("PGR.exe").as_os_str());
+            assert_eq!(command.get_current_dir(), Some(dir.as_path()));
+            assert_eq!(command.get_args().count(), 0);
+            assert_eq!(envs["ASCNET_PATCH_ORIGIN".as_ref() as &std::ffi::OsStr], Some("http://127.0.0.1:5000".as_ref()));
+            assert_eq!(envs["ASCNET_PATCH_TRACE".as_ref() as &std::ffi::OsStr], None);
+            assert_eq!(envs["HTTPS_PROXY".as_ref() as &std::ffi::OsStr], None);
+            // Off by default, and never inherited from the launcher's own environment.
+            assert_eq!(envs["ASCNET_PATCH_NOFADE".as_ref() as &std::ffi::OsStr], None);
+            assert_eq!(envs["ASCNET_PATCH_FPS".as_ref() as &std::ffi::OsStr], None);
+            let enabled = launch_command(&dir, dir.join("PGR.exe"), "http://127.0.0.1:5000".into(), true, Some(144));
+            assert_eq!(enabled.get_envs().find(|(k, _)| *k == "ASCNET_PATCH_NOFADE").unwrap().1, Some("1".as_ref()));
+            assert_eq!(enabled.get_envs().find(|(k, _)| *k == "ASCNET_PATCH_FPS").unwrap().1, Some("144".as_ref()));
+            assert!(!envs.contains_key("KEEP_ME".as_ref() as &std::ffi::OsStr));
+        }
+        fs::remove_dir_all(client).unwrap();
     }
     #[test]
     fn rollback_preserves_previous_managed_state() {
@@ -1921,7 +2026,7 @@ mod tests {
                     pgr_base: Some(PgrBaseBuild {
                         originals: vec![hash(&stock)],
                         unity_players: vec![hash(&unity)],
-                        original_export_jump: stock[0x500..0x505].try_into().unwrap(),
+                        original_export_jumps: vec![stock[0x500..0x505].try_into().unwrap()],
                     }),
                     files: vec![Payload {
                         path: "version.dll".into(), source: "version.dll".into(),
@@ -1980,5 +2085,124 @@ mod tests {
             assert!(read_state(&client).unwrap().is_none());
             fs::remove_dir_all(root).unwrap();
         }
+    }
+
+    #[test]
+    fn pgrbase_recovery_tries_every_known_stock_export_jump() {
+        use crate::package::PgrBaseBuild;
+        use sha2::{Digest, Sha256};
+        let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+        let (global, game, unity) = crate::pgrbase::fixture();
+        // A second stock build whose export entry jumps elsewhere (the CN case).
+        let mut cn = global.clone();
+        cn[0x501..0x505].copy_from_slice(&0x60u32.to_le_bytes());
+        cn[0x900] ^= 1; // distinct stock bytes: the wrong jump must not reproduce the other build's hash
+        let jumps: Vec<[u8; 5]> = vec![global[0x500..0x505].try_into().unwrap(), cn[0x500..0x505].try_into().unwrap()];
+        let build = |originals: Vec<String>, jumps: Vec<[u8; 5]>| PgrBaseBuild {
+            originals,
+            unity_players: vec![hash(&unity)],
+            original_export_jumps: jumps,
+        };
+        let both = build(vec![hash(&global), hash(&cn)], jumps.clone());
+        for stock in [&global, &cn] {
+            let patched = crate::pgrbase::patch(stock, &game, &unity).unwrap();
+            assert_ne!(&patched, stock);
+            assert_eq!(&recover_stock(&both, &patched, &game, &unity).unwrap(), stock);
+        }
+        // Recovery is bounded by the allowlist: a known jump with an unlisted stock hash, or an unknown jump, is refused.
+        let cn_patched = crate::pgrbase::patch(&cn, &game, &unity).unwrap();
+        assert!(recover_stock(&build(vec![hash(&global)], jumps.clone()), &cn_patched, &game, &unity).is_err());
+        assert!(recover_stock(&build(vec![hash(&cn)], jumps[..1].to_vec()), &cn_patched, &game, &unity).is_err());
+    }
+
+    #[test]
+    fn cn_client_installs_loader_without_touching_the_official_sdk() {
+        use crate::package::{File as Payload, Manifest};
+        use sha2::{Digest, Sha256};
+        let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+        let root = temp();
+        let client = root.join("game");
+        let directory = root.join("package");
+        fs::create_dir_all(client.join("PGR_Data/Plugins")).unwrap();
+        fs::create_dir_all(&directory).unwrap();
+        let retail = [
+            ("PGR.exe", b"cn-exe".as_slice()),
+            ("GameAssembly.dll", b"cn-assembly".as_slice()),
+            ("PGR_Data/Plugins/KRSDKEx.dll", b"cn-sdk-ex".as_slice()),
+            ("PGR_Data/Plugins/libkrsdkcurl.dll", b"cn-sdk-curl".as_slice()),
+        ];
+        let mut originals: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (path, bytes) in retail {
+            fs::write(client.join(path), bytes).unwrap();
+            originals.insert(path.into(), vec![hash(bytes)]);
+        }
+        originals.insert(KRSDK.into(), vec![hash(b"global-sdk")]);
+        let files = [
+            ("version.dll", "version.dll"),
+            ("lucia.dll", "lucia.dll"),
+            (KRSDK, "KRSDK.dll"),
+            ("libraries.txt", "libraries.txt"),
+        ]
+        .map(|(path, source)| {
+            let bytes = format!("payload {source}");
+            fs::write(directory.join(source), &bytes).unwrap();
+            Payload { path: path.into(), source: source.into(), sha256: hash(bytes.as_bytes()), size: bytes.len() as u64 }
+        });
+        let package = PatchPackage {
+            manifest: Manifest {
+                schema_version: 1,
+                version: "2.0.0".into(),
+                application_version: "fixture".into(),
+                originals,
+                pgr_base: None,
+                files: files.into(),
+            },
+            directory,
+        };
+        let sdk_bytes = || retail[2..].iter().map(|(path, _)| fs::read(client.join(path)).unwrap()).collect::<Vec<_>>();
+        let sdk_before = sdk_bytes();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Unpatched);
+        install(&client, &package, &mut |_| {}).unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
+        let state = read_state(&client).unwrap().unwrap();
+        assert_eq!(state.files.keys().map(String::as_str).collect::<Vec<_>>(), ["libraries.txt", "lucia.dll", "version.dll"]);
+        assert_eq!(state.originals.keys().map(String::as_str).collect::<Vec<_>>(), ["GameAssembly.dll", "PGR.exe"]);
+        for installed in ["version.dll", "lucia.dll", "libraries.txt"] {
+            assert!(client.join(installed).is_file(), "{installed}");
+        }
+        assert!(!client.join(KRSDK).exists());
+        assert_eq!(sdk_bytes(), sdk_before);
+
+        // State written by a global install cannot be reused for a CN folder.
+        let mut foreign = state.clone();
+        foreign.originals.insert(KRSDK.into(), hash(b"global-sdk"));
+        write_json_atomic(&client.join(STATE_DIR).join(STATE_FILE), &foreign).unwrap();
+        assert!(matches!(inspect(&client, &package).unwrap(), PatchState::RepairRequired(_)));
+        assert!(install(&client, &package, &mut |_| {}).is_err());
+        write_json_atomic(&client.join(STATE_DIR).join(STATE_FILE), &state).unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
+
+        restore(&client, &mut |_| {}).unwrap();
+        for installed in ["version.dll", "lucia.dll", "libraries.txt"] {
+            assert!(!client.join(installed).exists(), "{installed}");
+        }
+        assert!(read_state(&client).unwrap().is_none());
+        assert_eq!(sdk_bytes(), sdk_before);
+
+        // An SDK build outside the allowlist (or a folder with no SDK at all) is refused, nothing written.
+        fs::write(client.join("PGR_Data/Plugins/KRSDKEx.dll"), b"cn-sdk-ex-other").unwrap();
+        let observed = hash(b"cn-sdk-ex-other");
+        match inspect(&client, &package).unwrap() {
+            PatchState::Unsupported(reason) => assert!(reason.contains("KRSDKEx.dll") && reason.contains(&observed), "{reason}"),
+            other => panic!("{other:?}"),
+        }
+        assert!(install(&client, &package, &mut |_| {}).is_err());
+        assert!(!client.join("version.dll").exists());
+        fs::remove_file(client.join("PGR_Data/Plugins/KRSDKEx.dll")).unwrap();
+        match inspect(&client, &package).unwrap() {
+            PatchState::Unsupported(reason) => assert!(reason.contains("neither"), "{reason}"),
+            other => panic!("{other:?}"),
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 }

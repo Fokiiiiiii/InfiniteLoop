@@ -75,7 +75,18 @@ impl Music {
             _samples: wave.samples,
         })
     }
+    /// Holds playback on the open device (no close, no reload); `resume` continues where it stopped.
+    pub fn pause(&self) {
+        unsafe {
+            waveOutPause(self.output);
+        }
+    }
 
+    pub fn resume(&self) {
+        unsafe {
+            waveOutRestart(self.output);
+        }
+    }
 }
 
 impl Drop for Music {

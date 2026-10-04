@@ -503,4 +503,23 @@ mod tests {
         wine[0x820..0x834].copy_from_slice(&signature);
         assert!(original(&wine, &stock, &stock, &stock[0x500..0x505]).is_err());
     }
+
+    /// Needs a local copy of the CN 4.8.0 client (`ASCNET_CN_CLIENT`, default /tmp/cndl); run with `--ignored`.
+    #[test]
+    #[ignore]
+    fn real_cn_pgrbase_is_patched_and_recovers_to_retail_hash() {
+        use sha2::{Digest, Sha256};
+        let dir = std::path::PathBuf::from(std::env::var("ASCNET_CN_CLIENT").unwrap_or_else(|_| "/tmp/cndl".into()));
+        let read = |name: &str| std::fs::read(dir.join(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let (stock, game, unity) = (read("PGRBase.dll"), read("PGR.exe"), read("UnityPlayer.dll"));
+        let cn_jump = [0xe9, 0x0b, 0x1b, 0x00, 0x01];
+        let patched = patch(&stock, &game, &unity).unwrap();
+        assert_ne!(patched, stock);
+        assert!(!is_patched(&stock, &game, &unity).unwrap());
+        assert!(is_patched(&patched, &game, &unity).unwrap());
+        assert_eq!(patch(&patched, &game, &unity).unwrap(), patched);
+        let recovered = original(&patched, &game, &unity, &cn_jump).unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&recovered)), "6c2abc3486218a2ee21ecbe55540e3f2083022a339a2e10b698eaa4293f9102d");
+        assert_eq!(recovered, stock);
+    }
 }

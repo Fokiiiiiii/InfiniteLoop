@@ -20,7 +20,7 @@ pub fn get_export(name: &str) -> Result<usize> {
             PCSTR(name.as_ptr().cast()),
         )
         .map(|proc| proc as usize)
-        .ok_or_else(|| anyhow!("GameAssembly export `{}` not found", name.to_string_lossy()))
+        .ok_or_else(|| anyhow!("GameAssembly.dll does not export `{}` (il2cpp export stripped or not a stock IL2CPP GameAssembly.dll; the client may be a different version or already modified)", name.to_string_lossy()))
     }
 }
 
