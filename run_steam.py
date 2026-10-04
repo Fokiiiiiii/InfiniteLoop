@@ -97,11 +97,11 @@ def _smoke_target(label: str, cdn_key: str, package: str, document_version: str,
 
 
 CONFIG_SMOKE_TARGETS = [
-    _smoke_target("en-plain", "YHcyljDAVMYA6tK8", "com.kurogame.punishing.grayraven.en", "4.8.10", 5,
-                  "http://prod-encdn-ak.pgr-game.com/prod", "b22b87996db98720100e39586167440a005ea531",
+    _smoke_target("en-plain", "YHcyljDAVMYA6tK8", "com.kurogame.punishing.grayraven.en", "4.8.12", 5,
+                  "http://prod-encdn-ak.pgr-game.com/prod", "a2b5b6c93a32f8a88c22eb3827617ffd2a3438e1",
                   "IndexMd5\tstring\tc5d4baac85a6e37b8109ea43dc045d31"),
-    _smoke_target("en-pc", "YHcyljDAVMYA6tK8", "com.kurogame.pc.punishing.grayraven.en", "4.8.10", 205,
-                  "http://prod-encdn-ak.pgr-game.com/prod", "b22b87996db98720100e39586167440a005ea531"),
+    _smoke_target("en-pc", "YHcyljDAVMYA6tK8", "com.kurogame.pc.punishing.grayraven.en", "4.8.12", 205,
+                  "http://prod-encdn-ak.pgr-game.com/prod", "a2b5b6c93a32f8a88c22eb3827617ffd2a3438e1"),
     _smoke_target("tw", "B7OBn4RZic1fijNJ", "com.kurogame.punishing.grayraven.tw", "4.8.10", 5,
                   "http://prod-twcdn-ak.pgr-game.com/prod", "b683b400819a9095ec5ae0945cd95064809aa82f"),
     _smoke_target("kr", "jqlCmYRizwT76uvX", "com.kurogame.punishing.grayraven.kr", "4.8.12", 5,

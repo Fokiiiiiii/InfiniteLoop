@@ -6186,9 +6186,11 @@ namespace AscNet.Test
             JObject versions = JsonSnapshot.LoadObject("Configs/version_config.json");
             JProperty current = versions.Properties().MaxBy(entry => Version.Parse(entry.Name))!;
             string enDocumentVersion = current.Value.Value<string>("DocumentVersion")!;
-            string krDocumentVersion = current.Value["Packages"]!["com.kurogame.punishing.grayraven.kr"]!.Value<string>("DocumentVersion")!;
-            if (enDocumentVersion == krDocumentVersion)
-                throw new InvalidDataException("Regional regression needs EN and KR document versions to differ.");
+            // The server echoes the client's own handshake version; use any regional package that currently differs from EN.
+            string krDocumentVersion = ((JObject)current.Value["Packages"]!).Properties()
+                .Select(package => package.Value.Value<string>("DocumentVersion")!)
+                .FirstOrDefault(version => version != enDocumentVersion)
+                ?? throw new InvalidDataException("Regional regression needs a package whose document version differs from EN.");
 
             // Three sessions on one process: EN and KR clients that handshake, plus a legacy session that never does.
             long nextPlayerId = 88_006;

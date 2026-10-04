@@ -265,9 +265,9 @@ internal partial class Program
             AssertEqual(false, tw.ContainsKey("IndexMd5"), "TW omits IndexMd5 like its live config");
 
             Dictionary<string, string> en = Serve("com.kurogame.punishing.grayraven.en", cdnKey);
-            AssertEqual("4.8.10", en["DocumentVersion"], "EN 4.8 DocumentVersion");
-            AssertEqual("b22b87996db98720100e39586167440a005ea531", en["IndexSha1"], "EN 4.8 IndexSha1");
-            AssertEqual("9b4ecc9495e317975240f009bdb0876423750a5c", en["LaunchIndexSha1"], "EN 4.8 LaunchIndexSha1");
+            AssertEqual("4.8.12", en["DocumentVersion"], "EN 4.8 DocumentVersion");
+            AssertEqual("a2b5b6c93a32f8a88c22eb3827617ffd2a3438e1", en["IndexSha1"], "EN 4.8 IndexSha1");
+            AssertEqual("1591a0ac3f4ed08dbd98430b9b1b2d968da1ef15", en["LaunchIndexSha1"], "EN 4.8 LaunchIndexSha1");
             AssertEqual("http://prod-encdn-ak.pgr-game.com/prod", en["PrimaryCdns"], "EN PrimaryCdns");
             AssertEqual("http://prod-encdn-aliyun.kurogame.net/prod", en["SecondaryCdns"], "EN SecondaryCdns");
             AssertEqual("5", en["Channel"], "EN Channel");

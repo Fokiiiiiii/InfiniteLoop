@@ -85,11 +85,11 @@
     }
   },
   "4.8.0": {
-    "DocumentVersion": "4.8.10",
-    "LaunchModuleVersion": "4.8.10",
+    "DocumentVersion": "4.8.12",
+    "LaunchModuleVersion": "4.8.12",
     "IndexMd5": "c5d4baac85a6e37b8109ea43dc045d31",
-    "IndexSha1": "b22b87996db98720100e39586167440a005ea531",
-    "LaunchIndexSha1": "9b4ecc9495e317975240f009bdb0876423750a5c",
+    "IndexSha1": "a2b5b6c93a32f8a88c22eb3827617ffd2a3438e1",
+    "LaunchIndexSha1": "1591a0ac3f4ed08dbd98430b9b1b2d968da1ef15",
     "Packages": {
       "com.kurogame.punishing.grayraven.tw": {
         "DocumentVersion": "4.8.10",
