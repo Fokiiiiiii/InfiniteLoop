@@ -21,6 +21,7 @@ namespace AscNet.Test
         // not-gathered rejections, and the inventory-then-character persistence boundary with retry.
         private static void ValidateFashionSuitRewardCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(FashionGetSuitRewardRequest);
             const string responseName = nameof(FashionGetSuitRewardResponse);
             const int configNotFoundCode = 20010011;

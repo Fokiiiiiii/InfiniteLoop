@@ -408,6 +408,7 @@ internal partial class Program
 
     private static void ValidateVersion46LoginShape()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         const long uid = 46_001;
         AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(uid);
         player.PlayerData.Level = 80;

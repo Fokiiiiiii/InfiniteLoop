@@ -6394,6 +6394,7 @@ namespace AscNet.Test
 
         private static void ValidateLifeTreeFinishProcessRequestCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride mongoOverride =
                 MongoCollectionOverride.InstallForMainLine2MessageStateCompatibility(
                     out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection);
@@ -10993,6 +10994,7 @@ namespace AscNet.Test
 
         private static void ValidateWeaponFashionUnlockCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride mongoOverride =
                 MongoCollectionOverride.InstallForDailySignInCompatibility(
                     out _,
@@ -11241,6 +11243,7 @@ namespace AscNet.Test
 
         private static void ValidateWeaponFashionUseCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(WeaponFashionUseRequest);
             const string responseName = nameof(WeaponFashionUseResponse);
             const int capturedFashionId = 12_340_004;
@@ -13067,6 +13070,7 @@ namespace AscNet.Test
 
         private static void ValidateCharacterSwitchLiberateMagicCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(CharacterSwitchLiberateMagicIdRequest);
             const string responseName = nameof(CharacterSwitchLiberateMagicIdResponse);
             const int packetId = 19_520;
@@ -13376,6 +13380,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionRandomActiveCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(FashionRandomActiveRequest);
             const string responseName = nameof(FashionRandomActiveResponse);
             const int packetId = 19_451;
@@ -13665,6 +13670,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionSuitPoolSaveCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(FashionSuitPoolSaveRequest);
             const string responseName = nameof(FashionSuitPoolSaveResponse);
             const int packetId = 19_461;
@@ -14018,6 +14024,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionColorCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             List<FashionColorTable> colorRows = TableReaderV2.Parse<FashionColorTable>();
             List<FashionTable> fashionRows = TableReaderV2.Parse<FashionTable>();
             List<FashionColorTable> normalizationRows = colorRows
@@ -17289,6 +17296,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLine2LoginDataBsonCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const int passedMainLine2StageId = 10310102;
             const long derivedFirstPassTime = 1_744_211_568;
             const long fallbackLastPassTime = derivedFirstPassTime + 99;
@@ -17402,6 +17410,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLine2MessageStateUpdateCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = "MainLine2MessageStateUpdateRequest";
             const string responseName = "MainLine2MessageStateUpdateResponse";
             const int messageId = 1;
@@ -17721,6 +17730,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLineLuosaitaEnterCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             MainLineLuosaitaEnterRequest request = new()
             {
                 SectionId = 1
@@ -19359,6 +19369,7 @@ namespace AscNet.Test
 
         private static void ValidateCharacterSendGiftCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(CharacterSendGiftRequest);
             const string responseName = nameof(CharacterSendGiftResponse);
             const long playerId = 99_570;
@@ -19620,6 +19631,7 @@ namespace AscNet.Test
         }
         private static void ValidateCharacterMenuAcknowledgementCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string resetRequestName = nameof(CharacterResetNewFlagRequest);
             const string resetResponseName = nameof(CharacterResetNewFlagResponse);
             const string noticeRequestName = nameof(CharacterEnhanceSkillNoticeRequest);

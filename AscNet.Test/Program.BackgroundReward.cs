@@ -15,6 +15,7 @@ namespace AscNet.Test
     {
         private static void ValidateBackgroundRewardGrants()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             Type handler = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.RewardHandler");
             Type grantType = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.RewardGrant");
             MethodInfo apply = handler.GetMethod("ApplyRewardsOnceAndPersist", BindingFlags.Static | BindingFlags.Public)

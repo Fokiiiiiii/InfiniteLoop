@@ -17,6 +17,7 @@ internal partial class Program
 {
     private static void ValidateVersion48DrawCubCompatibility()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         AssertPartnerComposeViaSharedConstructor([16_420_000, 16_430_000]);
         var templates = Version47CatalogTemplates().ToDictionary(draw => draw.Id);
         var manager = RequiredAscNetGameServerType("AscNet.GameServer.Game.DrawManager");

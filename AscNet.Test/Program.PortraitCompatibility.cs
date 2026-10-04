@@ -122,6 +122,7 @@ internal partial class Program
         IReadOnlyCollection<HeadPortraitTable> heads,
         MethodInfo getRewardType)
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         List<RewardGoodsTable> goods = TableReaderV2.Parse<RewardGoodsTable>();
         (ExhibitionRewardTable Exhibition, RewardGoodsTable Reward) selected = TableReaderV2.Parse<ExhibitionRewardTable>()
             .Where(row => row.RewardId is > 0)

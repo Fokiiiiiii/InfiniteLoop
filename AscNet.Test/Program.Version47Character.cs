@@ -679,6 +679,7 @@ internal partial class Program
 
     private static void ValidateVersion47CharacterHeadSelectionCompatibility()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         const long playerId = 48_105;
         CharacterTable luciaRow = TableReaderV2.Parse<CharacterTable>()
             .Single(row => row.Id == 1021001);
