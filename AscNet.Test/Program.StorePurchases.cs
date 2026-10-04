@@ -15,6 +15,7 @@ internal static partial class Program
     private static void ValidateStorePurchases()
     {
         ValidatePurchaseCatalog();
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         using MongoCollectionOverride storage = MongoCollectionOverride.InstallForDailySignInCompatibility(
             out RecordingMongoCollectionProxy<Player> players,
             out RecordingMongoCollectionProxy<Character> characters,
@@ -120,7 +121,7 @@ internal static partial class Program
         staleSerum.LastBuyTime = yesterday;
         NotifyLogin nextDayLogin = (NotifyLogin)typeof(PurchaseRequest).Assembly
             .GetType("AscNet.GameServer.Handlers.AccountModule")!
-            .GetMethod("BuildNotifyLogin", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+            .GetMethod("BuildNotifyLogin", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic, null, [typeof(AscNet.GameServer.Session)], null)!
             .Invoke(null, [harness.Session])!;
         AssertEqual(0, nextDayLogin.ItemList.Single(item => item.Id == Inventory.Coin).BuyTimes,
             "next-day login resets exhausted Cogs purchases");

@@ -17774,6 +17774,14 @@ namespace AscNet.Test
                     (RequiredCollectionField(typeof(AscNet.Common.Database.Character)), collection)
                 ]);
             }
+            public static MongoCollectionOverride InstallNoOpStageCollection()
+            {
+                return new MongoCollectionOverride(
+                [
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Stage)), CreateNoOpMongoCollection<AscNet.Common.Database.Stage>())
+                ]);
+            }
+
             public static MongoCollectionOverride InstallForMissingFeatureCompatibility()
             {
                 return new MongoCollectionOverride(

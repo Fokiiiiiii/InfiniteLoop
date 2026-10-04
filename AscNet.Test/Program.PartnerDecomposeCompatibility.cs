@@ -22,6 +22,7 @@ namespace AscNet.Test
     {
         private static void ValidatePartnerDecomposeFeatureAndProxyDurabilityCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride collections = MongoCollectionOverride.InstallForDailySignInCompatibility(
                 out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection,
                 out RecordingMongoCollectionProxy<AscNet.Common.Database.Character> characterCollection,
@@ -856,6 +857,8 @@ namespace AscNet.Test
             Player.collection.InsertOne(player);
             Character.collection.InsertOne(character);
             Inventory.collection.InsertOne(inventory);
+            Stage loginStage = CreateLoginAccountCompatibilityStage(uid);
+            Stage.collection.InsertOne(loginStage); // login persists Stage rollover by ObjectId
 
             string claimKey = $"partner-decompose:real-mongo:{Guid.NewGuid():N}";
             PartnerDecomposePendingOperation pending = new()
@@ -902,7 +905,7 @@ namespace AscNet.Test
                        persistedPendingPlayer, persistedPendingInventory,
                        "partner-decompose-real-mongo-recovery", startClientLoop: false))
             {
-                recovered.Session.stage = CreateLoginAccountCompatibilityStage(uid);
+                recovered.Session.stage = loginStage;
                 MethodInfo buildNotifyLogin = RequiredMethod(
                     RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
                     "BuildNotifyLogin",
@@ -1270,8 +1273,8 @@ namespace AscNet.Test
                 MethodInfo resume = RequiredMethod(module,
                     purchase ? "ResumePendingPurchase" : "ResumePendingItemUse",
                     BindingFlags.Static | BindingFlags.Public,
-                    [typeof(Session)]);
-                _ = resume.Invoke(null, [harness.Session]);
+                    purchase ? [typeof(Session), typeof(int).MakeByRefType()] : [typeof(Session)]);
+                _ = resume.Invoke(null, purchase ? [harness.Session, 0] : [harness.Session]);
                 AssertEqual(true, purchase
                     ? player.PendingPurchase is null
                     : player.PendingItemUse is null,
@@ -1388,6 +1391,7 @@ namespace AscNet.Test
             }
 
             {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride collections = MongoCollectionOverride.InstallForDailySignInCompatibility(
                 out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> partialPlayerCollection,
                 out RecordingMongoCollectionProxy<AscNet.Common.Database.Character> partialCharacterCollection,
