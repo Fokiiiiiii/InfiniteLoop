@@ -22,6 +22,11 @@ namespace AscNet.Common
         [Option(DefaultValue = false)]
         bool SkipCommonGuides { get; set; }
 
+        // Client DlcFight Lua root (contains xmain.lua, questhotfix/...), any file-name case. Empty = probe
+        // ".runtime/installed-lua/dlcfight" upward from the working/base directory. Used by BigWorldQuestHotfix.
+        [Option(DefaultValue = "")]
+        string DlcFightLuaRoot { get; set; }
+
 
         interface IGameServer
         {

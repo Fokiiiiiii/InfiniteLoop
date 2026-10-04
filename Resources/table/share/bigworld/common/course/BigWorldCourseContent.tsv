@@ -1,0 +1,10 @@
+ContentId	Name	ContentType	TaskProgressItemId	BannerBg	TaskProgressItemIcon	ExploreRewardId	ExploreTitle	Priority	ContentTip	ConditionIds[1]	ConditionIds[2]
+101	Mission List	1	950000		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIconEXP01White.png	0		3			
+102	Exploration Progress	2	0	Assets/Product/Texture/Image/BigWorld/Common/UiBigWorldProcess/ProcessBanner/UiBigWorldProcessPanelAccumulate1.png		7000141	Total Exploration Progress	2	Complete Supply Crate exploration and reach 3-star in all Space Leap stages to claim the reward		
+103	Guide	3	0			0		1			
+201	Mission List	1	950001		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIconEXP02White.png	0		3			
+202	Exploration Progress	2	0	Assets/Product/Texture/Image/BigWorld/Common/UiBigWorldProcess/ProcessBanner/UiBigWorldProcessPanelAccumulate2.png		7000208	Exploration Progress	2	Complete Supply Crate exploration to claim the reward		
+203	Guide	3	0			0		1			
+301	Mission List	1	950002		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIconEXP03White.png	0		3			
+302	Exploration Progress	2	0	Assets/Product/Texture/Image/BigWorld/Common/UiBigWorldProcess/ProcessBanner/UiBigWorldProcessPanelAccumulate3.png		0	Exploration Progress	2			
+303	Guide	3	0			0		1			

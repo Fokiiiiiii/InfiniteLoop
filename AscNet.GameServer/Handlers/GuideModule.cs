@@ -3,6 +3,7 @@ using AscNet.Common.Database;
 using MessagePack;
 using AscNet.Common.Util;
 using AscNet.Table.V2.share.guide;
+using AscNet.Table.V2.share.bigworld.common.guide;
 
 namespace AscNet.GameServer.Handlers
 {
@@ -48,6 +49,15 @@ namespace AscNet.GameServer.Handlers
             TableReaderV2.Parse<GuideGroupTable>().ToDictionary(guide => guide.Id));
         private static readonly Lazy<Dictionary<int, GuideCompleteTable>> GuideCompletions = new(() =>
             TableReaderV2.Parse<GuideCompleteTable>().ToDictionary(completion => completion.Id));
+        // Babylonia's guide proxy (XSkyGardenGuideProxy) sends the same Guide* requests with BigWorldGuideGroup ids;
+        // completion lands in the shared GuideData list that NotifyLogin feeds to XGuideManager.InitGuideData.
+        private static readonly Lazy<Dictionary<int, BigWorldGuideGroupTable>> BigWorldGuides = new(() =>
+        {
+            HashSet<int> completions = TableReaderV2.Parse<BigWorldGuideCompleteTable>().Select(row => row.Id).ToHashSet();
+            return TableReaderV2.Parse<BigWorldGuideGroupTable>()
+                .Where(guide => completions.Contains(guide.CompleteId))
+                .ToDictionary(guide => guide.Id);
+        });
         [RequestPacketHandler("GuideOpenRequest")]
         public static void GuideOpenRequestHandler(Session session, Packet.Request packet)
         {
@@ -69,7 +79,26 @@ namespace AscNet.GameServer.Handlers
                 .ToList();
             if (groupGuides.Count == 0)
             {
-                session.SendResponse(new GuideGroupFinishResponse { Code = 1 }, packet.Id);
+                List<long> bigWorldGuideIds = BigWorldGuides.Value.Values
+                    .Where(guide => guide.GroupId == request.GroupId)
+                    .Select(guide => (long)guide.Id)
+                    .ToList();
+                if (bigWorldGuideIds.Count == 0)
+                {
+                    session.SendResponse(new GuideGroupFinishResponse { Code = 1 }, packet.Id);
+                    return;
+                }
+
+                List<RewardGoods>? groupRewards = null;
+                foreach (long guideId in bigWorldGuideIds)
+                {
+                    List<RewardGoods>? rewards = CompleteBigWorldGuide(session, (int)guideId);
+                    if (rewards is not null)
+                        (groupRewards ??= new()).AddRange(rewards);
+                }
+                BigWorld.BigWorldQuestRuntime.OnConditionsChanged(session);
+                session.SendResponse(new GuideGroupFinishResponse { RewardGoodsList = groupRewards }, packet.Id);
+                BigWorld.BigWorldQuestRuntime.Tick(session);
                 return;
             }
 
@@ -125,10 +154,12 @@ namespace AscNet.GameServer.Handlers
             }
 
             rewardApplication?.SendPushes(session);
+            BigWorld.BigWorldQuestRuntime.OnConditionsChanged(session);
             session.SendResponse(new GuideGroupFinishResponse
             {
                 RewardGoodsList = rewardApplication?.RewardGoods
             }, packet.Id);
+            BigWorld.BigWorldQuestRuntime.Tick(session);
         }
 
         [RequestPacketHandler("GuideCompleteRequest")]
@@ -138,7 +169,17 @@ namespace AscNet.GameServer.Handlers
             if (!GuideGroups.Value.TryGetValue(request.GuideGroupId, out GuideGroupTable? guide)
                 || !GuideCompletions.Value.ContainsKey(guide.CompleteId))
             {
-                session.SendResponse(new GuideCompleteResponse { Code = 1 }, packet.Id);
+                if (!BigWorldGuides.Value.ContainsKey(request.GuideGroupId))
+                {
+                    session.SendResponse(new GuideCompleteResponse { Code = 1 }, packet.Id);
+                    return;
+                }
+
+                List<RewardGoods>? rewards = CompleteBigWorldGuide(session, request.GuideGroupId);
+                session.SendPush(new NotifyGuide { GuideGroupId = request.GuideGroupId });
+                BigWorld.BigWorldQuestRuntime.OnConditionsChanged(session);
+                session.SendResponse(new GuideCompleteResponse { RewardGoodsList = rewards }, packet.Id);
+                BigWorld.BigWorldQuestRuntime.Tick(session);
                 return;
             }
 
@@ -191,10 +232,13 @@ namespace AscNet.GameServer.Handlers
             }
             rewardApplication?.SendPushes(session);
             session.SendPush(new NotifyGuide { GuideGroupId = request.GuideGroupId });
+            // Retail: BigWorld quest objectives waiting on the guide advance before the response (CheckRimSystemCondition, sequence I).
+            BigWorld.BigWorldQuestRuntime.OnConditionsChanged(session);
             session.SendResponse(new GuideCompleteResponse
             {
                 RewardGoodsList = rewardApplication?.RewardGoods
             }, packet.Id);
+            BigWorld.BigWorldQuestRuntime.Tick(session);
         }
 
 
@@ -290,7 +334,21 @@ namespace AscNet.GameServer.Handlers
 
         private static bool IsValidGuide(int guideGroupId)
             => GuideGroups.Value.TryGetValue(guideGroupId, out GuideGroupTable? guide)
-                && GuideCompletions.Value.ContainsKey(guide.CompleteId);
+                && GuideCompletions.Value.ContainsKey(guide.CompleteId)
+                || BigWorldGuides.Value.ContainsKey(guideGroupId);
+
+        // Records a BigWorld guide once; its RewardId is a BigWorldReward, granted only on first completion.
+        private static List<RewardGoods>? CompleteBigWorldGuide(Session session, int guideId)
+        {
+            session.player.PlayerData.GuideData ??= new();
+            if (session.player.PlayerData.GuideData.Contains(guideId))
+                return null;
+
+            session.player.PlayerData.GuideData.Add(guideId);
+            session.player.SaveChecked();
+            int rewardId = BigWorldGuides.Value[guideId].RewardId;
+            return rewardId > 0 ? BigWorld.BigWorldModule.GrantReward(session, rewardId) : null;
+        }
     }
 
 }

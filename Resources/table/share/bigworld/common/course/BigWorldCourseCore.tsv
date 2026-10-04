@@ -1,0 +1,5 @@
+CoreId	ContentId	GroupId	Priority	Name	LabelImage	Banner	SpineBanner	ConditionId	ElementIds[1]	ElementIds[2]	ElementIds[3]	ElementIds[4]	ElementIds[5]
+1	103	1	4					0	1001	1002			
+2	103	2	3	Lucia	Assets/Product/Texture/Image/BigWorld/Common/UiBigWorldProcess/ProcessBanner/UiBigWorldProcessPanelStoryBtnLucia.png	Assets/Product/Texture/Image/BigWorld/Common/UiBigWorldProcess/ProcessBanner/UiBigWorldProcessPanelStoryLucia.png	Assets/Product/Ui/Spine/BigWorld/Common/Process/KH01_LuxiyaXyProcess/KH01_LuxiyaXyProcess.prefab	0	2101				
+11	203	11	4					0	1011	1012	1013	1014	1015
+21	303	21	4					0	1021	1022			

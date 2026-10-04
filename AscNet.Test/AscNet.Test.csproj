@@ -13,4 +13,9 @@
     <ProjectReference Include="..\AscNet\AscNet.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Retail capture oracles (test-only; never runtime sources). -->
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

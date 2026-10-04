@@ -31,8 +31,12 @@ namespace AscNet.GameServer
         public bool PendingBigWorldLoadCompleteXRpc;
         public bool PendingBigWorldStartFightNotify;
         public readonly Dictionary<(uint EquipId, int Slot), ResonanceInfo> PendingEquipResonances = new();
+        // BigWorld: set by DlcWorldSaveData in online engine mode, drained by LoadCompleteRequest.
         public int? AppliedTeamPrefabId;
         public readonly Dictionary<uint, (uint FashionId, int WeaponFashionId)> RandomFashionRolls = new();
+        // BigWorld world the session is inside (0 = not in BigWorld) and when its fight snapshot was built.
+        public int BigWorldWorldId;
+        public DateTime BigWorldFightStartedAt;
         internal Dictionary<int, (int Value, int State)>? TaskSnapshotProgress;
         internal bool GuildIdentityReady;
         public readonly Logger log;
@@ -295,6 +299,7 @@ namespace AscNet.GameServer
                                         RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(request.Name);
                                         if (requestPacketHandler is not null)
                                         {
+                                        ProbeBigWorldPacket("in", request.Name ?? string.Empty, request.Content ?? [], request.Id, 0);
                                             // TODO: with new logger this will be unnecessary
                                             if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
@@ -536,9 +541,12 @@ namespace AscNet.GameServer
         private static bool ShouldDumpBigWorldPacket(string name)
         {
             return name.Contains("BigWorld", StringComparison.Ordinal)
-                || name.StartsWith("DlcWorld", StringComparison.Ordinal)
+                || name.StartsWith("Dlc", StringComparison.Ordinal)
+                || name.StartsWith("NotifyDlc", StringComparison.Ordinal)
+                || name.StartsWith("NotifySg", StringComparison.Ordinal)
+                || name.StartsWith("LeaveInstLevel", StringComparison.Ordinal)
                 || name.StartsWith("XRpc", StringComparison.Ordinal)
-                || name is "NotifySgDormData"
+                || name is "NotifyTask"
                     or "StartFightNotify"
                     or "LoadCompleteRequest"
                     or "LoadCompleteResponse"

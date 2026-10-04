@@ -66,7 +66,7 @@ namespace AscNet.GameServer.Handlers
     public class ClientVersionResponse
     {
         public int Code { get; set; }
-        public string Version { get; set; } = AccountModule.CurrentDocumentVersion;
+        public string Version { get; set; } = string.Empty;
         public bool KickOut { get; set; }
     }
 
@@ -83,14 +83,6 @@ namespace AscNet.GameServer.Handlers
             public long GetTime { get; set; }
             public long EndTime { get; set; }
         }
-    }
-
-    [MessagePackObject(true)]
-    public class NotifyExternalRequiredBigWorldPlayerData
-    {
-        public List<int> EnteredBigWorldIds = new();
-        public int Gender;
-        public List<int> CommanderFashionBags = new();
     }
 
     [MessagePackObject(true)]
@@ -185,12 +177,6 @@ namespace AscNet.GameServer.Handlers
             10, 11, 112, 12, 110, 14, 19, 25, 18, 20, 22, 24, 555, 21, 23, 599, 600,
             3108, 4108, 557, 558, 601, 602, 603, 604, 605, 556, 606, 607, 608, 609
         ];
-
-
-        private static NotifyExternalRequiredBigWorldPlayerData BuildExternalRequiredBigWorldPlayerData()
-        {
-            return DlcModule.BuildExternalRequiredBigWorldPlayerData();
-        }
 
 
         [RequestPacketHandler("HandshakeRequest")]
@@ -1451,8 +1437,8 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(purchaseRecommendConfig);
             session.SendPush(DrawTicketManager.BuildNotify(session.player));
             SendEmptyStartupPush(session, "NotifyLoginItemCollectionData");
-            session.SendPush(new NotifyBigWorldMainRedPoint());
-            session.SendPush(BuildExternalRequiredBigWorldPlayerData());
+            session.SendPush(BigWorld.BigWorldModule.BuildMainRedPoint(session.player));
+            session.SendPush(BigWorld.BigWorldModule.BuildExternalRequiredPlayerData(session.player));
             session.SendPush(BuildCurrentAccumulatedPayData());
             SendEmptyStartupPush(session, "NotifyAccumulateExpendData");
             if (arenaResult is not null)

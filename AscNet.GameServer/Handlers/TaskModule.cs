@@ -218,6 +218,13 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             FinishTaskRequest request = packet.Deserialize<FinishTaskRequest>();
+            if (BigWorld.BigWorldTaskModule.IsTask(request.TaskId))
+            {
+                FinishTaskResponse bigWorldResponse = new();
+                bigWorldResponse.Code = BigWorld.BigWorldTaskModule.Claim(session, [request.TaskId], bigWorldResponse.RewardGoodsList);
+                session.SendResponse(bigWorldResponse, packet.Id);
+                return;
+            }
             bool theatre5 = Theatre5Module.IsMetaTask(request.TaskId);
             bool theatre4 = Theatre4Module.IsMetaTask(request.TaskId);
             bool theatre = TheatreModule.IsMetaTask(request.TaskId);
@@ -321,6 +328,15 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             FinishMultiTaskRequest request = packet.Deserialize<FinishMultiTaskRequest>();
+            if (request.TaskIds.Any(BigWorld.BigWorldTaskModule.IsTask))
+            {
+                FinishMultiTaskResponse bigWorldResponse = new();
+                bigWorldResponse.Code = BigWorld.BigWorldTaskModule.Claim(session, request.TaskIds, bigWorldResponse.RewardGoodsList);
+                if (bigWorldResponse.Code == 0)
+                    bigWorldResponse.SuccessTaskIds.AddRange(request.TaskIds.Distinct());
+                session.SendResponse(bigWorldResponse, packet.Id);
+                return;
+            }
             bool theatre5 = request.TaskIds.Any(Theatre5Module.IsMetaTask);
             bool theatre4 = request.TaskIds.Any(Theatre4Module.IsMetaTask);
             bool theatre = request.TaskIds.Any(TheatreModule.IsMetaTask);
@@ -893,6 +909,11 @@ namespace AscNet.GameServer.Handlers
             tasks.AddRange(Theatre5Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(Theatre6Module.BuildTasks(session).Where(task => existingIds.Add(task.Id)));
             tasks.AddRange(BuildSameColorTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
+            tasks.AddRange(BigWorld.BigWorldTaskModule.BuildTasks(session).Where(task => existingIds.Add(task.Id)).Select(task => new LoginTask
+            {
+                Id = task.Id, State = task.State, RecordTime = task.RecordTime,
+                Schedule = task.Schedule.Select(value => new LoginTaskSchedule { Id = value.Id, Value = value.Value }).ToList()
+            }));
             session.TaskSnapshotProgress = tasks.Where(task => SnapshotTaskIds.Value.Contains((int)task.Id))
                 .ToDictionary(task => (int)task.Id, task => (task.Schedule[0].Value, task.State));
             return tasks;
@@ -935,6 +956,7 @@ namespace AscNet.GameServer.Handlers
                         .Concat(Theatre4Module.BuildTaskUpdates(new Theatre4Module.Mutation(session, newOperation: false)))
                         .Concat(Theatre6Module.BuildTaskUpdates(new Theatre6Module.Mutation(session, newOperation: false)))
                         .Concat(BuildSameColorTaskProgress(session).Select(ToSyncTask))
+                        .Concat(BigWorld.BigWorldTaskModule.BuildTasks(session))
                         .GroupBy(x => x.Id)
                         .Select(x => x.First())
                         .ToList()
@@ -993,13 +1015,13 @@ namespace AscNet.GameServer.Handlers
                 .ToList();
             HashSet<int> catalogIds = progress.Select(x => x.TaskId).ToHashSet();
             progress.AddRange(taskIds
-                .Where(taskId => !catalogIds.Contains(taskId) && !Theatre6Module.IsMetaTask(taskId))
+                .Where(taskId => !catalogIds.Contains(taskId) && !Theatre6Module.IsMetaTask(taskId) && !BigWorld.BigWorldTaskModule.IsTask(taskId))
                 .Select(taskId => new MissionTaskProgress(taskId, taskId, 0, TaskStateActive)));
             session.SendPush(new NotifyTask
             {
                 Tasks = new()
                 {
-                    Tasks = progress.Select(ToSyncTask).ToList()
+                    Tasks = progress.Select(ToSyncTask).Concat(BigWorld.BigWorldTaskModule.BuildTasks(session, taskIds)).ToList()
                 }
             });
             RememberSnapshotTaskProgress(session, progress);

@@ -1,0 +1,6 @@
+Id	LevelId	Name	IsDefaultGroup
+1	5001	Schedule A	1
+2	5001	Schedule B	0
+3	5001	Schedule C	0
+11	6001	Schedule A	1
+12	6001	Schedule B	0

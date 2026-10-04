@@ -1,0 +1,5 @@
+ExploreId	ContentId	Type	Title	TeachId	Banner	Icon	Priority	GuideId	RewardId	TimeId	PoiIds[1]	PoiIds[2]	PoiIds[3]	PoiIds[4]	PoiIds[5]
+1	102	1	Supply Crate Exploration	0		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/GridExploreIcon/UiBigWorldProcessGridExploreIconChest.png	3	0	7000140	0	101	102	103		
+2	102	2	Space Leap	0		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/GridExploreIcon/UiBigWorldProcessGridExploreIconJump.png	2	0	7000139	0	201	202			
+11	202	1	Supply Crate Exploration	0		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/GridExploreIcon/UiBigWorldProcessGridExploreIconChest.png	3	0	7000232	0	1001	1002	1003	1004	
+21	302	1	Supply Crate Exploration	0		Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/GridExploreIcon/UiBigWorldProcessGridExploreIconChest.png	3	0	7000287	0	2001	2002	2003	2005	2006

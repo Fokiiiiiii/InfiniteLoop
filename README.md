@@ -293,6 +293,20 @@ dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-
 
 ### Gender setup fix
 
+### Babylonia (BigWorld) world core
+
+`AscNet.GameServer/Handlers/BigWorld/BigWorldModule*.cs` owns world enter/leave, instance levels, the engine save channel (`DlcWorldSaveData`, `DlcWorldSceneObjectData`, `DlcSceneObjectStateSet`, `DlcWorldEnterSucceed`, `BigWorldCurNpcPosUpdate`), scene-object collection, box counts, teleporters, guide/fov/custom-param/red-point/map-pin state and the StatusSync XRpc channel. Nothing is replayed from captures; the retail oracles live in `AscNet.Test/Fixtures/BigWorld` for tests only.
+
+- **Scene objects:** `Resources/table/share/statussyncfight/level/sceneconfig/LevelSceneObject.tsv` is extracted from the installed client's level scene config (`Scripts/import_bigworld_scene_objects_4_7.py`): place ids (from 1; the lounge's interaction anchors 1-8 are below 1000), `CollectableComponent` (reward id, POI/course group) and `TeleporterComponent`. Collecting a collectable grants its `BigWorldReward` once, updates the level box count and the course explore POI. The same importer writes `LevelSpot.tsv` (`XTableLevelSpotNew` position/rotation per group).
+- **Dormitory (Commandant's Lounge, 4003):** `BigWorldDormitory.cs` is the server half of `XGameplayDormitory`. Enter snapshot and `SgDormSaveAndApplyLayoutRequest` (applied or re-saved preset) replicate the photo wall, photos, album photos, adorns, frame wall and frame goods of the player's applied layouts as `XSceneObject`s (children of the gameplay actor) at the `DormitoryConfig` spots; `Dormitory*.tsv` map `SgDormFurniture.SceneObjId` to scene object bases. Quest 2002's "View Photo Wall" target (scene object 1) is the `ConfigGroup_5001` anchor whose interaction completes 2002054 through `OnInteract`. Wall-plane placement, place id 0 and the parent uuid are AscNet policy (no retail lounge capture).
+- **Interactions:** `RpcPlayerInteractRequest` resolves the target (scene object or level NPC) and its `LevelInteractOption.tsv` row (same importer; `Config` holds the option's `CompleteActionList`). Order: collect push, `RpcNpcInteractStartNotify`, [`XRpcTeleportResetOnGroundRequest` when the list teleports, then the list via `BigWorldLevelActions.Run`], `RpcNpcInteractFinishNotify` after the client finishes the list, then `BigWorldQuestRuntime.OnInteract`. Unknown actor/option/level or a launcher that is not the player's NPC returns code 4.
+- **Policies:** a world's levels are the `Level` rows sharing its default level's `SectorName` prefix; the entrance red point stays on until the world is entered; an offline engine reports a collected object as `Active = false`.
+- **Engine mode (temporary experiment switch):** `ASCNET_BIGWORLD_ENGINE=online-min` (default) sends `WorldData.Online = true` with a generated `RepFight` (installed-client 11-key layout, `InitialQuests` from persisted quests) and a minimal `RepLevel` (player controller, team-NPC replicates, server controller) and answers `LoadCompleteRequest` with a generated XRpc bootstrap. `ASCNET_BIGWORLD_ENGINE=offline` sends `Online = false` with no `FightData`/`LevelData` (client-hosted engine). Any other value fails the enter. Set `ASCNET_DUMP_BIGWORLD=1` to dump BigWorld requests/responses/pushes to `.runtime/bigworld-packet-dumps`.
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --big-world-core-only
+```
+
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
 
 This branch adds:

@@ -435,9 +435,9 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("LoadCompleteRequest")]
         public static void LoadCompleteRequestHandler(Session session, Packet.Request packet)
         {
-            DlcModule.SendPendingBigWorldStartFightNotify(session);
+            BigWorld.BigWorldModule.SendPendingStartFightNotify(session);
             session.SendResponse(new LoadCompleteResponse(), packet.Id);
-            DlcModule.SendPendingBigWorldLoadCompleteXRpc(session);
+            BigWorld.BigWorldModule.SendPendingLoadCompleteXRpc(session);
         }
 
         [RequestPacketHandler("CheckCodeRequest")]
