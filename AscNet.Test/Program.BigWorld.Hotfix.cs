@@ -9,9 +9,10 @@ namespace AscNet.Test
 {
     internal partial class Program
     {
-        // --big-world-hotfix-only: BigWorldQuestHotfix runs the client's XDlcQuestHotfixManager + questhotfix Lua server-side.
+        // --big-world-hotfix-only: BigWorldQuestHotfix applies the imported QuestObjectiveHotfix.tsv rows at objective InProgress.
         private static void ValidateBigWorldHotfix()
         {
+            // Data-driven (QuestObjectiveHotfix.tsv): no Lua or .runtime folder is read.
             Type hotfix = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.BigWorld.BigWorldQuestHotfix");
             Type actors = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.BigWorld.BigWorldActors");
             const int Npc = 1;
@@ -22,7 +23,6 @@ namespace AscNet.Test
 
             const long playerId = 99_931;
             using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(out var playerSaves, out _, out _);
-            hotfix.GetMethod("Reset", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [null]);
 
             // Runs `act` on a logged-in player already in world 400; returns the SetInteractable pushes it produced
             // as (enable) in order. Player is reused across relogs by passing the saved one.
@@ -91,13 +91,14 @@ namespace AscNet.Test
 
             // ---- 251127181 (objective 300501121): both branches.
             // Input A: 500026 off, 500028 on -> enable 500026 and disable 500028.
-            Session(CreateDrawCompatibilityPlayer(playerId), "hotfix-4", s =>
+            List<bool> both = Session(CreateDrawCompatibilityPlayer(playerId), "hotfix-4", s =>
             {
                 SetInteractable(s, 500026, false);
                 SetInteractable(s, 500028, true);
                 State(s, 300501121, 3);
                 AssertEqual((true, false), (IsInteractable(s, 500026), IsInteractable(s, 500028)), "251127181 both branches fire");
             });
+            AssertEqual("False,True,True,False", string.Join(",", both), "251127181 pushes enable 500026 then disable 500028 after the test's own setup");
             // Input B: 500026 on, 500028 off -> neither branch fires.
             List<bool> untouched = Session(CreateDrawCompatibilityPlayer(playerId), "hotfix-5", s =>
             {
@@ -107,21 +108,6 @@ namespace AscNet.Test
                 AssertEqual((true, false), (IsInteractable(s, 500026), IsInteractable(s, 500028)), "251127181 no branch fires");
             });
             AssertEqual("True,False", string.Join(",", untouched), "251127181 pushes nothing beyond the test's own setup");
-
-            // ---- Missing Lua root: reported cleanly, hotfixes unavailable.
-            string missing = Path.Combine(Path.GetTempPath(), "ascnet-no-such-lua-root");
-            hotfix.GetMethod("Reset", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [missing]);
-            Player noLua = CreateDrawCompatibilityPlayer(playerId);
-            Session(noLua, "hotfix-6", s =>
-            {
-                SetInteractable(s, 600010, false);
-                State(s, 20010126, 3);
-                AssertEqual(false, IsInteractable(s, 600010), "no Lua root: hotfix does nothing");
-            });
-            string? reason = (string?)hotfix.GetProperty("UnavailableReason", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null);
-            AssertEqual(true, reason != null && reason.Contains("Lua root not found"), "missing root reason reported");
-            AssertEqual(0, noLua.BigWorldState.ExecutedHotfixScriptIds.Count, "nothing recorded without Lua");
-            hotfix.GetMethod("Reset", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [null]);
 
             Console.WriteLine("BigWorld hotfix validation passed.");
         }
