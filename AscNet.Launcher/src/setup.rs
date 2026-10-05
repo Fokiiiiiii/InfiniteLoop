@@ -989,6 +989,76 @@ fn quoted_response_file(path: &Path) -> String {
     format!("@\"{text}\"")
 }
 
+fn env_key_eq(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
+}
+
+fn env_set(env: &mut Vec<(String, String)>, key: &str, value: &str) {
+    if let Some((_, existing)) = env.iter_mut().find(|(name, _)| env_key_eq(name, key)) {
+        *existing = value.to_owned();
+        return;
+    }
+    env.push((key.to_owned(), value.to_owned()));
+}
+
+/// Build the environment for cargo, cl, and link.
+///
+/// A vcvars `set` dump is already a complete environment, so it replaces the
+/// parent block. The portable toolchain list is only the compiler overlay, and
+/// clearing the process environment there drops SystemRoot, TEMP, and the user
+/// profile those tools use when the dump is absent.
+fn compiler_process_env(
+    inherited: &[(String, String)],
+    compiler_vars: &[(String, String)],
+    toolchain_bin: &str,
+    rustc: &str,
+    wine: bool,
+    full_environment: bool,
+) -> Vec<(String, String)> {
+    let mut env = Vec::new();
+    if !full_environment {
+        for (key, value) in inherited {
+            if env_key_eq(key, "RUSTUP_TOOLCHAIN") || env_key_eq(key, "RUSTC") || env_key_eq(key, "Path") {
+                continue;
+            }
+            env_set(&mut env, key, value);
+        }
+    }
+    let mut compiler_path = String::new();
+    let mut path_key = "Path".to_owned();
+    for (key, value) in compiler_vars {
+        if env_key_eq(key, "Path") {
+            path_key = key.clone();
+            compiler_path = value.clone();
+            continue;
+        }
+        if env_key_eq(key, "RUSTUP_TOOLCHAIN") || env_key_eq(key, "RUSTC") {
+            continue;
+        }
+        env_set(&mut env, key, value);
+    }
+    let mut parts = Vec::new();
+    if !toolchain_bin.is_empty() {
+        parts.push(toolchain_bin.to_owned());
+    }
+    if !compiler_path.is_empty() {
+        parts.push(compiler_path);
+    }
+    if !full_environment {
+        if let Some((_, inherited_path)) = inherited.iter().find(|(key, _)| env_key_eq(key, "Path")) {
+            if !inherited_path.is_empty() {
+                parts.push(inherited_path.clone());
+            }
+        }
+    }
+    env_set(&mut env, &path_key, &parts.join(";"));
+    env_set(&mut env, "RUSTC", rustc);
+    if wine {
+        env_set(&mut env, "CARGO_BUILD_JOBS", "1");
+    }
+    env
+}
+
 fn quote_windows_arg(value: &str) -> String {
     let mut output = String::from("\"");
     let mut slashes = 0;
@@ -1263,6 +1333,7 @@ struct Compiler {
     vars: Vec<(String, String)>,
     msbuild: Option<PathBuf>,
     wine: bool,
+    full_environment: bool,
 }
 
 #[cfg(windows)]
@@ -1275,14 +1346,14 @@ fn compiler_from_vcvars(msvc: &Path, deadline: Instant, progress: &mut dyn FnMut
     let bat = vcvars_bat(msvc);
     let vars = capture_vcvars(&bat, deadline, progress, log)?;
     register_windows_sdk(msvc)?;
-    Ok(Compiler { vars, msbuild: None, wine: true })
+    Ok(Compiler { vars, msbuild: None, wine: true, full_environment: true })
 }
 
 #[cfg(windows)]
 fn compiler_from_tree(msvc: &Path) -> Result<Compiler> {
     let vars = crate::msvc::compiler_vars(msvc)?;
     register_windows_sdk(msvc)?;
-    Ok(Compiler { vars, msbuild: None, wine: true })
+    Ok(Compiler { vars, msbuild: None, wine: true, full_environment: false })
 }
 
 #[cfg(windows)]
@@ -1383,13 +1454,13 @@ fn ensure_compiler(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str
     }
     if let Some(found) = locate_vs(deadline, progress, log)? {
         let vars = capture_vcvars(&found.bat, deadline, progress, log)?;
-        return Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false });
+        return Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false, full_environment: true });
     }
     note(progress, log, "Installing Visual Studio 2022 Build Tools")?;
     install_build_tools(root, None, deadline, progress, log)?;
     let found = locate_vs(deadline, progress, log)?.context("Visual Studio Build Tools C++ workload was installed but MSBuild with v143 C++ tools was not found. Restart the launcher and retry.")?;
     let vars = capture_vcvars(&found.bat, deadline, progress, log)?;
-    Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false })
+    Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false, full_environment: true })
 }
 
 #[cfg(windows)]
@@ -1853,32 +1924,22 @@ fn build_patch(rust: &Path, compiler: &Compiler, checkout: &Path, root: &Path, s
 
 #[cfg(windows)]
 fn apply_build_env(command: &mut Command, compiler: &Compiler, toolchain_bin: &Path, rustc: &Path) {
-    command.env_clear();
-    let mut path_key = "Path".to_owned();
-    let mut path_value = String::new();
-    for (key, value) in &compiler.vars {
-        if key.eq_ignore_ascii_case("Path") {
-            path_key = key.clone();
-            path_value = value.clone();
-            continue;
-        }
-        if key.eq_ignore_ascii_case("RUSTUP_TOOLCHAIN") || key.eq_ignore_ascii_case("RUSTC") {
-            continue;
-        }
-        command.env(key, value);
-    }
-    let bin = toolchain_bin.display().to_string();
-    let merged = if toolchain_bin.as_os_str().is_empty() {
-        path_value
-    } else if path_value.is_empty() {
-        bin
+    let inherited = env::vars().collect::<Vec<_>>();
+    let block = compiler_process_env(
+        &inherited,
+        &compiler.vars,
+        &toolchain_bin.display().to_string(),
+        &rustc.display().to_string(),
+        compiler.wine,
+        compiler.full_environment,
+    );
+    if compiler.full_environment {
+        command.env_clear();
     } else {
-        format!("{bin};{path_value}")
-    };
-    command.env(path_key, merged);
-    command.env("RUSTC", rustc);
-    if compiler.wine {
-        command.env("CARGO_BUILD_JOBS", "1");
+        command.env_remove("RUSTUP_TOOLCHAIN");
+    }
+    for (key, value) in block {
+        command.env(key, value);
     }
 }
 
@@ -1932,7 +1993,7 @@ fn compile_version_shim_with_cl(compiler: &Compiler, checkout: &Path, loader: &P
         use std::os::windows::process::CommandExt;
         compile.raw_arg(&compile_argument);
     }
-    let compile_shown = format!("{} {compile_argument}", command_line(&compile));
+    let compile_shown = command_line(&compile);
     run_logged_shown(&mut compile, &compile_shown, "Compiling version loader", deadline, progress, log)?;
     let produced = loader.join("VersionShim.dll");
     let link_response = loader.join("link.rsp");
@@ -1948,7 +2009,7 @@ fn compile_version_shim_with_cl(compiler: &Compiler, checkout: &Path, loader: &P
         use std::os::windows::process::CommandExt;
         linker.raw_arg(&link_argument);
     }
-    let link_shown = format!("{} {link_argument}", command_line(&linker));
+    let link_shown = command_line(&linker);
     run_logged_shown(&mut linker, &link_shown, "Linking version loader", deadline, progress, log)?;
     Ok(())
 }
@@ -2154,5 +2215,60 @@ mod tests {
         assert!(format!("{error:#}").contains("Fast-forward") || format!("{error:#}").contains("exit code"), "{error:#}");
         assert_eq!(before, after);
         fs::remove_dir_all(temp).unwrap();
+    }
+
+    #[test]
+    fn portable_compiler_keeps_the_process_environment() {
+        let inherited = vec![
+            ("SystemRoot".to_owned(), r"C:\Windows".to_owned()),
+            ("TEMP".to_owned(), r"C:\users\steamuser\AppData\Local\Temp".to_owned()),
+            ("USERPROFILE".to_owned(), r"C:\users\steamuser".to_owned()),
+            ("Path".to_owned(), r"C:\Windows\system32".to_owned()),
+            ("INCLUDE".to_owned(), r"C:\stale".to_owned()),
+            ("RUSTUP_TOOLCHAIN".to_owned(), "stable-x86_64-pc-windows-msvc".to_owned()),
+            ("RUSTC".to_owned(), r"C:\wrong\rustc.exe".to_owned()),
+        ];
+        let compiler = vec![
+            ("Path".to_owned(), r"C:\msvc\cl".to_owned()),
+            ("INCLUDE".to_owned(), r"C:\msvc\include".to_owned()),
+            ("LIB".to_owned(), r"C:\msvc\lib".to_owned()),
+        ];
+        let portable = compiler_process_env(&inherited, &compiler, r"C:\rust\bin", r"C:\rust\bin\rustc.exe", true, false);
+        let get = |key: &str| {
+            portable.iter().find(|(name, _)| name.eq_ignore_ascii_case(key)).map(|(_, value)| value.as_str())
+        };
+        assert_eq!(get("SystemRoot"), Some(r"C:\Windows"));
+        assert_eq!(get("TEMP"), Some(r"C:\users\steamuser\AppData\Local\Temp"));
+        assert_eq!(get("USERPROFILE"), Some(r"C:\users\steamuser"));
+        assert_eq!(get("INCLUDE"), Some(r"C:\msvc\include"));
+        assert_eq!(get("LIB"), Some(r"C:\msvc\lib"));
+        assert_eq!(get("Path"), Some(r"C:\rust\bin;C:\msvc\cl;C:\Windows\system32"));
+        assert_eq!(get("RUSTC"), Some(r"C:\rust\bin\rustc.exe"));
+        assert_eq!(get("CARGO_BUILD_JOBS"), Some("1"));
+        assert_eq!(get("RUSTUP_TOOLCHAIN"), None);
+        assert_eq!(portable.iter().filter(|(name, _)| name.eq_ignore_ascii_case("Path")).count(), 1);
+
+        let dumped = compiler_process_env(
+            &inherited,
+            &[
+                ("SystemRoot".to_owned(), r"C:\Windows".to_owned()),
+                ("Path".to_owned(), r"C:\vc\bin;C:\Windows\system32".to_owned()),
+                ("INCLUDE".to_owned(), r"C:\vc\include".to_owned()),
+            ],
+            r"C:\rust\bin",
+            r"C:\rust\bin\rustc.exe",
+            false,
+            true,
+        );
+        let dumped_get = |key: &str| {
+            dumped.iter().find(|(name, _)| name.eq_ignore_ascii_case(key)).map(|(_, value)| value.as_str())
+        };
+        assert_eq!(dumped_get("SystemRoot"), Some(r"C:\Windows"));
+        assert_eq!(dumped_get("TEMP"), None);
+        assert_eq!(dumped_get("USERPROFILE"), None);
+        assert_eq!(dumped_get("Path"), Some(r"C:\rust\bin;C:\vc\bin;C:\Windows\system32"));
+        assert_eq!(dumped_get("INCLUDE"), Some(r"C:\vc\include"));
+        assert_eq!(dumped_get("CARGO_BUILD_JOBS"), None);
+        assert_eq!(dumped_get("RUSTC"), Some(r"C:\rust\bin\rustc.exe"));
     }
 }
