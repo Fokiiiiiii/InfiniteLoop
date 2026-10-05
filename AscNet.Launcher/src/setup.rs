@@ -1861,6 +1861,15 @@ fn prepare_config(checkout: &Path, config_path: &Path, game_port: u16, mongo_por
     Ok(())
 }
 
+/// MSBuild's out-of-proc nodes deadlock on Wine pipes. These switches keep
+/// `dotnet publish` in this process: one CPU, no reused node, no build server.
+fn apply_wine_publish_limits(command: &mut Command) {
+    command
+        .args(["-m:1", "-nodeReuse:false", "--disable-build-servers"])
+        .env("MSBUILDDISABLENODEREUSE", "1")
+        .env("DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER", "1");
+}
+
 #[cfg(windows)]
 fn publish_server(dotnet: &Path, checkout: &Path, stage: &Path, config: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
     if crate::install::running_under_wine() {
@@ -1882,6 +1891,10 @@ fn publish_server(dotnet: &Path, checkout: &Path, stage: &Path, config: &Path, d
         .env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1");
     if crate::install::running_under_wine() {
         command.env("NUGET_CERT_REVOCATION_MODE", "offline");
+        // Worker nodes (/nodemode:1 /nodeReuse:true) talk over pipes. Under Wine
+        // they stop after "Determining projects to restore" and never open a
+        // NuGet connection. One in-proc node does the restore in this process.
+        apply_wine_publish_limits(&mut command);
     }
     run_logged(&mut command, "Publishing AscNet server", deadline, progress, log)?;
     if !server.join("Configs").join("version_config.json").is_file() {
@@ -2367,5 +2380,16 @@ mod tests {
         assert!(!download_interrupted(&anyhow::anyhow!("local setup timed out")));
         assert!(!download_interrupted(&anyhow::anyhow!("download https://example.invalid/missing: HTTP status client error (404 Not Found)")));
         assert!(!download_interrupted(&anyhow::Error::from(std::io::Error::other("disk full"))));
+    }
+
+    #[test]
+    fn wine_publish_stays_in_process() {
+        let mut command = Command::new("dotnet");
+        apply_wine_publish_limits(&mut command);
+        let args: Vec<String> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert_eq!(args, vec!["-m:1".to_owned(), "-nodeReuse:false".to_owned(), "--disable-build-servers".to_owned()]);
+        let env = command.get_envs().map(|(key, value)| (key.to_string_lossy().into_owned(), value.map(|item| item.to_string_lossy().into_owned()))).collect::<Vec<_>>();
+        assert!(env.contains(&("MSBUILDDISABLENODEREUSE".to_owned(), Some("1".to_owned()))));
+        assert!(env.contains(&("DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER".to_owned(), Some("1".to_owned()))));
     }
 }
