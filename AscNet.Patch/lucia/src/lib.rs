@@ -46,9 +46,15 @@ unsafe fn initialize() -> bool {
     true
 }
 
-unsafe fn probe_thread() {
+/// Initializes once GameAssembly.dll is loaded. Global clients are started by AscNet's KRSDK.dll
+/// (`kurosdk_getConfigInfo`); CN keeps the retail KRSDKEx.dll, so nothing would call `ascnet_patch_initialize`
+/// and lucia must start itself. The short poll keeps the hooks ahead of the SDK's first request.
+unsafe fn startup_thread(probe: bool) {
+    if !probe && !is_cn_client() {
+        return;
+    }
     while GetModuleHandleA(PCSTR(b"GameAssembly.dll\0".as_ptr())).is_err() {
-        std::thread::sleep(Duration::from_millis(200));
+        std::thread::sleep(Duration::from_millis(10));
     }
     ascnet_patch_initialize();
 }
@@ -66,10 +72,10 @@ pub unsafe extern "system" fn ascnet_patch_initialize() -> i32 {
 #[no_mangle]
 #[allow(non_snake_case)]
 unsafe extern "system" fn DllMain(_: HINSTANCE, call_reason: u32, _: *mut ()) -> bool {
-    if call_reason == DLL_PROCESS_ATTACH
-        && std::env::var("ASCNET_PATCH_PROBE").as_deref() == Ok("1")
-    {
-        std::thread::spawn(|| probe_thread());
+    if call_reason == DLL_PROCESS_ATTACH {
+        // The CN check reads files, so it runs on the thread, outside the loader lock.
+        let probe = std::env::var("ASCNET_PATCH_PROBE").as_deref() == Ok("1");
+        std::thread::spawn(move || startup_thread(probe));
     }
 
     true
