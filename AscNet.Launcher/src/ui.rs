@@ -1836,8 +1836,8 @@ unsafe fn commit_inputs(hwnd: HWND, state: &mut Window) -> bool {
 }
 
 fn start_launcher_check(hwnd: HWND) {
-    if updater::updates_suppressed() {
-        let _ = local::launcher_log("Automatic updates skipped after launcher rollback");
+    if let Some(reason) = updater::updates_suppressed() {
+        let _ = local::launcher_log(&format!("Automatic updates skipped: {reason}"));
         start_refresh(hwnd, true, false);
         return;
     }

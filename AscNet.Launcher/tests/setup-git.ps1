@@ -60,7 +60,7 @@ try {
     Invoke-Checked $git @('-C', $Repository, 'commit', '-m', 'remote') 'fixture commit'
     $before = Git-Output $git $checkout @('rev-parse', 'HEAD')
     $refused = $false
-    try { Update-Checkout $git $checkout } catch { $refused = $true }
+    try { Update-Checkout $git $checkout } catch { $refused = $_.Exception.Message -match 'commits that are not on' -and $_.Exception.Message -match 'reset --hard FETCH_HEAD' }
     if (-not $refused -or (Git-Output $git $checkout @('rev-parse', 'HEAD')) -ne $before) { throw 'divergent history was modified' }
 
     # Unreachable remote (GitHub blocked): a clean checkout on the branch builds its current revision.

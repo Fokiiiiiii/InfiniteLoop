@@ -26,9 +26,15 @@ impl Drop for StagedUpdate {
     fn drop(&mut self) { let _ = fs::remove_dir_all(&self.root); }
 }
 
-pub fn updates_suppressed() -> bool {
-    std::env::var_os("ASCNET_DISABLE_AUTOMATIC_UPDATES").is_some_and(|value| value == "1")
-        || std::env::args().any(|arg| arg == "--self-update-rolled-back")
+/// Why automatic updates are off for this launch, if they are.
+pub fn updates_suppressed() -> Option<&'static str> {
+    if std::env::var_os("ASCNET_DISABLE_AUTOMATIC_UPDATES").is_some_and(|value| value == "1") {
+        Some("ASCNET_DISABLE_AUTOMATIC_UPDATES=1 is set in the environment")
+    } else if std::env::args().any(|arg| arg == "--self-update-rolled-back") {
+        Some("the previous launcher update was rolled back (started with --self-update-rolled-back); the next normal start checks again")
+    } else {
+        None
+    }
 }
 
 pub fn acknowledge_startup() -> Result<()> {

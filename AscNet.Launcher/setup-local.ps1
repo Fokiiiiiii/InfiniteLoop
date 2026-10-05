@@ -85,7 +85,14 @@ function Update-Checkout([string]$Git, [string]$Checkout) {
         Write-Host "WARNING: could not reach $Repository (git fetch exit code $fetchExit); continuing with the local checkout at $local."
         return
     }
-    # Reachable remote: a non-fast-forward (diverged) checkout still fails.
+    # Reachable remote: local commits that are not on the remote are never overwritten; say which and how to recover.
+    $localOnly = Git-Output $Git $Checkout @('log', '--oneline', 'FETCH_HEAD..HEAD')
+    if ($localOnly) {
+        Fail ("The source checkout has commits that are not on $Repository ($Branch), so it cannot be updated:`n$localOnly`n" +
+            "Setup will not discard them. To continue, either reset it (this deletes those commits):`n" +
+            "  git -C `"$Checkout`" reset --hard FETCH_HEAD`n" +
+            "or delete the folder `"$Checkout`" and run Setup again to download a fresh copy.")
+    }
     Invoke-Checked $Git @('-C', $Checkout, 'merge', '--ff-only', 'FETCH_HEAD') 'Fast-forward repository update'
 }
 function Ensure-DotNet {
