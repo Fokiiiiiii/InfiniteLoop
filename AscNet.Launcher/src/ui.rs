@@ -150,6 +150,8 @@ struct Model {
     update_available: Option<bool>,
     update_error: Option<String>,
     busy: bool,
+    /// Local server and MongoDB are shutting down after the game exited.
+    stopping: bool,
     generation: Arc<AtomicU64>,
     events: Sender<Event>,
 }
@@ -197,6 +199,7 @@ enum Event {
     Work(Work),
     Progress(String),
     Download(download::Progress),
+    ServicesStopped(Result<()>),
 }
 enum WorkResult {
     LauncherChecked(Result<Option<updater::StagedUpdate>>),
@@ -306,6 +309,7 @@ unsafe fn run_inner() -> Result<()> {
         update_available: None,
         update_error: None,
         busy: false,
+        stopping: false,
         generation: Arc::new(AtomicU64::new(0)),
         events: event_tx,
     }));
@@ -640,6 +644,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
                     match event {
                         Event::Work(work) => finish_work(hwnd, &mut *ptr, work),
                         Event::Download(p) => client::on_progress(hwnd, &mut *ptr, p),
+                        Event::ServicesStopped(result) => finish_services_stopped(hwnd, &mut *ptr, result),
                         Event::Progress(text) => {
                             if matches!(
                                 text.as_str(),
@@ -1596,7 +1601,8 @@ unsafe fn layout(hwnd: HWND, width: i32, height: i32, settings: bool, client: bo
 
 /// Game-watch tick: the background music pauses when PGR.exe appears and continues when it exits. The open audio
 /// device is paused, not closed, so nothing is reloaded. Muting is separate (it closes the device); music the player
-/// unmutes while the game runs starts when the game exits. A failed process query keeps the last state.
+/// unmutes while the game runs starts when the game exits. When the game exits, the local server and MongoDB stop
+/// too. A failed process query keeps the last state.
 unsafe fn follow_game_with_music(hwnd: HWND, state: &mut Window) {
     let Ok(running) = install::game_running() else {
         return;
@@ -1604,6 +1610,7 @@ unsafe fn follow_game_with_music(hwnd: HWND, state: &mut Window) {
     if running == state.game_running {
         return;
     }
+    let was_running = state.game_running;
     state.game_running = running;
     if running {
         if let Some(music) = &state.music {
@@ -1611,6 +1618,9 @@ unsafe fn follow_game_with_music(hwnd: HWND, state: &mut Window) {
             append_log(hwnd, state, "Game started; background music paused");
         }
         return;
+    }
+    if local::game_exit_stops_services(was_running, running) {
+        stop_services_after_game(hwnd, state);
     }
     if let Some(music) = &state.music {
         music.resume();
@@ -1629,6 +1639,42 @@ unsafe fn follow_game_with_music(hwnd: HWND, state: &mut Window) {
             let _ = local::launcher_log(&format!("Background music unavailable after the game closed: {e:#}"));
         }
     }
+}
+
+fn stop_services_after_game(hwnd: HWND, state: &mut Window) {
+    let (mut runtime, events) = {
+        let mut model = state.model.lock().unwrap();
+        if model.stopping {
+            return;
+        }
+        let Some(runtime) = model.runtime.take() else {
+            return;
+        };
+        model.stopping = true;
+        (runtime, model.events.clone())
+    };
+    unsafe {
+        append_log(hwnd, state, "Game closed; stopping the local server and MongoDB");
+        update_view(hwnd, &state.model);
+    }
+    thread::spawn(move || {
+        let result = runtime.stop();
+        post_event(hwnd, &events, Event::ServicesStopped(result));
+    });
+}
+
+unsafe fn finish_services_stopped(hwnd: HWND, state: &mut Window, result: Result<()>) {
+    state.model.lock().unwrap().stopping = false;
+    let message = match result {
+        Ok(()) => "Local server and MongoDB stopped".to_owned(),
+        Err(error) => {
+            let message = local::summarized_error("stop the local server and MongoDB", &error);
+            let _ = local::launcher_log(&message);
+            message
+        }
+    };
+    append_log(hwnd, state, &message);
+    update_view(hwnd, &state.model);
 }
 
 unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
@@ -1667,7 +1713,7 @@ unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
         ID_HOME_ACTION => {
             let target = {
                 let m = state.model.lock().unwrap();
-                if m.busy || m.runtime.is_some() {
+                if m.busy || m.runtime.is_some() || m.stopping {
                     return;
                 }
                 if m.settings.selected_game.is_none() {
@@ -1845,7 +1891,7 @@ fn start_launcher_check(hwnd: HWND) {
     };
     let (generation, events, repository) = {
         let mut m = model.lock().unwrap();
-        if m.busy || m.runtime.is_some() {
+        if m.busy || m.runtime.is_some() || m.stopping {
             return;
         }
         m.busy = true;
@@ -1991,7 +2037,7 @@ fn start_prepare(hwnd: HWND, state: &mut Window) {
     let (generation, events, config, game);
     {
         let mut m = model.lock().unwrap();
-        if m.busy || m.runtime.is_some() {
+        if m.busy || m.runtime.is_some() || m.stopping {
             return;
         }
         game = match m.settings.selected_game.clone() {
@@ -2050,7 +2096,7 @@ fn start_restore(hwnd: HWND, state: &mut Window) {
     let (generation, events);
     {
         let mut m = model.lock().unwrap();
-        if m.busy {
+        if m.busy || m.stopping {
             return;
         }
         m.busy = true;
@@ -2301,11 +2347,12 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
 }
 
 unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
-    let (update_available, runtime, busy, can_restore, can_launch, fps_setting, status_line) = {
+    let (update_available, runtime, stopping, busy, can_restore, can_launch, fps_setting, status_line) = {
         let m = model.lock().unwrap();
         (
             m.update_available,
             m.runtime.is_some(),
+            m.stopping,
             m.busy,
             m.settings.selected_game.is_some(),
             can_play(&m).is_ok(),
@@ -2323,8 +2370,9 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
             "&Setup / Update"
         },
     );
-    set_enabled(hwnd, ID_ACTION, !busy && !runtime);
-    set_enabled(hwnd, ID_RESTORE, !busy && can_restore);
+    let services = runtime || stopping;
+    set_enabled(hwnd, ID_ACTION, !busy && !services);
+    set_enabled(hwnd, ID_RESTORE, !busy && !stopping && can_restore);
     set_enabled(hwnd, ID_PLAY, !busy && can_launch);
     set_text(
         hwnd,
@@ -2339,6 +2387,8 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
     set_enabled(hwnd, ID_FPS_ACTION, !busy);
     let home_text = if busy {
         "WORKING…"
+    } else if stopping {
+        "STOPPING"
     } else if runtime {
         "RUNNING"
     } else if !can_restore {
@@ -2351,7 +2401,7 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
         "PLAY"
     };
     set_text(hwnd, ID_HOME_ACTION, home_text);
-    set_enabled(hwnd, ID_HOME_ACTION, !busy && !runtime);
+    set_enabled(hwnd, ID_HOME_ACTION, !busy && !services);
     set_busy(hwnd, false, "");
 }
 
@@ -2376,11 +2426,15 @@ fn status_line(m: &Model) -> String {
         Some(PatchState::Unsupported(_)) => "unsupported",
         Some(PatchState::RepairRequired(_)) => "repair needed",
     };
-    let server = match (&m.runtime, &m.server) {
-        (None, _) => "stopped",
-        (Some(_), Some(s)) if s.maintenance => "maintenance",
-        (Some(_), Some(s)) if s.online => "running",
-        (Some(_), _) => "offline",
+    let server = if m.stopping {
+        "stopping"
+    } else {
+        match (&m.runtime, &m.server) {
+            (None, _) => "stopped",
+            (Some(_), Some(s)) if s.maintenance => "maintenance",
+            (Some(_), Some(s)) if s.online => "running",
+            (Some(_), _) => "offline",
+        }
     };
     format!("Client {client} · Patch: {patch} · Server: {server}")
 }
@@ -2398,6 +2452,9 @@ fn can_play(m: &Model) -> Result<()> {
         .context("Run Setup / Update to build the local patch")?;
     if !matches!(m.patch, Some(PatchState::Current)) {
         anyhow::bail!("Run Setup / Update to install the current local patch")
+    }
+    if m.stopping {
+        anyhow::bail!("The local server is stopping")
     }
     if m.runtime.is_some() {
         anyhow::bail!("The local server is already running")

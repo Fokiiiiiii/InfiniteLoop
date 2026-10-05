@@ -151,6 +151,14 @@ mod summary_tests {
         assert_eq!(wine[wine.len() - 2], "--setParameter");
         assert_eq!(wine.last().map(String::as_str), Some("diagnosticDataCollectionEnabled=false"));
     }
+
+    #[test]
+    fn services_stop_only_when_the_game_exits() {
+        assert!(super::game_exit_stops_services(true, false));
+        assert!(!super::game_exit_stops_services(false, false));
+        assert!(!super::game_exit_stops_services(false, true));
+        assert!(!super::game_exit_stops_services(true, true));
+    }
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -621,6 +629,14 @@ impl LocalRuntime {
         Ok(())
     }
 }
+
+/// The local server and MongoDB are for the game session. Stop them when
+/// PGR.exe goes from running to exited, not while it is still open and not on
+/// a poll that never saw it running.
+pub fn game_exit_stops_services(was_running: bool, is_running: bool) -> bool {
+    was_running && !is_running
+}
+
 fn mongo_arguments(dbpath: &Path, port: u16, wine: bool) -> Vec<String> {
     let mut args = vec![
         "--bind_ip".to_owned(),
