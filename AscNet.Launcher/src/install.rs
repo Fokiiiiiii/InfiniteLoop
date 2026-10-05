@@ -1016,12 +1016,7 @@ pub fn launch(client: &Path, origin: &str, no_camera_fade: bool, fps: Option<i32
     let mut command = launch_command(&client, executable, origin, no_camera_fade, fps);
     if running_under_wine() {
         let old = std::env::var("WINEDLLOVERRIDES").unwrap_or_default();
-        let merged = if old.is_empty() {
-            "version=n,b".into()
-        } else {
-            format!("{old};version=n,b")
-        };
-        command.env("WINEDLLOVERRIDES", merged);
+        command.env("WINEDLLOVERRIDES", merge_version_dll_override(&old));
     }
     command.spawn().context("launching PGR.exe")?;
     Ok(())
@@ -1058,8 +1053,30 @@ fn launch_command(client: &Path, executable: PathBuf, origin: String, no_camera_
     }
     command
 }
+
+/// Keep an existing Wine DLL override list and make sure `version.dll` loads beside the game.
+pub(crate) fn merge_version_dll_override(current: &str) -> String {
+    let mut parts: Vec<String> = current
+        .split(';')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_owned)
+        .collect();
+    let has_version = parts.iter().any(|part| {
+        part.split('=')
+            .next()
+            .unwrap_or("")
+            .split(',')
+            .any(|name| name.trim().eq_ignore_ascii_case("version"))
+    });
+    if !has_version {
+        parts.push("version=n,b".to_owned());
+    }
+    parts.join(";")
+}
+
 #[cfg(windows)]
-fn running_under_wine() -> bool {
+pub(crate) fn running_under_wine() -> bool {
     use windows::core::{s, w};
     use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 
@@ -1072,7 +1089,7 @@ fn running_under_wine() -> bool {
 }
 
 #[cfg(not(windows))]
-fn running_under_wine() -> bool {
+pub(crate) fn running_under_wine() -> bool {
     false
 }
 
@@ -1685,6 +1702,15 @@ mod tests {
             assert!(!envs.contains_key("KEEP_ME".as_ref() as &std::ffi::OsStr));
         }
         fs::remove_dir_all(client).unwrap();
+    }
+    #[test]
+    fn version_override_is_merged_once() {
+        assert_eq!(merge_version_dll_override(""), "version=n,b");
+        assert_eq!(merge_version_dll_override("d3d11,dxgi=n,b"), "d3d11,dxgi=n,b;version=n,b");
+        assert_eq!(merge_version_dll_override("d3d11,dxgi=n,b;"), "d3d11,dxgi=n,b;version=n,b");
+        assert_eq!(merge_version_dll_override("version=n,b"), "version=n,b");
+        assert_eq!(merge_version_dll_override("Version=b"), "Version=b");
+        assert_eq!(merge_version_dll_override("d3d11,version=n"), "d3d11,version=n");
     }
     #[test]
     fn rollback_preserves_previous_managed_state() {

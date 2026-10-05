@@ -109,7 +109,7 @@ Verify/repair and update never touch files outside the chosen folder, and refuse
 1. User picks an empty folder (never a Steam install).
 2. Pin the version from `supported-client.json` (use versioned URLs, not "latest"); confirm index MD5 first.
 3. Resumable download with per-file/per-chunk MD5, disk-space check, repair.
-4. Existing SETUP: supported-client check → setup-local.ps1 → patch install → PLAY.
+4. Existing SETUP: supported-client check → local source setup → patch install → PLAY.
 5. On first start the game downloads `StreamingAssets/resource` itself from Kuro's `prod-encdn-*` CDN
    (AscNet's config points there; lucia.dll only redirects `client/config`, notices and notice HTML).
 

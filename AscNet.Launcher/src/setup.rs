@@ -1,0 +1,1861 @@
+//! Local source setup runs inside the launcher. It installs Git, the .NET 8 SDK,
+//! Rust, and MongoDB from official archives and never starts PowerShell or WinGet.
+#![cfg_attr(not(windows), allow(dead_code))]
+use anyhow::{bail, Context, Result};
+use serde::Deserialize;
+use serde_json::Value;
+use sha2::{Digest, Sha256, Sha512};
+use std::{
+    env, fs,
+    io::{Read, Write},
+    net::{Ipv4Addr, TcpListener},
+    path::{Component, Path, PathBuf},
+    process::{Child, Command, Stdio},
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
+
+const RUST_VERSION: &str = "1.92.0";
+const RUST_HOST: &str = "x86_64-pc-windows-msvc";
+const MINGIT_URL: &str = "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.1/MinGit-2.56.0-64-bit.zip";
+const MINGIT_SHA256: &str = "064b440ff870ed5198527e8f3a92cdf5bd2fd0fedf5e718af95e3fdaddeff718";
+const DOTNET_RELEASES: &str = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json";
+const MONGO_CATALOG: &str = "https://downloads.mongodb.org/full.json";
+const VS_BOOTSTRAPPER: &str = "https://aka.ms/vs/17/release/vs_buildtools.exe";
+const NUGET_INDEX: &str = "https://api.nuget.org/v3/index.json";
+
+struct RustComponent {
+    url: &'static str,
+    sha256: &'static str,
+}
+
+const RUST_COMPONENTS: [RustComponent; 3] = [
+    RustComponent {
+        url: "https://static.rust-lang.org/dist/2025-12-11/rustc-1.92.0-x86_64-pc-windows-msvc.tar.gz",
+        sha256: "4f321ca1903b8b08ceb07c0305f9f0320bc711ff6e285d726b8ef1dda774935d",
+    },
+    RustComponent {
+        url: "https://static.rust-lang.org/dist/2025-12-11/cargo-1.92.0-x86_64-pc-windows-msvc.tar.gz",
+        sha256: "9f6178ddcaed7c9190c454db5da801e2fe6c8fde8600258a9bdd0e107e81ac3b",
+    },
+    RustComponent {
+        url: "https://static.rust-lang.org/dist/2025-12-11/rust-std-1.92.0-x86_64-pc-windows-msvc.tar.gz",
+        sha256: "3af377fb29083c2117e85e6a107aedb008bd76929c22d56ce45c5be1be3a2540",
+    },
+];
+
+pub fn run(
+    root: &Path,
+    repository: &str,
+    branch: &str,
+    launcher_dir: &Path,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+    deadline: Instant,
+) -> Result<()> {
+    #[cfg(windows)]
+    {
+        return run_windows(root, repository, branch, launcher_dir, progress, log, deadline);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (root, repository, branch, launcher_dir, progress, log, deadline);
+        bail!("local source setup is supported on Windows only");
+    }
+}
+
+pub(crate) fn without_program_files_git_include(text: &str) -> String {
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut kept = Vec::new();
+    for line in text.split('\n') {
+        let line = line.trim_end_matches('\r');
+        let key = line.trim().to_ascii_lowercase().replace('\\', "/");
+        if key.starts_with("path") && key.contains("c:/program files/git/etc/gitconfig") {
+            continue;
+        }
+        kept.push(line);
+    }
+    let mut joined = kept.join(newline);
+    if text.ends_with('\n') {
+        joined.push_str(newline);
+    }
+    joined
+}
+
+pub(crate) fn repair_git_include(git: &Path) -> bool {
+    for config in gitconfig_candidates(git) {
+        if !config.is_file() {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&config) else {
+            continue;
+        };
+        let stripped = without_program_files_git_include(&text);
+        if stripped == text {
+            continue;
+        }
+        if fs::write(&config, stripped).is_err() {
+            continue;
+        }
+        return true;
+    }
+    false
+}
+
+fn gitconfig_candidates(git: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut cursor = git.parent();
+    for _ in 0..4 {
+        let Some(dir) = cursor else { break };
+        out.push(dir.join("etc").join("gitconfig"));
+        cursor = dir.parent();
+    }
+    out
+}
+
+pub(crate) fn path_is_within(path: &Path, root: &Path) -> bool {
+    let path = normalize_path_key(path);
+    let mut root = normalize_path_key(root);
+    if root.is_empty() {
+        return false;
+    }
+    if !root.ends_with('\\') {
+        root.push('\\');
+    }
+    path.starts_with(&root)
+}
+
+fn normalize_path_key(path: &Path) -> String {
+    path.to_string_lossy().replace('/', "\\").to_ascii_lowercase()
+}
+
+fn note(
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+    message: &str,
+) -> Result<()> {
+    progress(message);
+    log(message)
+}
+
+fn ensure_time(deadline: Instant) -> Result<()> {
+    if Instant::now() >= deadline {
+        bail!("local setup timed out");
+    }
+    Ok(())
+}
+
+fn command_line(command: &Command) -> String {
+    let mut parts = vec![command.get_program().to_string_lossy().into_owned()];
+    parts.extend(command.get_args().map(|arg| arg.to_string_lossy().into_owned()));
+    parts.join(" ")
+}
+
+fn contain(child: &Child) -> Result<()> {
+    #[cfg(windows)]
+    {
+        SETUP_JOB.with(|slot| {
+            let borrowed = slot.borrow();
+            if let Some(job) = borrowed.as_ref() {
+                crate::local::assign_to_job(job, child)
+            } else {
+                Ok(())
+            }
+        })?;
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = child;
+    }
+    Ok(())
+}
+
+fn stream_lines<R: Read + Send + 'static>(stream: R, send: mpsc::Sender<std::io::Result<String>>) {
+    thread::spawn(move || {
+        let mut stream = std::io::BufReader::new(stream);
+        let mut bytes = Vec::new();
+        loop {
+            bytes.clear();
+            match std::io::BufRead::read_until(&mut stream, b'\n', &mut bytes) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let line = String::from_utf8_lossy(&bytes)
+                        .trim_end_matches(['\r', '\n'])
+                        .to_owned();
+                    if send.send(Ok(line)).is_err() {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    let _ = send.send(Err(error));
+                    break;
+                }
+            }
+        }
+    });
+}
+
+fn run_logged(
+    command: &mut Command,
+    description: &str,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    ensure_time(deadline)?;
+    note(progress, log, &format!("+ {}", command_line(command)))?;
+    let mut child = crate::local::hide_console(command)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("start {description}"))?;
+    if let Err(error) = contain(&child) {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
+    }
+    let (send, receive) = mpsc::channel();
+    stream_lines(child.stdout.take().context("capture command output")?, send.clone());
+    stream_lines(child.stderr.take().context("capture command errors")?, send);
+    loop {
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("local setup timed out");
+        }
+        match receive.recv_timeout(Duration::from_millis(200)) {
+            Ok(line) => {
+                let line = line.context("read command output")?;
+                if !line.is_empty() {
+                    log(&line)?;
+                    progress(&line);
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+    let status = loop {
+        if let Some(status) = child.try_wait().with_context(|| format!("wait for {description}"))? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("local setup timed out");
+        }
+        thread::sleep(Duration::from_millis(100));
+    };
+    if !status.success() {
+        bail!("{description} failed with exit code {}", status.code().unwrap_or(-1));
+    }
+    Ok(())
+}
+
+fn capture_command(
+    command: &mut Command,
+    description: &str,
+    deadline: Instant,
+    log_stdout: bool,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<std::process::Output> {
+    ensure_time(deadline)?;
+    note(progress, log, &format!("+ {}", command_line(command)))?;
+    let mut child = crate::local::hide_console(command)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("start {description}"))?;
+    if let Err(error) = contain(&child) {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
+    }
+    let mut stdout = child.stdout.take().context("capture command output")?;
+    let mut stderr = child.stderr.take().context("capture command errors")?;
+    let stdout_thread = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = stdout.read_to_end(&mut bytes);
+        bytes
+    });
+    let stderr_thread = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = stderr.read_to_end(&mut bytes);
+        bytes
+    });
+    loop {
+        if child.try_wait().with_context(|| format!("wait for {description}"))?.is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("local setup timed out");
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    let status = child.wait().with_context(|| format!("wait for {description}"))?;
+    let stdout = stdout_thread.join().unwrap_or_default();
+    let stderr = stderr_thread.join().unwrap_or_default();
+    for stream in [stderr.as_slice(), if log_stdout { stdout.as_slice() } else { &[] }] {
+        for line in String::from_utf8_lossy(stream).lines() {
+            if !line.is_empty() {
+                log(line)?;
+                progress(line);
+            }
+        }
+    }
+    if !status.success() {
+        bail!("{description} failed with exit code {}", status.code().unwrap_or(-1));
+    }
+    Ok(std::process::Output { status, stdout, stderr })
+}
+
+fn git_text(
+    git: &Path,
+    checkout: Option<&Path>,
+    args: &[String],
+    description: &str,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<String> {
+    let mut command = Command::new(git);
+    command.env("GIT_TERMINAL_PROMPT", "0").env("GCM_INTERACTIVE", "Never");
+    // `-c` has to precede -C and the subcommand.
+    let mut ordered = vec!["-c".to_owned(), "credential.interactive=false".to_owned()];
+    if let Some(checkout) = checkout {
+        ordered.push("-C".to_owned());
+        ordered.push(checkout.display().to_string());
+    }
+    ordered.extend(args.iter().cloned());
+    command.args(&ordered);
+    let output = capture_command(&mut command, description, deadline, false, progress, log)?;
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+fn update_checkout(
+    git: &Path,
+    checkout: &Path,
+    repository: &str,
+    branch: &str,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    if !checkout.exists() {
+        if let Some(parent) = checkout.parent() {
+            fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+        }
+        let mut command = Command::new(git);
+        command
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "Never")
+            .args([
+                "-c",
+                "credential.interactive=false",
+                "clone",
+                "-c",
+                "core.autocrlf=false",
+                "--single-branch",
+                "--branch",
+                branch,
+                "--",
+                repository,
+            ])
+            .arg(checkout);
+        if let Err(error) = run_logged(&mut command, "Repository clone", deadline, progress, log) {
+            if checkout.exists() {
+                let _ = fs::remove_dir_all(checkout);
+            }
+            return Err(error);
+        }
+    }
+    if !checkout.join(".git").exists() {
+        bail!("Checkout path is not a Git repository: {}", checkout.display());
+    }
+    let origin = git_text(git, Some(checkout), &["remote".into(), "get-url".into(), "origin".into()], "git remote get-url origin", deadline, progress, log)?;
+    if origin != repository {
+        bail!("Checkout origin is '{origin}', expected exactly '{repository}'. Refusing to replace it.");
+    }
+    let current = git_text(git, Some(checkout), &["branch".into(), "--show-current".into()], "git branch --show-current", deadline, progress, log)?;
+    if current != branch {
+        bail!("Checkout is on branch '{current}', expected '{branch}'. Switch it manually; setup will not reset your work.");
+    }
+    let dirty = git_text(
+        git,
+        Some(checkout),
+        &["status".into(), "--porcelain".into(), "--untracked-files=normal".into()],
+        "git status --porcelain",
+        deadline,
+        progress,
+        log,
+    )?;
+    if !dirty.is_empty() {
+        bail!("Checkout has local changes. Commit or remove them before updating; setup will not reset, clean, or stash files.\n{dirty}");
+    }
+    let mut pull = Command::new(git);
+    pull.env("GIT_TERMINAL_PROMPT", "0")
+        .env("GCM_INTERACTIVE", "Never")
+        .args(["-c", "credential.interactive=false", "-C"])
+        .arg(checkout)
+        .args(["pull", "--ff-only", "origin", branch]);
+    run_logged(&mut pull, "Fast-forward repository update", deadline, progress, log)
+}
+
+fn http_client(deadline: Instant) -> Result<reqwest::blocking::Client> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        bail!("local setup timed out");
+    }
+    Ok(reqwest::blocking::Client::builder()
+        .user_agent(concat!("ascnet-launcher/", env!("CARGO_PKG_VERSION")))
+        .https_only(true)
+        .connect_timeout(remaining.min(Duration::from_secs(30)))
+        .timeout(remaining)
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()?)
+}
+
+fn download_file(
+    url: &str,
+    dest: &Path,
+    expect_sha256: Option<&str>,
+    expect_sha512: Option<&str>,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<String> {
+    ensure_time(deadline)?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let partial = partial_path(dest);
+    let _ = fs::remove_file(&partial);
+    note(progress, log, &format!("Downloading {url}"))?;
+    let response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
+    let mut reader = response;
+    let mut file = fs::File::create(&partial).with_context(|| format!("create {}", partial.display()))?;
+    let mut sha256 = Sha256::new();
+    let mut sha512 = Sha512::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        if Instant::now() >= deadline {
+            drop(file);
+            let _ = fs::remove_file(&partial);
+            bail!("local setup timed out");
+        }
+        let count = reader.read(&mut buffer).with_context(|| format!("read {url}"))?;
+        if count == 0 {
+            break;
+        }
+        file.write_all(&buffer[..count])?;
+        sha256.update(&buffer[..count]);
+        sha512.update(&buffer[..count]);
+    }
+    file.sync_all()?;
+    drop(file);
+    let actual256 = format!("{:x}", sha256.finalize());
+    let actual512 = format!("{:x}", sha512.finalize());
+    if let Some(expected) = expect_sha256 {
+        if !actual256.eq_ignore_ascii_case(expected) {
+            let _ = fs::remove_file(&partial);
+            bail!("checksum mismatch for {url} (expected {expected}, received {actual256})");
+        }
+    }
+    if let Some(expected) = expect_sha512 {
+        if !actual512.eq_ignore_ascii_case(expected) {
+            let _ = fs::remove_file(&partial);
+            bail!("checksum mismatch for {url} (expected {expected}, received {actual512})");
+        }
+    }
+    let _ = fs::remove_file(dest);
+    fs::rename(&partial, dest).with_context(|| format!("store {}", dest.display()))?;
+    Ok(actual256)
+}
+
+fn partial_path(dest: &Path) -> PathBuf {
+    let mut name = dest.as_os_str().to_owned();
+    name.push(".partial");
+    PathBuf::from(name)
+}
+
+fn read_download_text(url: &str, deadline: Instant) -> Result<String> {
+    ensure_time(deadline)?;
+    let response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
+    let bytes = response.bytes().with_context(|| format!("read {url}"))?;
+    ensure_time(deadline)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn first_sha256(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    while index + 64 <= bytes.len() {
+        let window = &bytes[index..index + 64];
+        let hex = window.iter().all(|byte| byte.is_ascii_hexdigit());
+        let before = index == 0 || !bytes[index - 1].is_ascii_hexdigit();
+        let after = index + 64 == bytes.len() || !bytes[index + 64].is_ascii_hexdigit();
+        if hex && before && after {
+            return Some(text[index..index + 64].to_ascii_lowercase());
+        }
+        index += 1;
+    }
+    None
+}
+
+fn scratch_file(root: &Path, name: &str) -> PathBuf {
+    root.join("tmp").join(format!("{name}-{}-{}", std::process::id(), uuid::Uuid::new_v4()))
+}
+
+#[derive(Debug)]
+struct SdkArchive {
+    url: String,
+    sha512: String,
+}
+
+#[derive(Deserialize)]
+struct DotnetReleases {
+    #[serde(default)]
+    releases: Vec<DotnetRelease>,
+}
+#[derive(Deserialize)]
+struct DotnetRelease {
+    sdk: Option<DotnetSdk>,
+}
+#[derive(Deserialize)]
+struct DotnetSdk {
+    #[serde(default)]
+    files: Vec<DotnetFile>,
+}
+#[derive(Deserialize)]
+struct DotnetFile {
+    name: Option<String>,
+    url: Option<String>,
+    hash: Option<String>,
+}
+
+fn select_dotnet_sdk(document: &str) -> Result<SdkArchive> {
+    let parsed: DotnetReleases = serde_json::from_str(document).context("invalid .NET release metadata")?;
+    for release in &parsed.releases {
+        let Some(sdk) = &release.sdk else { continue };
+        for file in &sdk.files {
+            if file.name.as_deref() != Some("dotnet-sdk-win-x64.zip") {
+                continue;
+            }
+            let url = file.url.clone().context(".NET metadata is missing the Windows SDK zip URL")?;
+            let hash = file.hash.as_deref().unwrap_or("").trim().to_ascii_lowercase();
+            if hash.len() != 128 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                bail!(".NET metadata did not provide a SHA-512 for {url}");
+            }
+            return Ok(SdkArchive { url, sha512: hash });
+        }
+    }
+    bail!(".NET 8 metadata contains no Windows x64 SDK zip");
+}
+
+#[derive(Debug)]
+struct MongoArchiveChoice {
+    version: String,
+    url: String,
+    sha256: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct MongoCatalog {
+    #[serde(default)]
+    versions: Vec<MongoVersion>,
+}
+#[derive(Deserialize)]
+struct MongoVersion {
+    version: String,
+    #[serde(default)]
+    downloads: Vec<MongoDownload>,
+}
+#[derive(Deserialize)]
+struct MongoDownload {
+    target: Option<String>,
+    arch: Option<String>,
+    edition: Option<String>,
+    archive: Option<MongoArchiveMeta>,
+}
+#[derive(Deserialize)]
+struct MongoArchiveMeta {
+    url: Option<String>,
+    sha256: Option<String>,
+}
+
+fn select_mongo_archive(document: &str) -> Result<MongoArchiveChoice> {
+    let catalog: MongoCatalog = serde_json::from_str(document).context("invalid MongoDB download metadata")?;
+    let mut matches: Vec<&MongoVersion> = catalog.versions.iter().filter(|version| mongo_80(&version.version)).collect();
+    if matches.is_empty() {
+        bail!("MongoDB metadata contains no stable 8.0 release.");
+    }
+    matches.sort_by(|left, right| mongo_parts(&right.version).cmp(&mongo_parts(&left.version)));
+    let version = matches[0];
+    let mut downloads: Vec<&MongoDownload> = version.downloads.iter().filter(|download| mongo_windows_zip(download)).collect();
+    if downloads.is_empty() {
+        bail!("MongoDB metadata contains no Windows x64 Community ZIP for {}.", version.version);
+    }
+    downloads.sort_by_key(|download| if download.edition.as_deref() == Some("community") { 0 } else { 1 });
+    let chosen = downloads[0];
+    let url = chosen.archive.as_ref().and_then(|archive| archive.url.clone()).context("MongoDB archive URL is missing")?;
+    let sha256 = chosen.archive.as_ref().and_then(|archive| archive.sha256.as_deref()).map(str::trim).filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())).map(|value| value.to_ascii_lowercase());
+    Ok(MongoArchiveChoice { version: version.version.clone(), url, sha256 })
+}
+
+fn mongo_80(version: &str) -> bool {
+    let mut parts = version.split('.');
+    let Some(major) = parts.next() else { return false };
+    let Some(minor) = parts.next() else { return false };
+    let Some(patch) = parts.next() else { return false };
+    parts.next().is_none() && major == "8" && minor == "0" && !patch.is_empty() && patch.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn mongo_parts(version: &str) -> Vec<u32> {
+    version.split('.').filter_map(|part| part.parse().ok()).collect()
+}
+
+fn mongo_windows_zip(download: &MongoDownload) -> bool {
+    download.target.as_deref() == Some("windows")
+        && download.arch.as_deref() == Some("x86_64")
+        && matches!(download.edition.as_deref(), Some("base" | "community"))
+        && download.archive.as_ref().and_then(|archive| archive.url.as_deref()).is_some_and(|url| url.to_ascii_lowercase().ends_with(".zip"))
+}
+
+fn pem_certificates(text: &str) -> Result<Vec<Vec<u8>>> {
+    let mut certs = Vec::new();
+    let mut rest = text;
+    const BEGIN: &str = "-----BEGIN CERTIFICATE-----";
+    const END: &str = "-----END CERTIFICATE-----";
+    while let Some(start) = rest.find(BEGIN) {
+        let after = &rest[start + BEGIN.len()..];
+        let end = after.find(END).context("truncated certificate")?;
+        certs.push(decode_base64(&after[..end])?);
+        rest = &after[end + END.len()..];
+    }
+    Ok(certs)
+}
+
+fn decode_base64(input: &str) -> Result<Vec<u8>> {
+    fn value(byte: u8) -> Option<u8> {
+        match byte {
+            b'A'..=b'Z' => Some(byte - b'A'),
+            b'a'..=b'z' => Some(byte - b'a' + 26),
+            b'0'..=b'9' => Some(byte - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+    let bytes: Vec<u8> = input.bytes().filter(|byte| !byte.is_ascii_whitespace()).collect();
+    if bytes.is_empty() || bytes.len() % 4 != 0 {
+        bail!("invalid certificate encoding");
+    }
+    let mut output = Vec::new();
+    for chunk in bytes.chunks(4) {
+        let pad = chunk.iter().filter(|byte| **byte == b'=').count();
+        if pad > 2 || chunk[..4 - pad].contains(&b'=') {
+            bail!("invalid certificate encoding");
+        }
+        let mut parts = [0u8; 4];
+        for (index, byte) in chunk.iter().enumerate() {
+            if *byte == b'=' {
+                continue;
+            }
+            parts[index] = value(*byte).context("invalid certificate encoding")?;
+        }
+        output.push((parts[0] << 2) | (parts[1] >> 4));
+        if pad < 2 {
+            output.push((parts[1] << 4) | (parts[2] >> 2));
+        }
+        if pad < 1 {
+            output.push((parts[2] << 6) | parts[3]);
+        }
+    }
+    Ok(output)
+}
+
+fn parse_environment_block(text: &str) -> Vec<(String, String)> {
+    let mut pairs = Vec::new();
+    for line in text.split('\n') {
+        let line = line.trim_end_matches('\r');
+        let Some((key, value)) = line.split_once('=') else { continue };
+        if key.is_empty() || key.contains('\0') {
+            continue;
+        }
+        pairs.push((key.to_owned(), value.to_owned()));
+    }
+    pairs
+}
+
+fn rust_payload_relative(path: &Path) -> Option<PathBuf> {
+    let mut components = path.components();
+    components.next()?;
+    components.next()?;
+    let relative: PathBuf = components.collect();
+    if relative.as_os_str().is_empty() || relative.components().any(|component| matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))) {
+        return None;
+    }
+    Some(relative)
+}
+
+fn apply_network(config: &mut Value, game_port: u16, mongo_port: u16) {
+    if !config.is_object() {
+        *config = Value::Object(serde_json::Map::new());
+    }
+    let object = config.as_object_mut().expect("config object");
+    let game = object.entry("GameServer").or_insert_with(|| Value::Object(serde_json::Map::new()));
+    if !game.is_object() {
+        *game = Value::Object(serde_json::Map::new());
+    }
+    game["Host"] = Value::String("127.0.0.1".into());
+    game["Port"] = Value::from(game_port);
+    let database = object.entry("Database").or_insert_with(|| Value::Object(serde_json::Map::new()));
+    if !database.is_object() {
+        *database = Value::Object(serde_json::Map::new());
+    }
+    database["Host"] = Value::String("127.0.0.1".into());
+    database["Port"] = Value::from(mongo_port);
+    database["Name"] = Value::String("asc_net".into());
+}
+
+fn network_matches(config: &Value, game_port: u16, mongo_port: u16) -> bool {
+    json_string(config, &["GameServer", "Host"]).as_deref() == Some("127.0.0.1")
+        && json_u16(config, &["GameServer", "Port"]) == Some(game_port)
+        && json_string(config, &["Database", "Host"]).as_deref() == Some("127.0.0.1")
+        && json_u16(config, &["Database", "Port"]) == Some(mongo_port)
+        && json_string(config, &["Database", "Name"]).as_deref() == Some("asc_net")
+}
+
+fn json_string(value: &Value, path: &[&str]) -> Option<String> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_str().map(str::to_owned)
+}
+
+fn json_u16(value: &Value, path: &[&str]) -> Option<u16> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    let number = current.as_u64()?;
+    u16::try_from(number).ok().filter(|port| *port >= 1)
+}
+
+fn free_port(excluded: &[u16]) -> Result<u16> {
+    for _ in 0..64 {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).context("allocate a free loopback port")?;
+        let port = listener.local_addr()?.port();
+        drop(listener);
+        if port != 0 && !excluded.contains(&port) {
+            return Ok(port);
+        }
+    }
+    bail!("could not allocate a free loopback port");
+}
+
+fn assert_port_free(port: u16, label: &str) -> Result<()> {
+    if port == 0 {
+        bail!("Persisted ports must each be between 1 and 65535.");
+    }
+    match TcpListener::bind((Ipv4Addr::LOCALHOST, port)) {
+        Ok(listener) => {
+            drop(listener);
+            Ok(())
+        }
+        Err(_) => bail!("{label} port {port} is already in use. Stop that process or preserve the current build and choose new ports; setup will not adopt or stop it."),
+    }
+}
+
+fn find_named(dir: &Path, name: &str) -> Result<Option<PathBuf>> {
+    if !dir.exists() {
+        return Ok(None);
+    }
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        for entry in fs::read_dir(&current).with_context(|| format!("read {}", current.display()))? {
+            let entry = entry?;
+            let path = entry.path();
+            let matches = path.file_name().and_then(|file| file.to_str()).is_some_and(|file| file.eq_ignore_ascii_case(name));
+            if matches && path.is_file() {
+                return Ok(Some(path));
+            }
+            if path.is_dir() {
+                stack.push(path);
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn directory_has_child(dir: &Path) -> Result<bool> {
+    if !dir.is_dir() {
+        return Ok(false);
+    }
+    Ok(fs::read_dir(dir)?.next().is_some())
+}
+
+fn copy_dir(from: &Path, to: &Path) -> Result<()> {
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let dest = to.join(entry.file_name());
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_dir(&entry.path(), &dest)?;
+        } else if kind.is_file() {
+            fs::copy(entry.path(), &dest)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = partial_path(path);
+    {
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+    }
+    #[cfg(windows)]
+    {
+        crate::local::atomic_replace(&temporary, path)?;
+    }
+    #[cfg(not(windows))]
+    {
+        fs::rename(&temporary, path)?;
+    }
+    Ok(())
+}
+
+fn quoted_response_file(path: &Path) -> String {
+    let text = path.display().to_string().replace('\\', "/");
+    format!("@\"{text}\"")
+}
+
+fn quote_windows_arg(value: &str) -> String {
+    let mut output = String::from("\"");
+    let mut slashes = 0;
+    for character in value.chars() {
+        if character == '\\' {
+            slashes += 1;
+            continue;
+        }
+        output.extend(std::iter::repeat('\\').take(if character == '"' { slashes * 2 + 1 } else { slashes }));
+        output.push(character);
+        slashes = 0;
+    }
+    output.extend(std::iter::repeat('\\').take(slashes * 2));
+    output.push('"');
+    output
+}
+
+#[cfg(windows)]
+thread_local! {
+    static SETUP_JOB: std::cell::RefCell<Option<crate::local::JobHandle>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(windows)]
+struct JobGuard;
+#[cfg(windows)]
+impl Drop for JobGuard {
+    fn drop(&mut self) {
+        SETUP_JOB.with(|slot| {
+            slot.borrow_mut().take();
+        });
+    }
+}
+
+#[cfg(windows)]
+fn run_windows(
+    root: &Path,
+    repository: &str,
+    branch: &str,
+    launcher_dir: &Path,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+    deadline: Instant,
+) -> Result<()> {
+    let job = crate::local::create_job()?;
+    SETUP_JOB.with(|slot| *slot.borrow_mut() = Some(job));
+    let _guard = JobGuard;
+    ensure_time(deadline)?;
+    fs::create_dir_all(root.join("tmp"))?;
+    let checkout = root.join("checkout");
+    let git = ensure_git(root, deadline, progress, log)?;
+    note(progress, log, "Updating source checkout")?;
+    update_checkout(&git, &checkout, repository, branch, deadline, progress, log)?;
+    let revision = git_text(&git, Some(&checkout), &["rev-parse".into(), "HEAD".into()], "git rev-parse HEAD", deadline, progress, log)?;
+    if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("git returned an invalid revision");
+    }
+    let previous = read_previous_state(&root.join("build-state.json"))?;
+    ensure_time(deadline)?;
+    let dotnet = ensure_dotnet(root, deadline, progress, log)?;
+    let rust = ensure_rust(root, deadline, progress, log)?;
+    let tools = ensure_compiler(root, deadline, progress, log)?;
+    let tool_dir = root.join("tools");
+    fs::create_dir_all(&tool_dir)?;
+    let mongod = ensure_mongo(root, &tool_dir, previous.as_ref(), deadline, progress, log)?;
+    fs::create_dir_all(root.join("data").join("mongo"))?;
+    fs::create_dir_all(root.join("logs"))?;
+    let (sdk_port, game_port, mongo_port) = choose_ports(root, previous.as_ref())?;
+    let config_path = root.join("config.json");
+    prepare_config(&checkout, &config_path, game_port, mongo_port)?;
+    let build_root = root.join("build");
+    fs::create_dir_all(&build_root)?;
+    let final_dir = build_root.join(&revision);
+    let stage = build_root.join(format!("{revision}.tmp-{}", std::process::id()));
+    if !final_dir.join("server").join("AscNet.dll").is_file() || !final_dir.join("patch").join("supported-client.json").is_file() {
+        if stage.exists() {
+            fs::remove_dir_all(&stage)?;
+        }
+        fs::create_dir_all(&stage)?;
+        let built = (|| -> Result<()> {
+            publish_server(&dotnet, &checkout, &stage, &config_path, deadline, progress, log)?;
+            build_patch(&rust, &tools, &checkout, root, &stage, deadline, progress, log)?;
+            build_version_shim(&tools, &checkout, &stage, launcher_dir, deadline, progress, log)?;
+            let _ = fs::remove_dir_all(stage.join("dotnet-artifacts"));
+            let _ = fs::remove_dir_all(stage.join("loader"));
+            let _ = fs::remove_dir_all(stage.join("loader-obj"));
+            if final_dir.exists() {
+                fs::remove_dir_all(&final_dir)?;
+            }
+            fs::rename(&stage, &final_dir).context("move staged build into place")?;
+            Ok(())
+        })();
+        if built.is_err() {
+            let _ = fs::remove_dir_all(&stage);
+        }
+        built?;
+    }
+    let server_directory = std::path::absolute(final_dir.join("server"))?;
+    let patch_directory = std::path::absolute(final_dir.join("patch"))?;
+    let state = crate::local::LocalBuild {
+        schema_version: crate::local::SCHEMA_VERSION,
+        revision,
+        repository: repository.to_owned(),
+        dotnet: std::path::absolute(dotnet)?,
+        mongod: std::path::absolute(mongod)?,
+        server_directory: server_directory.clone(),
+        resource_directory: server_directory,
+        patch_directory,
+        sdk_port,
+        game_port,
+        mongo_port,
+    };
+    let mut bytes = serde_json::to_vec_pretty(&state)?;
+    bytes.push(b'\n');
+    let pending = root.join("build-state.pending.json");
+    write_atomic(&pending, &bytes)?;
+    note(progress, log, &format!("AscNet local build prepared for launcher validation: {}", state.revision))?;
+    note(progress, log, &format!("Pending state: {}", pending.display()))?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn read_previous_state(path: &Path) -> Result<Option<Value>> {
+    match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).with_context(|| format!("Existing build-state.json is invalid: {}", path.display())).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| format!("read {}", path.display())),
+    }
+}
+
+#[cfg(windows)]
+fn ensure_git(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<PathBuf> {
+    if let Some(git) = crate::local::git_executable() {
+        return Ok(git);
+    }
+    note(progress, log, "Installing portable Git")?;
+    let archive = scratch_file(root, "mingit.zip");
+    download_file(MINGIT_URL, &archive, Some(MINGIT_SHA256), None, deadline, progress, log)?;
+    let destination = root.join("tools").join("git");
+    if destination.exists() {
+        fs::remove_dir_all(&destination)?;
+    }
+    fs::create_dir_all(&destination)?;
+    zip::ZipArchive::new(fs::File::open(&archive)?).context("open MinGit archive")?.extract(&destination).context("extract MinGit")?;
+    let _ = fs::remove_file(&archive);
+    let config = destination.join("etc").join("gitconfig");
+    if let Ok(text) = fs::read_to_string(&config) {
+        fs::write(&config, without_program_files_git_include(&text))?;
+    }
+    let git = destination.join("cmd").join("git.exe");
+    if !git.is_file() {
+        bail!("MinGit archive did not contain cmd\\git.exe");
+    }
+    let mut version = Command::new(&git);
+    version.arg("--version").env("GIT_TERMINAL_PROMPT", "0");
+    capture_command(&mut version, "git --version", deadline, false, progress, log)?;
+    Ok(git)
+}
+
+#[cfg(windows)]
+fn dotnet_candidates(root: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = env::var_os("PATH") {
+        candidates.extend(env::split_paths(&path).map(|dir| dir.join("dotnet.exe")));
+    }
+    if let Some(base) = env::var_os("ProgramFiles") {
+        candidates.push(PathBuf::from(base).join("dotnet").join("dotnet.exe"));
+    }
+    candidates.push(root.join("tools").join("dotnet").join("dotnet.exe"));
+    candidates
+}
+
+#[cfg(windows)]
+fn dotnet_sdk8(dotnet: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Option<String>> {
+    if !dotnet.is_file() {
+        return Ok(None);
+    }
+    let mut command = Command::new(dotnet);
+    command.args(["--list-sdks"]).env("DOTNET_CLI_TELEMETRY_OPTOUT", "1").env("DOTNET_NOLOGO", "1").env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1");
+    let output = match capture_command(&mut command, "dotnet --list-sdks", deadline, false, progress, log) {
+        Ok(output) => output,
+        Err(_) => return Ok(None),
+    };
+    let text = String::from_utf8_lossy(&output.stdout);
+    Ok(text.lines().map(str::trim).find(|line| line.starts_with("8.")).and_then(|line| line.split_whitespace().next()).map(str::to_owned))
+}
+
+#[cfg(windows)]
+fn ensure_dotnet(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<PathBuf> {
+    for candidate in dotnet_candidates(root) {
+        if dotnet_sdk8(&candidate, deadline, progress, log)?.is_some() {
+            return Ok(std::path::absolute(candidate)?);
+        }
+    }
+    note(progress, log, "Installing the .NET 8 SDK")?;
+    let metadata = read_download_text(DOTNET_RELEASES, deadline)?;
+    let selected = select_dotnet_sdk(&metadata)?;
+    let archive = scratch_file(root, "dotnet-sdk.zip");
+    download_file(&selected.url, &archive, None, Some(&selected.sha512), deadline, progress, log)?;
+    let destination = root.join("tools").join("dotnet");
+    if destination.exists() {
+        fs::remove_dir_all(&destination)?;
+    }
+    fs::create_dir_all(&destination)?;
+    zip::ZipArchive::new(fs::File::open(&archive)?).context("open .NET SDK archive")?.extract(&destination).context("extract .NET SDK")?;
+    let _ = fs::remove_file(&archive);
+    let dotnet = destination.join("dotnet.exe");
+    if dotnet_sdk8(&dotnet, deadline, progress, log)?.is_none() {
+        bail!(".NET 8 SDK was installed but dotnet.exe could not be found. Restart the launcher and retry.");
+    }
+    Ok(std::path::absolute(dotnet)?)
+}
+
+#[cfg(windows)]
+fn rust_root(root: &Path) -> PathBuf {
+    root.join("tools").join(format!("rust-{RUST_VERSION}-{RUST_HOST}"))
+}
+
+#[cfg(windows)]
+fn rust_ready(root: &Path) -> bool {
+    root.join("bin").join("cargo.exe").is_file() && root.join("bin").join("rustc.exe").is_file() && root.join("lib").join("rustlib").join(RUST_HOST).is_dir()
+}
+
+#[cfg(windows)]
+fn ensure_rust(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<PathBuf> {
+    let destination = rust_root(root);
+    if rust_ready(&destination) {
+        return Ok(destination);
+    }
+    note(progress, log, &format!("Installing Rust {RUST_VERSION}"))?;
+    fs::create_dir_all(&destination)?;
+    for component in RUST_COMPONENTS {
+        ensure_time(deadline)?;
+        let name = component.url.rsplit('/').next().unwrap_or("rust-component.tar.gz");
+        let archive = scratch_file(root, name);
+        download_file(component.url, &archive, Some(component.sha256), None, deadline, progress, log)?;
+        unpack_rust_component(&archive, &destination)?;
+        let _ = fs::remove_file(&archive);
+    }
+    if !rust_ready(&destination) {
+        bail!("Rust {RUST_VERSION} archive did not produce cargo.exe, rustc.exe, and the MSVC standard library");
+    }
+    Ok(destination)
+}
+
+#[cfg(windows)]
+fn unpack_rust_component(archive: &Path, dest: &Path) -> Result<()> {
+    let file = fs::File::open(archive)?;
+    let decoder = flate2::read::GzDecoder::new(file);
+    let mut tar = tar::Archive::new(decoder);
+    for entry in tar.entries().context("read Rust component archive")? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        let Some(relative) = rust_payload_relative(&path) else { continue };
+        if !entry.header().entry_type().is_file() {
+            if entry.header().entry_type().is_dir() {
+                fs::create_dir_all(dest.join(&relative))?;
+            }
+            continue;
+        }
+        let output = dest.join(&relative);
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut file = fs::File::create(&output)?;
+        std::io::copy(&mut entry, &mut file)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+struct Compiler {
+    vars: Vec<(String, String)>,
+    msbuild: Option<PathBuf>,
+    wine: bool,
+}
+
+#[cfg(windows)]
+fn ensure_compiler(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Compiler> {
+    let wine = crate::install::running_under_wine();
+    if wine {
+        let msvc = env::var_os("ASCNET_MSVC").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\msvc"));
+        let bat = msvc.join("VC").join("Auxiliary").join("Build").join("vcvars64.bat");
+        if !bat.is_file() {
+            bail!("Wine builds need an unpacked MSVC at C:\\msvc or ASCNET_MSVC (missing {})", bat.display());
+        }
+        let vars = capture_vcvars(&bat, deadline, progress, log)?;
+        register_windows_sdk(&msvc)?;
+        return Ok(Compiler { vars, msbuild: None, wine: true });
+    }
+    if let Some(found) = locate_vs(deadline, progress, log)? {
+        let vars = capture_vcvars(&found.bat, deadline, progress, log)?;
+        return Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false });
+    }
+    note(progress, log, "Installing Visual Studio 2022 Build Tools")?;
+    install_build_tools(root, None, deadline, progress, log)?;
+    let found = locate_vs(deadline, progress, log)?.context("Visual Studio Build Tools C++ workload was installed but MSBuild with v143 C++ tools was not found. Restart the launcher and retry.")?;
+    let vars = capture_vcvars(&found.bat, deadline, progress, log)?;
+    Ok(Compiler { vars, msbuild: Some(found.msbuild), wine: false })
+}
+
+#[cfg(windows)]
+struct VsInstall {
+    bat: PathBuf,
+    msbuild: PathBuf,
+}
+
+#[cfg(windows)]
+fn vswhere_path() -> Option<PathBuf> {
+    ["ProgramFiles(x86)", "ProgramFiles"].into_iter().filter_map(env::var_os).map(PathBuf::from).map(|base| base.join("Microsoft Visual Studio").join("Installer").join("vswhere.exe")).find(|path| path.is_file())
+}
+
+#[cfg(windows)]
+fn vswhere_text(vswhere: &Path, args: &[&str], deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<String> {
+    let mut command = Command::new(vswhere);
+    command.args(args);
+    let output = capture_command(&mut command, "vswhere", deadline, false, progress, log)?;
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+#[cfg(windows)]
+fn locate_vs(deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Option<VsInstall>> {
+    let Some(vswhere) = vswhere_path() else { return Ok(None) };
+    let install = vswhere_text(&vswhere, &["-latest", "-version", "[17.0,18.0)", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath"], deadline, progress, log)?;
+    let install = install.lines().next().unwrap_or("").trim();
+    if !install.is_empty() {
+        let root = PathBuf::from(install);
+        let bat = root.join("VC").join("Auxiliary").join("Build").join("vcvars64.bat");
+        let msbuild = root.join("MSBuild").join("Current").join("Bin").join("MSBuild.exe");
+        if bat.is_file() && msbuild.is_file() {
+            return Ok(Some(VsInstall { bat, msbuild }));
+        }
+        let found = vswhere_text(&vswhere, &["-latest", "-version", "[17.0,18.0)", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-find", r"MSBuild\**\Bin\MSBuild.exe"], deadline, progress, log)?;
+        if let Some(msbuild) = found.lines().map(str::trim).find(|line| !line.is_empty()).map(PathBuf::from) {
+            if bat.is_file() && msbuild.is_file() {
+                return Ok(Some(VsInstall { bat, msbuild }));
+            }
+        }
+    }
+    let build_tools = vswhere_text(&vswhere, &["-latest", "-version", "[17.0,18.0)", "-products", "Microsoft.VisualStudio.Product.BuildTools", "-property", "installationPath"], deadline, progress, log)?;
+    let build_tools = build_tools.lines().next().unwrap_or("").trim();
+    if !build_tools.is_empty() {
+        let setup = vswhere.parent().context("vswhere has no directory")?.join("setup.exe");
+        if !setup.is_file() {
+            bail!("Visual Studio Installer is missing; repair it before adding the C++ workload.");
+        }
+        install_build_tools_at(&setup, Some(PathBuf::from(build_tools)), deadline, progress, log)?;
+        return locate_vs_installed(&vswhere, deadline, progress, log);
+    }
+    Ok(None)
+}
+
+#[cfg(windows)]
+fn locate_vs_installed(vswhere: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Option<VsInstall>> {
+    let install = vswhere_text(vswhere, &["-latest", "-version", "[17.0,18.0)", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath"], deadline, progress, log)?;
+    let install = install.lines().next().unwrap_or("").trim();
+    if install.is_empty() {
+        return Ok(None);
+    }
+    let root = PathBuf::from(install);
+    let bat = root.join("VC").join("Auxiliary").join("Build").join("vcvars64.bat");
+    let mut msbuild = root.join("MSBuild").join("Current").join("Bin").join("MSBuild.exe");
+    if !msbuild.is_file() {
+        let found = vswhere_text(vswhere, &["-latest", "-version", "[17.0,18.0)", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-find", r"MSBuild\**\Bin\MSBuild.exe"], deadline, progress, log)?;
+        if let Some(path) = found.lines().map(str::trim).find(|line| !line.is_empty()) {
+            msbuild = PathBuf::from(path);
+        }
+    }
+    if bat.is_file() && msbuild.is_file() {
+        Ok(Some(VsInstall { bat, msbuild }))
+    } else {
+        Ok(None)
+    }
+}
+
+#[cfg(windows)]
+fn install_build_tools(root: &Path, install_path: Option<PathBuf>, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let bootstrapper = scratch_file(root, "vs_buildtools.exe");
+    let hash = download_file(VS_BOOTSTRAPPER, &bootstrapper, None, None, deadline, progress, log)?;
+    note(progress, log, &format!("Visual Studio Build Tools bootstrapper SHA-256 {hash}"))?;
+    install_build_tools_at(&bootstrapper, install_path, deadline, progress, log)?;
+    let _ = fs::remove_file(&bootstrapper);
+    Ok(())
+}
+
+#[cfg(windows)]
+fn install_build_tools_at(program: &Path, install_path: Option<PathBuf>, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let mut args = Vec::new();
+    if let Some(path) = install_path {
+        args.extend(["modify".into(), "--installPath".into(), path.display().to_string()]);
+    }
+    args.extend(["--wait".into(), "--passive".into(), "--norestart".into(), "--add".into(), "Microsoft.VisualStudio.Workload.VCTools".into(), "--includeRecommended".into()]);
+    let parameters = args.iter().map(|arg| quote_windows_arg(arg)).collect::<Vec<_>>().join(" ");
+    let code = elevate_and_wait(program, &parameters, deadline, progress, log)?;
+    if code == 3010 {
+        bail!("Visual Studio C++ workload was added but Windows must restart before setup can continue.");
+    }
+    if code != 0 {
+        bail!("Adding Visual Studio 2022 C++ workload failed with exit code {code}.");
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn elevate_and_wait(program: &Path, parameters: &str, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<u32> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0, ERROR_CANCELLED};
+    use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject};
+    use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    ensure_time(deadline)?;
+    note(progress, log, "Requesting administrator approval for Visual Studio Build Tools")?;
+    let file: Vec<u16> = program.as_os_str().encode_wide().chain(Some(0)).collect();
+    let params: Vec<u16> = parameters.encode_utf16().chain(Some(0)).collect();
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC,
+        lpVerb: w!("runas"),
+        lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: PCWSTR(params.as_ptr()),
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    if let Err(error) = unsafe { ShellExecuteExW(&mut info) } {
+        if error.code() == windows::core::HRESULT::from_win32(ERROR_CANCELLED.0) || error.code() == windows::core::HRESULT::from_win32(740) {
+            bail!("Visual Studio C++ workload elevation was cancelled or could not start: {error}");
+        }
+        return Err(error).context("Visual Studio C++ workload elevation was cancelled or could not start");
+    }
+    let result = (|| -> Result<u32> {
+        let remaining = deadline.saturating_duration_since(Instant::now()).as_millis().min(u32::MAX as u128) as u32;
+        let wait = unsafe { WaitForSingleObject(info.hProcess, remaining) };
+        if wait != WAIT_OBJECT_0 {
+            bail!("local setup timed out");
+        }
+        let mut code = 1u32;
+        unsafe { GetExitCodeProcess(info.hProcess, &mut code)? };
+        Ok(code)
+    })();
+    unsafe { let _ = CloseHandle(info.hProcess); }
+    result
+}
+
+#[cfg(windows)]
+fn capture_vcvars(bat: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Vec<(String, String)>> {
+    let text = bat.display().to_string();
+    if text.contains('"') {
+        bail!("MSVC vcvars path contains a quote: {text}");
+    }
+    let script = format!("call \"{text}\" >nul && set");
+    let mut command = Command::new("cmd.exe");
+    command.args(["/d", "/c", &script]);
+    let output = capture_command(&mut command, "Import MSVC environment", deadline, false, progress, log)?;
+    let vars = parse_environment_block(&String::from_utf8_lossy(&output.stdout));
+    if vars.is_empty() {
+        bail!("vcvars64.bat did not produce an environment: {}", bat.display());
+    }
+    Ok(vars)
+}
+
+#[cfg(windows)]
+fn register_windows_sdk(msvc: &Path) -> Result<()> {
+    let include = msvc.join("Windows Kits").join("10").join("Include");
+    let Some(version) = highest_sdk_version(&include) else { return Ok(()) };
+    let mut kits = msvc.join("Windows Kits").join("10");
+    let mut text = kits.display().to_string();
+    if !text.ends_with('\\') {
+        text.push('\\');
+    }
+    let _ = &mut kits;
+    for key in [
+        r"SOFTWARE\Microsoft\Windows Kits\Installed Roots",
+        r"SOFTWARE\Wow6432Node\Microsoft\Windows Kits\Installed Roots",
+    ] {
+        reg_set_sz(key, "KitsRoot10", &text)?;
+    }
+    for key in [
+        r"SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0",
+        r"SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0",
+    ] {
+        reg_set_sz(key, "InstallationFolder", &text)?;
+        reg_set_sz(key, "ProductVersion", &version)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn highest_sdk_version(include: &Path) -> Option<String> {
+    let mut best: Option<(Vec<u32>, String)> = None;
+    for entry in fs::read_dir(include).ok()?.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with("10.") || !entry.path().is_dir() {
+            continue;
+        }
+        let numbers: Vec<u32> = name.split('.').map(|part| part.parse().unwrap_or(0)).collect();
+        if best.as_ref().map(|(current, _)| numbers > *current).unwrap_or(true) {
+            best = Some((numbers, name));
+        }
+    }
+    best.map(|(_, name)| name)
+}
+
+#[cfg(windows)]
+fn reg_set_sz(key: &str, name: &str, value: &str) -> Result<()> {
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{RegCloseKey, RegCreateKeyExW, RegSetValueExW, HKEY, HKEY_LOCAL_MACHINE, KEY_SET_VALUE, KEY_WOW64_64KEY, REG_OPTION_NON_VOLATILE, REG_SZ};
+    let sub: Vec<u16> = key.encode_utf16().chain(Some(0)).collect();
+    let mut handle = HKEY(0);
+    unsafe {
+        RegCreateKeyExW(HKEY_LOCAL_MACHINE, PCWSTR(sub.as_ptr()), 0, PCWSTR::null(), REG_OPTION_NON_VOLATILE, KEY_SET_VALUE | KEY_WOW64_64KEY, None, &mut handle, None)
+            .ok()
+            .with_context(|| format!("create registry key {key}"))?;
+    }
+    let value_name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
+    let data: Vec<u8> = value.encode_utf16().chain(Some(0)).flat_map(|unit| unit.to_le_bytes()).collect();
+    let result = unsafe { RegSetValueExW(handle, PCWSTR(value_name.as_ptr()), 0, REG_SZ, Some(&data)).ok().with_context(|| format!("set registry value {key}\\{name}")) };
+    unsafe { let _ = RegCloseKey(handle); }
+    result
+}
+
+#[cfg(windows)]
+fn ensure_mongo(root: &Path, tools: &Path, previous: Option<&Value>, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<PathBuf> {
+    if let Some(state) = previous {
+        if let Some(pinned) = state.get("mongod").and_then(Value::as_str) {
+            let pinned = std::path::absolute(pinned)?;
+            if !path_is_within(&pinned, tools) {
+                bail!("Active build-state mongod is outside the owned tools directory: {}", pinned.display());
+            }
+            if pinned.is_file() {
+                return Ok(pinned);
+            }
+            if directory_has_child(&root.join("data").join("mongo"))? {
+                bail!("The pinned MongoDB executable is missing ({}), but persistent database files exist. Restore that owned MongoDB version; setup will not upgrade the database engine opportunistically.", pinned.display());
+            }
+        }
+    }
+    if let Some(existing) = find_named(tools, "mongod.exe")? {
+        return Ok(existing);
+    }
+    note(progress, log, "Installing MongoDB 8.0")?;
+    let catalog = read_download_text(MONGO_CATALOG, deadline)?;
+    let selected = select_mongo_archive(&catalog)?;
+    let sha256 = match selected.sha256 {
+        Some(hash) => hash,
+        None => {
+            let sidecar = read_download_text(&format!("{}.sha256", selected.url), deadline)?;
+            first_sha256(&sidecar).with_context(|| format!("MongoDB's official metadata did not provide a valid SHA-256 for {}", selected.url))?
+        }
+    };
+    let archive = scratch_file(root, "mongodb.zip");
+    download_file(&selected.url, &archive, Some(&sha256), None, deadline, progress, log)?;
+    let extracted = scratch_file(root, "mongodb");
+    fs::create_dir_all(&extracted)?;
+    let extracted_ok = (|| -> Result<PathBuf> {
+        zip::ZipArchive::new(fs::File::open(&archive)?).context("open MongoDB archive")?.extract(&extracted).context("extract MongoDB")?;
+        let mongod = find_named(&extracted, "mongod.exe")?.context("The verified MongoDB archive did not contain mongod.exe.")?;
+        let distribution = mongod.parent().and_then(Path::parent).context("MongoDB archive layout is missing bin\\mongod.exe")?;
+        let destination = tools.join(format!("mongodb-{}", selected.version));
+        if destination.exists() {
+            fs::remove_dir_all(&destination)?;
+        }
+        fs::create_dir_all(&destination)?;
+        let folder_name = distribution.file_name().context("MongoDB distribution has no folder name")?;
+        copy_dir(distribution, &destination.join(folder_name))?;
+        find_named(&destination, "mongod.exe")?.context("MongoDB extraction did not produce an executable.")
+    })();
+    let _ = fs::remove_file(&archive);
+    let _ = fs::remove_dir_all(&extracted);
+    extracted_ok
+}
+
+#[cfg(windows)]
+fn choose_ports(root: &Path, previous: Option<&Value>) -> Result<(u16, u16, u16)> {
+    let ports = if let Some(state) = previous {
+        let sdk = json_u16(state, &["sdkPort"]).context("Existing build-state.json is invalid: sdkPort")?;
+        let game = json_u16(state, &["gamePort"]).context("Existing build-state.json is invalid: gamePort")?;
+        let mongo = json_u16(state, &["mongoPort"]).context("Existing build-state.json is invalid: mongoPort")?;
+        (sdk, game, mongo)
+    } else if root.join("config.json").is_file() {
+        let config: Value = serde_json::from_slice(&fs::read(root.join("config.json"))?).context("Persistent config.json has invalid GameServer/Database ports")?;
+        let game = json_u16(&config, &["GameServer", "Port"]).context("Persistent config.json has invalid GameServer/Database ports")?;
+        let mongo = json_u16(&config, &["Database", "Port"]).context("Persistent config.json has invalid GameServer/Database ports")?;
+        let sdk = free_port(&[game, mongo])?;
+        (sdk, game, mongo)
+    } else {
+        let sdk = free_port(&[])?;
+        let game = free_port(&[sdk])?;
+        let mongo = free_port(&[sdk, game])?;
+        (sdk, game, mongo)
+    };
+    if ports.0 == ports.1 || ports.0 == ports.2 || ports.1 == ports.2 {
+        bail!("Persisted SDK, game, and MongoDB ports must be distinct.");
+    }
+    assert_port_free(ports.0, "SDK")?;
+    assert_port_free(ports.1, "Game")?;
+    assert_port_free(ports.2, "MongoDB")?;
+    Ok(ports)
+}
+
+#[cfg(windows)]
+fn prepare_config(checkout: &Path, config_path: &Path, game_port: u16, mongo_port: u16) -> Result<()> {
+    if !config_path.is_file() {
+        let source = fs::read(checkout.join("Resources").join("Configs").join("config.json")).context("read checkout config.json")?;
+        let mut config: Value = serde_json::from_slice(&source).context("checkout config.json is invalid")?;
+        if !config.is_object() {
+            bail!("checkout config.json is invalid");
+        }
+        apply_network(&mut config, game_port, mongo_port);
+        let mut bytes = serde_json::to_vec_pretty(&config)?;
+        bytes.push(b'\n');
+        write_atomic(config_path, &bytes)?;
+    }
+    let config: Value = serde_json::from_slice(&fs::read(config_path)?).context("Persistent config.json is invalid")?;
+    if !network_matches(&config, game_port, mongo_port) {
+        bail!("Persistent config.json network fields do not match the reserved local ports. Restore GameServer/Database loopback settings; setup will not overwrite user configuration.");
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn publish_server(dotnet: &Path, checkout: &Path, stage: &Path, config: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    if crate::install::running_under_wine() {
+        import_nuget_roots(dotnet, deadline, progress, log)?;
+    }
+    note(progress, log, "Publishing AscNet server")?;
+    let server = stage.join("server");
+    let mut command = Command::new(dotnet);
+    command
+        .args(["publish"])
+        .arg(checkout.join("AscNet").join("AscNet.csproj"))
+        .args(["-c", "Release", "-o"])
+        .arg(&server)
+        .arg("--artifacts-path")
+        .arg(stage.join("dotnet-artifacts"))
+        .args(["--source", NUGET_INDEX])
+        .env("DOTNET_CLI_TELEMETRY_OPTOUT", "1")
+        .env("DOTNET_NOLOGO", "1")
+        .env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1");
+    if crate::install::running_under_wine() {
+        command.env("NUGET_CERT_REVOCATION_MODE", "offline");
+    }
+    run_logged(&mut command, "Publishing AscNet server", deadline, progress, log)?;
+    if !server.join("Configs").join("version_config.json").is_file() {
+        bail!("Published server is missing Configs\\version_config.json.");
+    }
+    fs::create_dir_all(server.join("Configs"))?;
+    fs::copy(config, server.join("Configs").join("config.json"))?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn import_nuget_roots(dotnet: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let marker = crate::local::root()?.parent().context("local root has no parent")?.join("nuget-trust-imported.txt");
+    if marker.is_file() {
+        return Ok(());
+    }
+    let version = dotnet_sdk8(dotnet, deadline, progress, log)?.context("installed dotnet.exe does not provide a .NET 8 SDK")?;
+    let roots = dotnet.parent().context("dotnet.exe has no directory")?.join("sdk").join(version).join("trustedroots");
+    let mut imported = 0usize;
+    if roots.is_dir() {
+        for entry in fs::read_dir(&roots)? {
+            let entry = entry?;
+            if !entry.path().is_file() {
+                continue;
+            }
+            let Ok(text) = fs::read_to_string(entry.path()) else { continue };
+            for certificate in pem_certificates(&text)? {
+                if import_certificate(&certificate)? {
+                    imported += 1;
+                }
+            }
+        }
+    }
+    if imported == 0 {
+        bail!("NuGet trust import found no certificates under {}", roots.display());
+    }
+    if let Some(parent) = marker.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&marker, format!("{imported}\n"))?;
+    note(progress, log, &format!("Imported {imported} NuGet trust roots"))?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn import_certificate(encoded: &[u8]) -> Result<bool> {
+    use windows::Win32::Security::Cryptography::{CertAddEncodedCertificateToStore, CertCloseStore, CertOpenStore, CERT_QUERY_ENCODING_TYPE, CERT_STORE_ADD_USE_EXISTING, CERT_STORE_OPEN_EXISTING_FLAG, CERT_STORE_PROV_SYSTEM_W, CERT_SYSTEM_STORE_CURRENT_USER_ID, CERT_SYSTEM_STORE_LOCAL_MACHINE_ID, CERT_SYSTEM_STORE_LOCATION_SHIFT, PKCS_7_ASN_ENCODING, X509_ASN_ENCODING, CERT_OPEN_STORE_FLAGS, HCRYPTPROV_LEGACY};
+    let name: Vec<u16> = "ROOT".encode_utf16().chain(Some(0)).collect();
+    let encoding = CERT_QUERY_ENCODING_TYPE(X509_ASN_ENCODING.0 | PKCS_7_ASN_ENCODING.0);
+    let locations = [
+        CERT_OPEN_STORE_FLAGS((CERT_SYSTEM_STORE_LOCAL_MACHINE_ID << CERT_SYSTEM_STORE_LOCATION_SHIFT) | CERT_STORE_OPEN_EXISTING_FLAG.0),
+        CERT_OPEN_STORE_FLAGS((CERT_SYSTEM_STORE_CURRENT_USER_ID << CERT_SYSTEM_STORE_LOCATION_SHIFT) | CERT_STORE_OPEN_EXISTING_FLAG.0),
+    ];
+    let mut last = None;
+    for flags in locations {
+        let opened = unsafe { CertOpenStore(CERT_STORE_PROV_SYSTEM_W, encoding, HCRYPTPROV_LEGACY(0), flags, Some(name.as_ptr().cast())) };
+        let store = match opened {
+            Ok(store) => store,
+            Err(error) => {
+                last = Some(error);
+                continue;
+            }
+        };
+        let added = unsafe { CertAddEncodedCertificateToStore(store, encoding, encoded, CERT_STORE_ADD_USE_EXISTING, None) };
+        unsafe { let _ = CertCloseStore(store, 0); }
+        match added {
+            Ok(()) => return Ok(true),
+            Err(error) => last = Some(error),
+        }
+    }
+    match last {
+        Some(error) => Err(error).context("import NuGet trust certificate"),
+        None => bail!("could not open a certificate store for NuGet trust"),
+    }
+}
+
+#[cfg(windows)]
+fn build_patch(rust: &Path, compiler: &Compiler, checkout: &Path, root: &Path, stage: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let cargo = rust.join("bin").join("cargo.exe");
+    let rustc = rust.join("bin").join("rustc.exe");
+    let target = root.join("cargo-target");
+    let attempts = if compiler.wine { 3 } else { 1 };
+    let mut last = None;
+    for attempt in 1..=attempts {
+        ensure_time(deadline)?;
+        note(progress, log, "Building client patch")?;
+        let mut command = Command::new(&cargo);
+        apply_build_env(&mut command, compiler, &rust.join("bin"), &rustc);
+        command
+            .arg("build")
+            .arg("--manifest-path")
+            .arg(checkout.join("AscNet.Patch").join("Cargo.toml"))
+            .args(["--locked", "--release", "--target", RUST_HOST, "--target-dir"])
+            .arg(&target);
+        match run_logged(&mut command, "Building client patch", deadline, progress, log) {
+            Ok(()) => {
+                last = None;
+                break;
+            }
+            Err(error) => {
+                last = Some(error);
+                if attempt == attempts {
+                    break;
+                }
+                note(progress, log, &format!("cargo build failed (attempt {attempt} of {attempts}); retrying"))?;
+            }
+        }
+    }
+    if let Some(error) = last {
+        return Err(error);
+    }
+    let release = target.join(RUST_HOST).join("release");
+    let patch = stage.join("patch");
+    fs::create_dir_all(&patch)?;
+    fs::copy(release.join("lucia.dll"), patch.join("lucia.dll")).context("copy lucia.dll")?;
+    fs::copy(release.join("KRSDK.dll"), patch.join("KRSDK.dll")).context("copy KRSDK.dll")?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn apply_build_env(command: &mut Command, compiler: &Compiler, toolchain_bin: &Path, rustc: &Path) {
+    command.env_clear();
+    let mut path_key = "Path".to_owned();
+    let mut path_value = String::new();
+    for (key, value) in &compiler.vars {
+        if key.eq_ignore_ascii_case("Path") {
+            path_key = key.clone();
+            path_value = value.clone();
+            continue;
+        }
+        if key.eq_ignore_ascii_case("RUSTUP_TOOLCHAIN") || key.eq_ignore_ascii_case("RUSTC") {
+            continue;
+        }
+        command.env(key, value);
+    }
+    let bin = toolchain_bin.display().to_string();
+    let merged = if toolchain_bin.as_os_str().is_empty() {
+        path_value
+    } else if path_value.is_empty() {
+        bin
+    } else {
+        format!("{bin};{path_value}")
+    };
+    command.env(path_key, merged);
+    command.env("RUSTC", rustc);
+    if compiler.wine {
+        command.env("CARGO_BUILD_JOBS", "1");
+    }
+}
+
+#[cfg(windows)]
+fn build_version_shim(compiler: &Compiler, checkout: &Path, stage: &Path, launcher_dir: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    note(progress, log, "Building version loader")?;
+    let patch = stage.join("patch");
+    fs::create_dir_all(&patch)?;
+    let loader = stage.join("loader");
+    fs::create_dir_all(&loader)?;
+    if let Some(msbuild) = &compiler.msbuild {
+        let object = stage.join("loader-obj");
+        fs::create_dir_all(&object)?;
+        let mut command = Command::new(msbuild);
+        apply_build_env(&mut command, compiler, Path::new(""), Path::new("rustc.exe"));
+        command.env_remove("RUSTC");
+        let out_dir = loader.display().to_string().replace('\\', "/");
+        let int_dir = object.display().to_string().replace('\\', "/");
+        command
+            .arg(checkout.join("AscNet.Patch").join("VersionShim").join("src").join("VersionShim.vcxproj"))
+            .args(["/m:1", "/p:Configuration=Release", "/p:Platform=x64"])
+            .arg(format!("/p:OutDir=\"{out_dir}/\""))
+            .arg(format!("/p:IntDir=\"{int_dir}/\""));
+        run_logged(&mut command, "Building version loader", deadline, progress, log)?;
+        fs::copy(loader.join("VersionShim.dll"), patch.join("version.dll")).context("copy version.dll")?;
+    } else {
+        compile_version_shim_with_cl(compiler, checkout, &loader, deadline, progress, log)?;
+        fs::copy(loader.join("VersionShim.dll"), patch.join("version.dll")).context("copy version.dll")?;
+    }
+    fs::write(patch.join("libraries.txt"), "*PGR.exe\nlucia.dll\n")?;
+    fs::copy(launcher_dir.join("supported-client.json"), patch.join("supported-client.json")).context("copy supported-client.json")?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn compile_version_shim_with_cl(compiler: &Compiler, checkout: &Path, loader: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let path = compiler.vars.iter().find(|(key, _)| key.eq_ignore_ascii_case("Path")).map(|(_, value)| value.as_str()).unwrap_or("");
+    let cl = find_on_windows_path(path, "cl.exe").context("vcvars64 did not provide cl.exe")?;
+    let link = find_on_windows_path(path, "link.exe").context("vcvars64 did not provide link.exe")?;
+    let source = checkout.join("AscNet.Patch").join("VersionShim").join("src");
+    let object = loader.join("dllmain.obj");
+    let response = loader.join("cl.rsp");
+    let object_text = object.display().to_string().replace('\\', "/");
+    fs::write(&response, format!("/nologo\n/O1\n/GS-\n/c\n/DNDEBUG\n/DVERSIONSHIM_EXPORTS\n/D_WINDOWS\n/D_USRDLL\n/DPROJECT_NAME=\\\"VersionShim\\\"\n/Fo\"{object_text}\"\ndllmain.c\n"))?;
+    let mut compile = Command::new(&cl);
+    apply_build_env(&mut compile, compiler, Path::new(""), Path::new("rustc.exe"));
+    compile.env_remove("RUSTC");
+    compile.current_dir(&source).arg(quoted_response_file(&response));
+    run_logged(&mut compile, "Compiling version loader", deadline, progress, log)?;
+    let produced = loader.join("VersionShim.dll");
+    let link_response = loader.join("link.rsp");
+    let out = produced.display().to_string().replace('\\', "/");
+    let obj = object.display().to_string().replace('\\', "/");
+    fs::write(&link_response, format!("/DLL\n/NODEFAULTLIB\n/ENTRY:DllMain\n/SUBSYSTEM:WINDOWS\n/OUT:\"{out}\"\n\"{obj}\"\nkernel32.lib\nuser32.lib\n"))?;
+    let mut linker = Command::new(link);
+    apply_build_env(&mut linker, compiler, Path::new(""), Path::new("rustc.exe"));
+    linker.env_remove("RUSTC");
+    linker.current_dir(&source).arg(quoted_response_file(&link_response));
+    run_logged(&mut linker, "Linking version loader", deadline, progress, log)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn find_on_windows_path(path: &str, name: &str) -> Option<PathBuf> {
+    path.split(';').map(str::trim).filter(|dir| !dir.is_empty()).map(|dir| PathBuf::from(dir).join(name)).find(|candidate| candidate.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dotnet_selector_uses_the_first_windows_sdk_zip() {
+        let document = r#"{
+            "channel-version": "8.0",
+            "releases": [
+                {"release-version": "8.0.1", "sdk": {"version": "8.0.1", "files": [
+                    {"name": "dotnet-sdk-win-x64.exe", "rid": "win-x64", "url": "https://example.invalid/sdk.exe", "hash": "aa"},
+                    {"name": "dotnet-sdk-win-x64.zip", "rid": "win-x64", "url": "https://example.invalid/first.zip", "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                ]}},
+                {"sdk": {"files": [
+                    {"name": "dotnet-sdk-win-x64.zip", "url": "https://example.invalid/second.zip", "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+                ]}}
+            ]
+        }"#;
+        let selected = select_dotnet_sdk(document).unwrap();
+        assert_eq!(selected.url, "https://example.invalid/first.zip");
+        assert_eq!(selected.sha512.len(), 128);
+    }
+
+    #[test]
+    fn mongo_selector_prefers_newest_community_zip() {
+        let document = r#"{
+            "versions": [
+                {"version": "8.1.2", "downloads": [{"target": "windows", "arch": "x86_64", "edition": "community", "archive": {"url": "https://example.invalid/81.zip", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}]},
+                {"version": "8.0.4", "downloads": [
+                    {"target": "windows", "arch": "x86_64", "edition": "base", "archive": {"url": "https://example.invalid/base.zip", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}},
+                    {"target": "linux", "arch": "x86_64", "edition": "community", "archive": {"url": "https://example.invalid/linux.tgz", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}},
+                    {"target": "windows", "arch": "x86_64", "edition": "community", "archive": {"url": "https://example.invalid/community.zip", "sha256": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"}}
+                ]},
+                {"version": "7.0.14", "downloads": [{"target": "windows", "arch": "x86_64", "edition": "community", "archive": {"url": "https://example.invalid/7.zip", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}]}
+            ]
+        }"#;
+        let selected = select_mongo_archive(document).unwrap();
+        assert_eq!(selected.version, "8.0.4");
+        assert_eq!(selected.url, "https://example.invalid/community.zip");
+        assert_eq!(selected.sha256.as_deref(), Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"));
+    }
+
+    #[test]
+    fn mongo_selector_leaves_missing_checksum_for_the_sidecar() {
+        let document = r#"{"versions":[{"version":"8.0.10","downloads":[{"target":"windows","arch":"x86_64","edition":"community","archive":{"url":"https://example.invalid/810.zip","sha256":""}}]}]}"#;
+        let selected = select_mongo_archive(document).unwrap();
+        assert_eq!(selected.version, "8.0.10");
+        assert!(selected.sha256.is_none());
+        assert_eq!(first_sha256("abc\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n").as_deref(), Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+    }
+
+    #[test]
+    fn gitconfig_strip_removes_only_the_program_files_include() {
+        let text = "[include]\r\n\tpath = C:/Program Files/Git/etc/gitconfig\r\n\tpath = C:/Other/gitconfig\r\n\tPath = C:\\Program Files\\Git\\etc\\gitconfig\r\n";
+        let stripped = without_program_files_git_include(text);
+        assert!(!stripped.to_ascii_lowercase().contains("program files/git"));
+        assert!(stripped.contains("C:/Other/gitconfig"));
+        assert!(stripped.contains("[include]"));
+    }
+
+    #[test]
+    fn owned_tool_path_requires_a_boundary() {
+        assert!(path_is_within(Path::new(r"C:\AscNet\tools\mongo\mongod.exe"), Path::new(r"C:\AscNet\tools")));
+        assert!(path_is_within(Path::new("/tmp/Tools/mongo/mongod.exe"), Path::new("/tmp/tools")));
+        assert!(!path_is_within(Path::new(r"C:\AscNet\tools-other\mongod.exe"), Path::new(r"C:\AscNet\tools")));
+        assert!(!path_is_within(Path::new(r"C:\AscNet\tools"), Path::new(r"C:\AscNet\tools")));
+    }
+
+    #[test]
+    fn pem_decoder_reads_a_certificate_body() {
+        let body = pem_certificates("-----BEGIN CERTIFICATE-----\nAQIDBA==\n-----END CERTIFICATE-----\nnoise\n").unwrap();
+        assert_eq!(body, vec![vec![1, 2, 3, 4]]);
+    }
+
+    #[test]
+    fn environment_block_keeps_equals_in_values() {
+        let pairs = parse_environment_block("Path=C:\\a;C:\\b\r\nINCLUDE=C:\\inc\r\nnot a pair\r\n");
+        assert_eq!(pairs, vec![("Path".into(), r"C:\a;C:\b".into()), ("INCLUDE".into(), r"C:\inc".into())]);
+    }
+
+    #[test]
+    fn response_file_argument_quotes_windows_paths() {
+        assert_eq!(quoted_response_file(Path::new(r"C:\Users\A B\cl.rsp")), "@\"C:/Users/A B/cl.rsp\"");
+    }
+
+    #[test]
+    fn rust_component_paths_drop_the_two_leading_directories() {
+        let relative = rust_payload_relative(Path::new("rustc-1.92.0-x86_64-pc-windows-msvc/rustc/bin/rustc.exe")).unwrap();
+        assert_eq!(relative, PathBuf::from("bin/rustc.exe"));
+        assert!(rust_payload_relative(Path::new("rustc-1.92.0/rustc/../outside")).is_none());
+    }
+
+    #[test]
+    fn network_config_preserves_other_fields_and_checks_the_reserved_ports() {
+        let mut config = serde_json::json!({"SkipCommonGuides": false, "VerboseLevel": "Debug"});
+        apply_network(&mut config, 2335, 27017);
+        assert_eq!(config["SkipCommonGuides"], false);
+        assert!(network_matches(&config, 2335, 27017));
+        assert!(!network_matches(&config, 2336, 27017));
+    }
+
+    #[test]
+    fn occupied_port_is_refused() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let error = assert_port_free(port, "fixture").unwrap_err().to_string();
+        assert!(error.contains("already in use"), "{error}");
+    }
+
+    #[test]
+    fn checkout_clones_fast_forwards_and_refuses_dirty_or_divergent_history() {
+        let temp = env::temp_dir().join(format!("ascnet-setup-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&temp).unwrap();
+        let origin = temp.join("origin");
+        let checkout = temp.join("checkout");
+        let git = Path::new("git");
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let mut progress = |_: &str| {};
+        let mut log = |_: &str| Ok(());
+        let run = |args: &[&str]| {
+            let mut command = Command::new(git);
+            command.args(["-c", "commit.gpgsign=false", "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture"]);
+            command.args(args);
+            let output = command.output().unwrap();
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        };
+        run(&["init", "--initial-branch=master", origin.to_str().unwrap()]);
+        fs::write(origin.join("value.txt"), "one").unwrap();
+        run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "add", "value.txt"]);
+        run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-m", "one"]);
+        update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap();
+        assert_eq!(fs::read_to_string(checkout.join("value.txt")).unwrap(), "one");
+        fs::create_dir_all(origin.join("AscNet.Launcher")).unwrap();
+        fs::write(origin.join("AscNet.Launcher").join("setup-local.ps1"), "obsolete").unwrap();
+        run(&["-C", origin.to_str().unwrap(), "add", "AscNet.Launcher/setup-local.ps1"]);
+        run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-m", "obsolete setup"]);
+        update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap();
+        assert_eq!(fs::read_to_string(checkout.join("AscNet.Launcher").join("setup-local.ps1")).unwrap(), "obsolete");
+
+        fs::write(origin.join("value.txt"), "two").unwrap();
+        run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-am", "two"]);
+        update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap();
+        assert_eq!(fs::read_to_string(checkout.join("value.txt")).unwrap(), "two");
+
+        fs::write(checkout.join("value.txt"), "user changes").unwrap();
+        let error = update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap_err().to_string();
+        assert!(error.contains("local changes"), "{error}");
+        assert_eq!(fs::read_to_string(checkout.join("value.txt")).unwrap(), "user changes");
+        fs::write(checkout.join("value.txt"), "two").unwrap();
+
+        fs::write(checkout.join("local.txt"), "local commit").unwrap();
+        run(&["-C", checkout.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "add", "local.txt"]);
+        run(&["-C", checkout.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-m", "local"]);
+        fs::write(origin.join("remote.txt"), "remote commit").unwrap();
+        run(&["-C", origin.to_str().unwrap(), "add", "remote.txt"]);
+        run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-m", "remote"]);
+        let before = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
+        let error = update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap_err();
+        let after = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
+        assert!(format!("{error:#}").contains("Fast-forward") || format!("{error:#}").contains("exit code"), "{error:#}");
+        assert_eq!(before, after);
+        fs::remove_dir_all(temp).unwrap();
+    }
+}

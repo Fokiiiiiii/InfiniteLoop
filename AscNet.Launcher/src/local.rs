@@ -1,21 +1,26 @@
 use anyhow::{bail, Context, Result};
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::{BufRead, BufReader, Write},
+    io::Write,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Mutex,
+        Mutex,
     },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+#[cfg(test)]
+use std::{
+    io::{BufRead, BufReader},
+    sync::mpsc,
+};
 
-const SCHEMA_VERSION: u32 = 1;
+pub(crate) const SCHEMA_VERSION: u32 = 1;
 const START_TIMEOUT: Duration = Duration::from_secs(45);
 const SETUP_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -114,8 +119,9 @@ fn summarize_error(action: &str, error: &anyhow::Error) -> String {
 
 #[cfg(test)]
 mod summary_tests {
-    use super::summarize_error;
+    use super::{mongo_arguments, summarize_error};
     use anyhow::anyhow;
+    use std::path::Path;
 
     #[test]
     fn network_failures_collapse_to_offline() {
@@ -135,8 +141,18 @@ mod summary_tests {
         let error = anyhow!("disk full").context("Staged update is invalid\nsecond line");
         assert_eq!(summarize_error("do it", &error), "Couldn't do it: Staged update is invalid");
     }
+
+    #[test]
+    fn wine_mongod_disables_diagnostic_collection() {
+        let owned = mongo_arguments(Path::new(r"C:\data\mongo"), 27017, false);
+        let plain: Vec<_> = owned.iter().map(String::as_str).collect();
+        assert_eq!(plain, ["--bind_ip", "127.0.0.1", "--dbpath", r"C:\data\mongo", "--port", "27017"]);
+        let wine = mongo_arguments(Path::new(r"C:\data\mongo"), 27017, true);
+        assert_eq!(wine[wine.len() - 2], "--setParameter");
+        assert_eq!(wine.last().map(String::as_str), Some("diagnosticDataCollectionEnabled=false"));
+    }
 }
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBuild {
     pub schema_version: u32,
@@ -193,6 +209,7 @@ pub fn prepare(
     log.finish(result)
 }
 
+#[cfg_attr(not(windows), allow(unreachable_code, unused_variables))]
 fn prepare_logged(
     repository: &str,
     branch: &str,
@@ -209,44 +226,27 @@ fn prepare_logged(
     fs::create_dir_all(&root).with_context(|| format!("create {}", root.display()))?;
     #[cfg(windows)]
     let _setup_lock = open_setup_lock(&root)?;
-    let script = env::current_exe()?
+    let launcher_dir = env::current_exe()?
         .parent()
         .context("launcher executable has no parent directory")?
-        .join("setup-local.ps1");
-    if !script.is_file() {
-        bail!("local setup script is missing: {}", script.display());
+        .to_path_buf();
+    let supported = launcher_dir.join("supported-client.json");
+    if !supported.is_file() {
+        bail!("supported client manifest is missing: {}", supported.display());
     }
-    // Refuse before setup-local.ps1 installs dependencies for a client we cannot patch.
-    crate::package::check_supported_client(&script.with_file_name("supported-client.json"), game)?;
+    // Refuse before setup installs dependencies for a client we cannot patch.
+    crate::package::check_supported_client(&supported, game)?;
 
     progress("Starting local source setup");
-    #[cfg(windows)]
-    let setup_job = create_job()?;
-    let mut child = OwnedChild(
-        hide_console(&mut Command::new("powershell.exe"))
-            .args([
-                "-NoLogo",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-            ])
-            .arg(&script)
-            .arg("-Root")
-            .arg(&root)
-            .arg("-Repository")
-            .arg(repository)
-            .arg("-Branch")
-            .arg(branch)
-            .arg("-SetupLockHeld")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .context("start PowerShell local setup")?,
-    );
-    #[cfg(windows)]
-    assign_to_job(&setup_job, &child.0)?;
-    capture_setup(&mut child.0, log, progress, SETUP_TIMEOUT)?;
+    crate::setup::run(
+        &root,
+        repository,
+        branch,
+        &launcher_dir,
+        progress,
+        &mut |line| log.write(line),
+        Instant::now() + SETUP_TIMEOUT,
+    )?;
     let pending = root.join("build-state.pending.json");
     let bytes = fs::read(&pending).with_context(|| format!("read {}", pending.display()))?;
     let build: LocalBuild =
@@ -254,10 +254,7 @@ fn prepare_logged(
     validate_build(&root, &build)?;
     crate::package::refresh_supported_client(
         &build.patch_directory,
-        &script
-            .parent()
-            .context("local setup script has no parent directory")?
-            .join("supported-client.json"),
+        &launcher_dir.join("supported-client.json"),
     )?;
     let package = crate::package::load_package(&build.patch_directory)
         .context("validate prepared patch package")?;
@@ -276,6 +273,7 @@ fn prepare_logged(
     Ok(build)
 }
 
+#[cfg(test)]
 fn capture_setup(
     child: &mut Child,
     log: &mut LauncherLog,
@@ -451,10 +449,10 @@ mod update_tests {
             String::from_utf8(output.stdout).unwrap().trim().to_owned()
         };
         git(&["init", "--initial-branch=master"]);
-        git(&["-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
+        git(&["-c", "commit.gpgsign=false", "-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
             "commit", "--allow-empty", "-m", "active build"]);
         let active_revision = git(&["rev-parse", "HEAD"]);
-        git(&["-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
+        git(&["-c", "commit.gpgsign=false", "-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
             "commit", "--allow-empty", "-m", "checkout advanced before failed build"]);
         let remote_revision = git(&["rev-parse", "HEAD"]);
         let repository = directory.to_str().unwrap();
@@ -511,12 +509,14 @@ impl LocalRuntime {
                 .create(true)
                 .append(true)
                 .open(root.join("logs/mongod.log"))?;
+            let mongo_args = mongo_arguments(
+                &root.join("data/mongo"),
+                build.mongo_port,
+                crate::install::running_under_wine(),
+            );
             let mut mongo = OwnedChild(
                 Command::new(&build.mongod)
-                    .args(["--bind_ip", "127.0.0.1", "--dbpath"])
-                    .arg(root.join("data/mongo"))
-                    .arg("--port")
-                    .arg(build.mongo_port.to_string())
+                    .args(&mongo_args)
                     .stdout(mongo_log.try_clone()?)
                     .stderr(mongo_log)
                     .creation_flags(CREATE_NO_WINDOW.0)
@@ -621,25 +621,85 @@ impl LocalRuntime {
         Ok(())
     }
 }
-fn git_executable() -> Option<PathBuf> {
-    if let Some(path) = env::var_os("PATH").and_then(|path| {
-        env::split_paths(&path)
-            .map(|directory| directory.join("git.exe"))
-            .find(|candidate| candidate.is_file())
-    }) {
-        return Some(path);
+fn mongo_arguments(dbpath: &Path, port: u16, wine: bool) -> Vec<String> {
+    let mut args = vec![
+        "--bind_ip".to_owned(),
+        "127.0.0.1".to_owned(),
+        "--dbpath".to_owned(),
+        dbpath.display().to_string(),
+        "--port".to_owned(),
+        port.to_string(),
+    ];
+    if wine {
+        args.push("--setParameter".to_owned());
+        args.push("diagnosticDataCollectionEnabled=false".to_owned());
     }
-    ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"]
-        .into_iter()
-        .filter_map(env::var_os)
-        .map(PathBuf::from)
-        .flat_map(|base| {
-            [
-                base.join("Git/cmd/git.exe"),
-                base.join("Programs/Git/cmd/git.exe"),
-            ]
-        })
-        .find(|candidate| candidate.is_file())
+    args
+}
+
+enum GitProbe {
+    Ready,
+    IncludeDepth,
+    Failed,
+}
+
+fn probe_git(path: &Path) -> GitProbe {
+    if !path.is_file() {
+        return GitProbe::Failed;
+    }
+    let mut command = Command::new(path);
+    command.arg("--version").env("GIT_TERMINAL_PROMPT", "0");
+    match command_output_timeout(command, Duration::from_secs(20)) {
+        Ok(output) if output.status.success() => GitProbe::Ready,
+        Ok(output) => {
+            let text = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            if text.contains("exceeded maximum include depth") {
+                GitProbe::IncludeDepth
+            } else {
+                GitProbe::Failed
+            }
+        }
+        Err(_) => GitProbe::Failed,
+    }
+}
+
+fn git_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = env::var_os("PATH") {
+        candidates.extend(env::split_paths(&path).map(|directory| directory.join("git.exe")));
+    }
+    for key in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+        if let Some(base) = env::var_os(key) {
+            let base = PathBuf::from(base);
+            candidates.push(base.join("Git/cmd/git.exe"));
+            candidates.push(base.join("Programs/Git/cmd/git.exe"));
+        }
+    }
+    if let Ok(root) = root() {
+        candidates.push(root.join("tools/git/cmd/git.exe"));
+    }
+    candidates
+}
+
+pub(crate) fn git_executable() -> Option<PathBuf> {
+    for candidate in git_candidates() {
+        match probe_git(&candidate) {
+            GitProbe::Ready => return Some(candidate),
+            GitProbe::IncludeDepth
+                if crate::install::running_under_wine() && crate::setup::repair_git_include(&candidate) =>
+            {
+                if matches!(probe_git(&candidate), GitProbe::Ready) {
+                    return Some(candidate);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 struct OwnedChild(Child);
@@ -658,6 +718,7 @@ impl Drop for OperationPermit {
     }
 }
 
+#[cfg(test)]
 fn stream_lines<R: std::io::Read + Send + 'static>(
     stream: R,
     send: mpsc::Sender<std::io::Result<String>>,
@@ -894,7 +955,7 @@ fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std
     }
 }
 #[cfg(windows)]
-fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
+pub(crate) fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows::{
         core::PCWSTR,
@@ -919,7 +980,7 @@ fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
 }
 
 #[cfg(windows)]
-struct JobHandle(windows::Win32::Foundation::HANDLE);
+pub(crate) struct JobHandle(windows::Win32::Foundation::HANDLE);
 
 #[cfg(windows)]
 impl Drop for JobHandle {
@@ -933,7 +994,7 @@ impl Drop for JobHandle {
 }
 
 #[cfg(windows)]
-fn create_job() -> Result<JobHandle> {
+pub(crate) fn create_job() -> Result<JobHandle> {
     use windows::Win32::System::JobObjects::{
         CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -953,7 +1014,7 @@ fn create_job() -> Result<JobHandle> {
 }
 
 #[cfg(windows)]
-fn assign_to_job(job: &JobHandle, child: &Child) -> Result<()> {
+pub(crate) fn assign_to_job(job: &JobHandle, child: &Child) -> Result<()> {
     use std::os::windows::io::AsRawHandle;
     use windows::Win32::{Foundation::HANDLE, System::JobObjects::AssignProcessToJobObject};
     unsafe {

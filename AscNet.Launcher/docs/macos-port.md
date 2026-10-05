@@ -23,7 +23,7 @@ Status: design agreed 2026-09-27; not implemented. Related: `client-download.md`
      version pins its pattern in `supported-client.json`; the launcher never guesses.
    - Unity startup stub: already implemented in `src/pgrbase.rs`.
    `supported-client.json` already accepts the Rosetta-patched `GameAssembly.dll` hash.
-5. Server: macOS equivalent of `setup-local.ps1` installs the .NET 8 SDK and MongoDB from official archives
+5. Server: macOS setup installs the .NET 8 SDK and MongoDB from official archives
    (not Homebrew), clones/builds AscNet, and builds or downloads AscNet.Patch (Windows DLLs).
 6. Install the AscNet patch (lucia.dll, version.dll, KRSDK.dll) with the existing `install.rs`.
 7. Launch `wineloader PGR.exe` from the game directory with the environment from `launch-pgr-ascnet.sh`

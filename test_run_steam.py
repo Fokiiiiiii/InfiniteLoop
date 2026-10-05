@@ -238,5 +238,25 @@ class ClientRegionTests(unittest.TestCase):
             self.assertEqual(("kr", run_steam.REGION_IDENTITIES["kr"], "table"), run_steam.resolve_region(client, "kr"))
 
 
+class WineLaunchEnvTests(unittest.TestCase):
+    def test_version_override_is_merged_once(self):
+        self.assertEqual(run_steam.merge_version_dll_override(""), "version=n,b")
+        self.assertEqual(run_steam.merge_version_dll_override("d3d11,dxgi=n,b"), "d3d11,dxgi=n,b;version=n,b")
+        self.assertEqual(run_steam.merge_version_dll_override("d3d11,dxgi=n,b;"), "d3d11,dxgi=n,b;version=n,b")
+        self.assertEqual(run_steam.merge_version_dll_override("version=n,b"), "version=n,b")
+        self.assertEqual(run_steam.merge_version_dll_override("d3d11,version=n"), "d3d11,version=n")
+
+    def test_windows_mongod_on_linux_disables_ftdc(self):
+        with patch.object(run_steam.sys, "platform", "linux"):
+            command = run_steam.local_mongod_command(r"C:\mongo\mongod.exe", "/data", "127.0.0.1", 27017, "/data/mongod.log")
+        self.assertEqual(command[-2:], ["--setParameter", "diagnosticDataCollectionEnabled=false"])
+        with patch.object(run_steam.sys, "platform", "win32"):
+            native = run_steam.local_mongod_command("mongod.exe", r"C:\data", "127.0.0.1", 27017, r"C:\data\mongod.log")
+        self.assertNotIn("--setParameter", native)
+        with patch.object(run_steam.sys, "platform", "linux"):
+            unix = run_steam.local_mongod_command("/usr/bin/mongod", "/data", "127.0.0.1", 27017, "/data/mongod.log")
+        self.assertNotIn("--setParameter", unix)
+
+
 if __name__ == "__main__":
     unittest.main()

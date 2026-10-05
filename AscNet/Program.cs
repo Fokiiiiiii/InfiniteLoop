@@ -23,7 +23,7 @@ namespace AscNet
             LoggerFactory.InitializeLogger(new Logger(typeof(Program), LogLevel.DEBUG, LogLevel.DEBUG));
             LoggerFactory.Info("Starting...", memberName: "");
 
-            Player.EnsureIndexes();
+            EnsureIndexesReady();
             PacketFactory.LoadPacketHandlers();
             CommandFactory.LoadCommands();
 
@@ -35,11 +35,58 @@ namespace AscNet
             if (Environment.GetEnvironmentVariable("ASCNET_MANAGED_STDIN") == "1")
                 new Thread(() =>
                 {
-                    Console.In.ReadLine();
-                    Environment.Exit(0);
+                    try
+                    {
+                        while (true)
+                        {
+                            string? line;
+                            try
+                            {
+                                line = Console.In.ReadLine();
+                            }
+                            catch (IOException)
+                            {
+                                return;
+                            }
+                            if (line == null)
+                                return;
+                            if (line.Trim().Equals("shutdown", StringComparison.OrdinalIgnoreCase))
+                                Environment.Exit(0);
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        return;
+                    }
                 }) { IsBackground = true }.Start();
 
             return 0;
+        }
+
+        static void EnsureIndexesReady()
+        {
+            const int attempts = 5;
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    Player.EnsureIndexes();
+                    return;
+                }
+                catch (Exception ex) when (attempt < attempts && IsTransientMongo(ex))
+                {
+                    LoggerFactory.Warn($"MongoDB is not ready for index setup (attempt {attempt} of {attempts}): {ex.Message}");
+                    Thread.Sleep(TimeSpan.FromMilliseconds(400 * attempt));
+                }
+            }
+        }
+
+        static bool IsTransientMongo(Exception ex)
+        {
+            for (Exception? current = ex; current != null; current = current.InnerException)
+                if (current is MongoConnectionException or TimeoutException or IOException or System.Net.Sockets.SocketException)
+                    return true;
+            return false;
         }
 
         static int ShutdownLocalMongo(string[] args)

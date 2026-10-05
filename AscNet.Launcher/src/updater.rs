@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs::{self, File, OpenOptions}, io::{Read, Write}, path::{Path, PathBuf}, process::Command, time::{Duration, Instant}};
 use crate::package::sha256_file;
 
-const FILES: [&str; 7] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "setup-local.ps1", "supported-client.json"];
+const FILES: [&str; 6] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "supported-client.json"];
 const MAX_ARCHIVE: u64 = 128 * 1024 * 1024;
 const MAX_EXPANDED: u64 = 256 * 1024 * 1024;
 const TRANSACTION: &str = ".ascnet-launcher-update";
@@ -142,7 +142,7 @@ fn synced_write(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn extract(archive: &Path, target: &Path, version: &str) -> Result<BTreeMap<String, String>> {
     let mut zip = zip::ZipArchive::new(File::open(archive)?)?;
-    ensure!(zip.len() == FILES.len(), "launcher ZIP must contain exactly seven flat files");
+    ensure!(zip.len() == FILES.len(), "launcher ZIP must contain exactly {} flat files", FILES.len());
     let mut hashes = BTreeMap::new();
     let mut expanded = 0u64;
     for index in 0..zip.len() {
