@@ -2018,15 +2018,19 @@ fn start_prepare(hwnd: HWND, state: &mut Window) {
     thread::spawn(move || {
         let result = (|| {
             let mut progress = |s: &str| post_progress(hwnd, &events, s);
+            install::log_action("Setup", &game, None, None);
             let build = local::prepare(&config.repository_url, &config.branch, &game, &mut progress)?;
             let package = package::load_package(&build.patch_directory)?;
-            let patch = install::inspect(&game, &package)?;
+            let patch = install::inspect(&game, &package);
+            install::log_action("Setup", &game, Some(&package), patch.as_ref().ok());
+            let patch = patch?;
             Ok(WorkResult::Prepared {
                 build,
                 package,
                 patch,
             })
         })();
+        let result = install::log_result("Setup", result);
         post_event(hwnd, &events, Event::Work(Work { generation, result }));
     });
 }
@@ -2064,9 +2068,11 @@ fn start_restore(hwnd: HWND, state: &mut Window) {
                 .selected_game
                 .clone()
                 .context("Select a game folder")?;
+            install::log_action("Restore", &game, None, None);
             install::restore_with_consent(&game, &mut |s| post_progress(hwnd, &events, &s))?;
             Ok(WorkResult::Restored)
         })();
+        let result = install::log_result("Restore", result);
         post_event(hwnd, &events, Event::Work(Work { generation, result }));
     });
 }
@@ -2104,7 +2110,9 @@ fn start_play(hwnd: HWND, state: &mut Window) {
     unsafe { set_busy(hwnd, true, "Checking game and resource access…") };
     thread::spawn(move || {
         let result = (|| {
-            let patch = install::inspect(&game, &package)?;
+            let patch = install::inspect(&game, &package);
+            install::log_action("Play", &game, Some(&package), patch.as_ref().ok());
+            let patch = patch?;
             if !matches!(patch, PatchState::Current) {
                 anyhow::bail!("Run Setup / Update to install the current local patch")
             }
@@ -2130,6 +2138,7 @@ fn start_play(hwnd: HWND, state: &mut Window) {
                 server,
             })
         })();
+        let result = install::log_result("Play", result);
         post_event(hwnd, &events, Event::Work(Work { generation, result }));
     });
 }

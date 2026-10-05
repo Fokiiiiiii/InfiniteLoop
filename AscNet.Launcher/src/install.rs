@@ -1,4 +1,4 @@
-use crate::package::{client_region, compare_versions, sha256_file, validate_server_origin, PatchPackage, Region, KRSDK};
+use crate::package::{client_region, is_cn_layout, compare_versions, sha256_file, validate_server_origin, PatchPackage, Region, KRSDK};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -31,6 +31,16 @@ struct State {
     release_version: String,
     originals: BTreeMap<String, String>,
     files: BTreeMap<String, FileState>,
+    /// A leftover `KRSDK.dll` moved out of a CN folder; `restore` puts it back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    stray: Option<Stray>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Stray {
+    sha256: String,
+    backup: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,9 +83,15 @@ struct PreparedPgrBase {
     observed: String,
 }
 
-/// Global clients ship KRSDK.dll (replaced by the patch); CN ones never have it (`prepare_pgrbase` validated the SDK pair).
+/// Global clients ship KRSDK.dll (replaced by the patch); CN ones never have a retail one, so a CN-layout folder's
+/// KRSDK.dll is a leftover (`prepare_pgrbase` validated the SDK pair).
 fn is_global(client: &Path) -> bool {
-    client.join(KRSDK).exists()
+    !is_cn_layout(client) && client.join(KRSDK).exists()
+}
+
+/// A leftover KRSDK.dll in a CN folder: never retail, removed (and backed up) by install.
+fn has_stray(client: &Path) -> bool {
+    is_cn_layout(client) && client.join(KRSDK).exists()
 }
 
 /// Stock PGRBase.dll candidate for `current`: the first known stock export entry whose recovery hashes into `originals`.
@@ -205,7 +221,7 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
             all_original &= new_base || old.is_some_and(|old| actual.as_deref() == old.original.as_deref());
         }
         if all_target {
-            return Ok(PatchState::Current);
+            return Ok(if has_stray(client) { PatchState::UpdateAvailable } else { PatchState::Current });
         }
         if all_original {
             return Ok(PatchState::Unpatched);
@@ -265,6 +281,34 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
     Ok(PatchState::Unpatched)
 }
 
+/// One launcher.log line: the action, the game folder, the detected region (or why detection failed) and the
+/// patch state (`managed=` whether launcher state exists when no inspection was made).
+pub fn log_action(action: &str, game: &Path, package: Option<&PatchPackage>, patch: Option<&PatchState>) {
+    let region = match package {
+        Some(p) => match client_region(&p.manifest.application_version, &p.manifest.originals, game) {
+            Ok(region) => format!("{region:?}"),
+            Err(error) => format!("error: {error:#}"),
+        },
+        None if is_cn_layout(game) => "CN".into(),
+        None if game.join(KRSDK).exists() => "Global".into(),
+        None => "unknown".into(),
+    };
+    let patch = match patch {
+        Some(patch) => format!("{patch:?}"),
+        None => format!("managed={}", read_state(game).map(|state| state.is_some()).unwrap_or(false)),
+    };
+    let _ = crate::local::launcher_log(&format!("{action}: game={} region={region} patch={patch}", game.display()));
+}
+
+/// Logs the outcome (or the full error chain) of `action`; passes the result through.
+pub fn log_result<T>(action: &str, result: Result<T>) -> Result<T> {
+    let _ = crate::local::launcher_log(&match &result {
+        Ok(_) => format!("{action}: ok"),
+        Err(error) => format!("{action}: failed: {error:#}"),
+    });
+    result
+}
+
 /// A declined UAC request is cancellation, not a failed transaction.
 #[derive(Debug)]
 pub struct ElevationCancelled;
@@ -306,6 +350,11 @@ pub fn restore_with_consent(client: &Path, progress: &mut dyn FnMut(String)) -> 
         let state = read_state(&client)?.context("no launcher-managed installation to restore")?;
         verify_saved_backups(&client, &state)?;
         elevate(&client, None, progress)?;
+        if let Some(stray) = &state.stray {
+            if file_hash(&client.join(KRSDK))?.as_deref() != Some(&stray.sha256) {
+                bail!("elevated restore did not restore the leftover KRSDK.dll");
+            }
+        }
         for (relative, record) in state.files {
             if file_hash(&client.join(&relative))? != record.original {
                 bail!("elevated restore did not restore the verified original: {relative}");
@@ -629,6 +678,21 @@ pub fn install(
     let backup_root = backup_parent.join(&id);
     create_private_dir(&backup_root)?;
     let mut files = BTreeMap::new();
+    let stray_target = client.join(KRSDK);
+    let remove_stray = has_stray(&client);
+    let mut stray = prior.as_ref().and_then(|state| state.stray.clone());
+    if remove_stray {
+        check_target(&client, &stray_target)?;
+        let hash = sha256_file(&stray_target)?;
+        if stray.as_ref().map(|s| &s.sha256) != Some(&hash) {
+            let dest = backup_root.join(KRSDK);
+            atomic_copy(&stray_target, &dest)?;
+            if sha256_file(&dest)? != hash {
+                bail!("backup verification failed: {KRSDK}");
+            }
+            stray = Some(Stray { sha256: hash, backup: format!("backups/{id}/{KRSDK}") });
+        }
+    }
     for file in &package.manifest.files {
         let target = client.join(&file.path);
         check_target(&client, &target)?;
@@ -688,6 +752,7 @@ pub fn install(
         release_version: package.manifest.version.clone(),
         originals,
         files,
+        stray,
     };
     verify_saved_backups_at(&client, &state, &state_root)?;
 
@@ -707,22 +772,22 @@ pub fn install(
         &format!("{STATE_DIR}/{STATE_FILE}"),
         &mut rollback,
     )?;
-    for file in &package.manifest.files {
-        let target = client.join(&file.path);
+    for path in package.manifest.files.iter().map(|file| file.path.as_str()).chain(remove_stray.then_some(KRSDK)) {
+        let target = client.join(path);
         if target.is_file() {
             let hash = sha256_file(&target)?;
-            let saved = rollback_root.join(&file.path);
+            let saved = rollback_root.join(path);
             atomic_copy(&target, &saved)?;
             rollback.insert(
-                file.path.clone(),
+                path.to_owned(),
                 RollbackFile {
                     hash: Some(hash),
-                    backup: Some(format!("rollback/{id}/{}", file.path.replace('\\', "/"))),
+                    backup: Some(format!("rollback/{id}/{}", path.replace('\\', "/"))),
                 },
             );
         } else {
             rollback.insert(
-                file.path.clone(),
+                path.to_owned(),
                 RollbackFile {
                     hash: None,
                     backup: None,
@@ -764,6 +829,10 @@ pub fn install(
                 bail!("installed-file verification failed: {}", file.path);
             }
         }
+        if remove_stray {
+            fs::remove_file(&stray_target)?;
+            sync_dir(stray_target.parent().unwrap())?;
+        }
         write_json_atomic(&state_root.join(STATE_FILE), &state)?;
         Ok(())
     })();
@@ -774,6 +843,12 @@ pub fn install(
     fs::remove_file(state_root.join(JOURNAL_FILE))?;
     remove_rollback_directory(&rollback_root);
     sync_dir(&state_root)?;
+    if let (true, Some(stray)) = (remove_stray, &state.stray) {
+        progress(format!(
+            "Removed leftover KRSDK.dll from a CN client (backed up to {})",
+            state_root.join(&stray.backup).display()
+        ));
+    }
     Ok(state_root.join(STATE_FILE))
 }
 
@@ -796,6 +871,13 @@ pub fn restore(client: &Path, progress: &mut dyn FnMut(String)) -> Result<()> {
             bail!("refusing to overwrite modified managed file: {relative}");
         }
     }
+    if let Some(stray) = &state.stray {
+        let target = client.join(KRSDK);
+        check_target(&client, &target)?;
+        if file_hash(&target)?.is_some_and(|hash| hash != stray.sha256) {
+            bail!("refusing to overwrite a different {KRSDK}");
+        }
+    }
     let state_root = client.join(STATE_DIR);
     let id = Uuid::new_v4().to_string();
     let rollback_root = state_root.join("rollback").join(&id);
@@ -809,13 +891,13 @@ pub fn restore(client: &Path, progress: &mut dyn FnMut(String)) -> Result<()> {
         &format!("{STATE_DIR}/{STATE_FILE}"),
         &mut rollback,
     )?;
-    for (relative, _) in &state.files {
+    for relative in state.files.keys().map(String::as_str).chain(state.stray.as_ref().map(|_| KRSDK)) {
         let target = client.join(relative);
         if target.is_file() {
             let saved = rollback_root.join(relative);
             atomic_copy(&target, &saved)?;
             rollback.insert(
-                relative.clone(),
+                relative.to_owned(),
                 RollbackFile {
                     hash: Some(sha256_file(&target)?),
                     backup: Some(format!("rollback/{id}/{}", relative.replace('\\', "/"))),
@@ -823,7 +905,7 @@ pub fn restore(client: &Path, progress: &mut dyn FnMut(String)) -> Result<()> {
             );
         } else {
             rollback.insert(
-                relative.clone(),
+                relative.to_owned(),
                 RollbackFile {
                     hash: None,
                     backup: None,
@@ -848,6 +930,10 @@ pub fn restore(client: &Path, progress: &mut dyn FnMut(String)) -> Result<()> {
                 fs::remove_file(&target)?;
                 sync_dir(target.parent().unwrap())?;
             }
+        }
+        if let Some(stray) = &state.stray {
+            progress(format!("Restoring leftover {KRSDK}"));
+            atomic_copy(&state_root.join(&stray.backup), &client.join(KRSDK))?;
         }
         fs::remove_file(state_root.join(STATE_FILE))?;
         sync_dir(&state_root)?;
@@ -1309,6 +1395,14 @@ fn verify_saved_backups_at(client: &Path, state: &State, root: &Path) -> Result<
             _ => bail!("invalid backup record: {relative}"),
         }
     }
+    if let Some(stray) = &state.stray {
+        validate_relative(&stray.backup)?;
+        let path = root.join(&stray.backup);
+        check_contained(root, &path)?;
+        if file_hash(&path)?.as_deref() != Some(&stray.sha256) {
+            bail!("backup is missing or modified: {KRSDK}");
+        }
+    }
     let _ = client;
     Ok(())
 }
@@ -1506,6 +1600,7 @@ fn adopt_legacy(client: &Path, package: &PatchPackage) -> Result<Option<State>> 
         release_version: "legacy".into(),
         originals: legacy.pinned_client,
         files,
+        stray: None,
     }))
 }
 
@@ -1748,6 +1843,7 @@ mod tests {
                     backup: Some("backups/x/a".into()),
                 },
             )]),
+            stray: None,
         };
         assert!(verify_saved_backups(&client, &state).is_err());
         let _ = fs::remove_dir_all(client);
@@ -1791,6 +1887,7 @@ mod tests {
                     backup: None,
                 },
             )]),
+            stray: None,
         };
         write_json_atomic(&root.join(STATE_FILE), &state).unwrap();
         let error = restore(&client, &mut |_| {}).unwrap_err().to_string();
@@ -2123,7 +2220,8 @@ mod tests {
         let root = temp();
         let client = root.join("game");
         let directory = root.join("package");
-        fs::create_dir_all(client.join("PGR_Data/Plugins")).unwrap();
+        fs::create_dir_all(client.join("PGR_Data/Plugins/KRSDKRes")).unwrap();
+        fs::write(client.join("PGR_Data/Plugins/KRSDKRes/KRSDKConfig.json"), b"{}").unwrap();
         fs::create_dir_all(&directory).unwrap();
         let retail = [
             ("PGR.exe", b"cn-exe".as_slice()),
@@ -2188,6 +2286,30 @@ mod tests {
         }
         assert!(read_state(&client).unwrap().is_none());
         assert_eq!(sdk_bytes(), sdk_before);
+
+        // A leftover AscNet KRSDK.dll is not a global client: Setup backs it up and removes it, Restore returns it.
+        let stray = client.join(KRSDK);
+        fs::write(&stray, b"leftover-asc-sdk").unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Unpatched);
+        let mut lines = Vec::new();
+        install(&client, &package, &mut |line| lines.push(line)).unwrap();
+        assert!(!stray.exists());
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
+        assert!(lines.iter().any(|l| l.starts_with("Removed leftover KRSDK.dll from a CN client (backed up to ")), "{lines:?}");
+        assert_eq!(read_state(&client).unwrap().unwrap().originals.keys().count(), 2);
+        // Copying it back afterwards is detected again, and a second Setup keeps the first backup recoverable.
+        fs::write(&stray, b"leftover-asc-sdk").unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::UpdateAvailable);
+        install(&client, &package, &mut |_| {}).unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
+        restore(&client, &mut |_| {}).unwrap();
+        assert_eq!(fs::read(&stray).unwrap(), b"leftover-asc-sdk");
+        for installed in ["version.dll", "lucia.dll", "libraries.txt"] {
+            assert!(!client.join(installed).exists(), "{installed}");
+        }
+        assert!(read_state(&client).unwrap().is_none());
+        assert_eq!(sdk_bytes(), sdk_before);
+        fs::remove_file(&stray).unwrap();
 
         // An SDK build outside the allowlist (or a folder with no SDK at all) is refused, nothing written.
         fs::write(client.join("PGR_Data/Plugins/KRSDKEx.dll"), b"cn-sdk-ex-other").unwrap();

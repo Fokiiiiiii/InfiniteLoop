@@ -63,9 +63,23 @@ Format: `[lucia|KRSDK] FAILED <what was looked up>: <reason> | send: ascnet-patc
 
 When `lucia` fails, native routing stays off and the client talks to the retail servers.
 
+## launcher.log (beside `AscNet.Launcher.exe`)
+
+Setup, Restore, Play and the official-client download/update each write one line naming the selected game folder, the
+detected region (or why detection failed), the patch state before the action, and the outcome or the full error:
+
+```
+Setup: game=D:\Games\PGR region=CN patch=Unpatched
+Play: failed: refusing installation: unsupported client: ...
+```
+
+The region comes from the SDK files: `KRSDKEx.dll` + `KRSDKRes/KRSDKConfig.json` without `KRSDKRes/KRSDK.bin` is CN, even
+if a `KRSDK.dll` is present.
+
 ## China (CN) client
 
-The CN client (战双帕弥什) has no `KRSDK.dll` and no `KRSDK.bin`; it ships the official SDK
+The CN client (战双帕弥什) has no `KRSDK.dll` and no `KRSDK.bin`, and a CN folder must not contain `KRSDK.dll`: Setup moves a
+leftover one (an old patch or a manual copy) into `.ascnet-launcher/backups/` and Restore puts it back; it ships the official SDK
 (`PGR_Data/Plugins/KRSDKEx.dll`, `libkrsdkcurl.dll`, `KRSDKRes/KRSDKConfig.json`). The Launcher installs only
 `version.dll`, `lucia.dll`, `libraries.txt` and the generated `PGRBase.dll`; `PGR.exe`, `GameAssembly.dll`, `KRSDKEx.dll`
 and `libkrsdkcurl.dll` are only hash-checked against `supported-client.json` (never modified or backed up), and

@@ -22,6 +22,8 @@ const REQUIRED_FILES: [(&str, &str); 4] = [
 pub const KRSDK: &str = "PGR_Data/Plugins/KRSDK.dll";
 const KRSDK_EX: &str = "PGR_Data/Plugins/KRSDKEx.dll";
 const KRSDK_CURL: &str = "PGR_Data/Plugins/libkrsdkcurl.dll";
+const KRSDK_BIN: &str = "PGR_Data/Plugins/KRSDKRes/KRSDK.bin";
+const KRSDK_CONFIG: &str = "PGR_Data/Plugins/KRSDKRes/KRSDKConfig.json";
 const REQUIRED_ORIGINALS: [&str; 5] = ["PGR.exe", "GameAssembly.dll", KRSDK, KRSDK_EX, KRSDK_CURL];
 
 /// Global (EN/TW/KR/JP) clients ship `KRSDK.dll`, which the patch replaces; the CN client ships the official
@@ -32,9 +34,14 @@ pub enum Region {
     Cn,
 }
 
+/// The CN SDK layout (`KRSDKEx.dll` + `KRSDKConfig.json`, no `KRSDK.bin`); a stray `KRSDK.dll` does not change it.
+pub fn is_cn_layout(game: &Path) -> bool {
+    game.join(KRSDK_EX).exists() && game.join(KRSDK_CONFIG).exists() && !game.join(KRSDK_BIN).exists()
+}
+
 /// Classifies the folder by its SDK files; a CN folder must also carry the allowlisted SDK pair.
 pub fn client_region(application_version: &str, originals: &BTreeMap<String, Vec<String>>, game: &Path) -> Result<Region> {
-    if game.join(KRSDK).exists() {
+    if !is_cn_layout(game) && game.join(KRSDK).exists() {
         return Ok(Region::Global);
     }
     if !game.join(KRSDK_EX).exists() {
@@ -619,8 +626,17 @@ mod tests {
         assert!(error.starts_with("PGR_Data/Plugins/libkrsdkcurl.dll is not the supported 4.8.0 client") && error.contains(&observed), "{error}");
         fs::remove_file(game.join(KRSDK_CURL)).unwrap();
         assert!(client_region("4.8.0", &originals(b"ex", b"curl"), &game).unwrap_err().to_string().contains("file missing"));
-        // KRSDK.dll wins: a global client needs no CN pair.
+        // KRSDK.dll wins unless the CN SDK layout is present: a global client needs no CN pair.
         fs::write(game.join(KRSDK), b"sdk").unwrap();
+        assert_eq!(client_region("4.8.0", &BTreeMap::new(), &game).unwrap(), Region::Global);
+        // A leftover AscNet KRSDK.dll in a CN folder (KRSDKEx + KRSDKConfig.json, no KRSDK.bin) stays CN...
+        fs::write(game.join(KRSDK_CURL), b"curl").unwrap();
+        fs::create_dir_all(game.join("PGR_Data/Plugins/KRSDKRes")).unwrap();
+        fs::write(game.join(KRSDK_CONFIG), b"{}").unwrap();
+        assert_eq!(client_region("4.8.0", &originals(b"ex", b"curl"), &game).unwrap(), Region::Cn);
+        assert!(client_region("4.8.0", &originals(b"ex", b"other"), &game).is_err());
+        // ...but a KRSDK.bin (global/Steam) wins.
+        fs::write(game.join(KRSDK_BIN), b"KR_ProjectId=G143").unwrap();
         assert_eq!(client_region("4.8.0", &BTreeMap::new(), &game).unwrap(), Region::Global);
         fs::remove_dir_all(game).unwrap();
     }

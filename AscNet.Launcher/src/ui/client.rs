@@ -506,6 +506,12 @@ unsafe fn start_inspect(hwnd: HWND, state: &mut Window) {
         let result = (|| {
             let meta = metadata_path()?;
             let detected = game.then(|| download::detect(&dir));
+            if let Some(detected) = &detected {
+                let _ = local::launcher_log(&match detected {
+                    Ok(d) => format!("Client inspect: dir={} region={:?} version={:?}", dir.display(), d.region.map(full_name), d.version),
+                    Err(e) => format!("Client inspect: dir={} region detection failed: {e:#}", dir.display()),
+                });
+            }
             let region = detected.as_ref().and_then(|d| d.as_ref().ok()).and_then(|d| d.region).unwrap_or(region);
             let source = download::sources(&meta)?
                 .into_iter()
@@ -575,6 +581,8 @@ unsafe fn start_job(hwnd: HWND, state: &mut Window, kind: Kind) {
     append_log(hwnd, state, &format!("{} ({})", kind.running_text(), full_name(region)));
     refresh(hwnd, state);
     thread::spawn(move || {
+        let action = format!("Client {}", kind.running_text());
+        let _ = local::launcher_log(&format!("{action}: dir={} region={}", dir.display(), full_name(region)));
         let result = (|| {
             let source = download::sources(&metadata_path()?)?
                 .into_iter()
@@ -596,6 +604,11 @@ unsafe fn start_job(hwnd: HWND, state: &mut Window, kind: Kind) {
             Err(e) if cancel.load(Ordering::SeqCst) || e.downcast_ref::<download::Cancelled>().is_some() => Ok(WorkResult::Client(Done::Stopped)),
             Err(e) => Err(e),
         };
+        let _ = local::launcher_log(&match &result {
+            Ok(WorkResult::Client(Done::Stopped)) => format!("{action}: stopped"),
+            Ok(_) => format!("{action}: ok"),
+            Err(e) => format!("{action}: failed: {e:#}"),
+        });
         post_event(hwnd, &events, Event::Work(Work { generation, result }));
     });
 }
