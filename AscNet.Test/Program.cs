@@ -11847,6 +11847,7 @@ namespace AscNet.Test
                 player,
                 CreateDrawCompatibilityInventory(playerId, []),
                 "team-prefab-compat");
+            harness.Session.stage = AscNet.Common.Database.Stage.FromUid(playerId);
 
             TeamPrefabData capturedEmpty = new()
             {
@@ -12436,6 +12437,11 @@ namespace AscNet.Test
                     CharacterId = secondCharacterId,
                     GroupId = chipGroup.GroupId
                 });
+            Packet chipGroupEquipPacket = harness.ReadPacket("memory preset equip push");
+            AssertEqual(Packet.ContentType.Push, chipGroupEquipPacket.Type, "memory preset equip push packet type");
+            Packet.Push chipGroupEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(chipGroupEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), chipGroupEquipPush.Name, "memory preset equip push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnChipGroupResponse>(
                 harness, 71_082, nameof(EquipPutOnChipGroupResponse), "memory preset equip").Code,
                 "memory preset equip Code");
@@ -12497,7 +12503,7 @@ namespace AscNet.Test
                 {
                     if (equipment is null)
                         continue;
-                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values)
+                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values.Where(preset => preset.EquipId != 0))
                         AssertEqual(applied.TeamData[position],
                             equipPush.EquipDataList.Single(equip => equip.Id == preset.EquipId).CharacterId,
                             $"{name} client receives preset equipment ownership before acknowledgement");
