@@ -165,6 +165,11 @@ struct Window {
     music_path: PathBuf,
     /// PGR.exe was running at the last game-watch tick; background music stays stopped meanwhile.
     game_running: bool,
+    /// The stop-services confirmation is on the stack. It pumps the game-watch
+    /// timer, which must not take the runtime until the dialog returns.
+    confirming_close: bool,
+    /// The user asked to close while shutdown was already running.
+    close_when_stopped: bool,
     animation_sequence: u64,
     backdrop: HBITMAP,
     backdrop_size: SIZE,
@@ -371,6 +376,8 @@ unsafe fn run_inner() -> Result<()> {
         music,
         music_path,
         game_running: false,
+        confirming_close: false,
+        close_when_stopped: false,
         animation_sequence: 0,
         overlay,
         backdrop: HBITMAP(0),
@@ -665,47 +672,71 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
         }
         WM_CLOSE => {
             if !ptr.is_null() {
-                let (busy, has_runtime) = {
+                // A nested close from the confirmation dialog must not start a second prompt.
+                if (*ptr).confirming_close {
+                    return LRESULT(0);
+                }
+                let (busy, stopping, has_runtime) = {
                     let m = (*ptr).model.lock().unwrap();
-                    (m.busy, m.runtime.is_some())
+                    (m.busy, m.stopping, m.runtime.is_some())
                 };
-                if busy {
-                    show_fatal("Wait for the current operation to finish before closing.");
-                    return LRESULT(0);
-                }
-                if has_runtime {
-                    match install::game_running() {
-                        Ok(true) => {
-                            show_fatal("PGR is still running. Close the game before closing the launcher so its local server remains available.");
-                            return LRESULT(0);
-                        }
-                        Err(e) => {
-                            show_fatal(&format!(
-                                "Cannot safely check whether PGR is running: {e:#}"
-                            ));
-                            return LRESULT(0);
-                        }
-                        Ok(false) => {}
+                match local::close_request(busy, stopping, has_runtime) {
+                    local::CloseRequest::Wait => {
+                        show_fatal("Wait for the current operation to finish before closing.");
+                        return LRESULT(0);
                     }
-                }
-                if has_runtime
-                    && MessageBoxW(
-                        hwnd,
-                        w!("Closing will stop the local AscNet server and MongoDB started by this launcher. Continue?"),
-                        w!("Stop local services?"),
-                        MB_OKCANCEL | MB_ICONWARNING,
-                    ) != IDOK
-                {
-                    return LRESULT(0);
-                }
-                let mut owned_runtime = (*ptr).model.lock().unwrap().runtime.take();
-                let stop_error = owned_runtime
-                    .as_mut()
-                    .and_then(|runtime| runtime.stop().err());
-                if let Some(e) = stop_error {
-                    (*ptr).model.lock().unwrap().runtime = owned_runtime;
-                    show_fatal(&format!("Could not stop local services safely: {e:#}"));
-                    return LRESULT(0);
+                    local::CloseRequest::AfterStop => {
+                        (*ptr).close_when_stopped = true;
+                        append_log(hwnd, &mut *ptr, "Closing after the local server and MongoDB stop");
+                        return LRESULT(0);
+                    }
+                    local::CloseRequest::StopServices => {
+                        match install::game_running() {
+                            Ok(true) => {
+                                show_fatal("PGR is still running. Close the game before closing the launcher so its local server remains available.");
+                                return LRESULT(0);
+                            }
+                            Err(e) => {
+                                show_fatal(&format!(
+                                    "Cannot safely check whether PGR is running: {e:#}"
+                                ));
+                                return LRESULT(0);
+                            }
+                            Ok(false) => {}
+                        }
+                        let saw_game = (*ptr).game_running;
+                        (*ptr).confirming_close = true;
+                        let confirmed = MessageBoxW(
+                            hwnd,
+                            w!("Closing will stop the local AscNet server and MongoDB started by this launcher. Continue?"),
+                            w!("Stop local services?"),
+                            MB_OKCANCEL | MB_ICONWARNING,
+                        ) == IDOK;
+                        (*ptr).confirming_close = false;
+                        if !confirmed {
+                            // The dialog pumped the game-watch timer, which skipped the
+                            // stop. If the game exited during the prompt, stop now and stay open.
+                            if local::game_exit_stops_services(saw_game, (*ptr).game_running) {
+                                stop_services_after_game(hwnd, &mut *ptr);
+                            }
+                            return LRESULT(0);
+                        }
+                        if (*ptr).model.lock().unwrap().stopping {
+                            (*ptr).close_when_stopped = true;
+                            append_log(hwnd, &mut *ptr, "Closing after the local server and MongoDB stop");
+                            return LRESULT(0);
+                        }
+                        let mut owned_runtime = (*ptr).model.lock().unwrap().runtime.take();
+                        let stop_error = owned_runtime
+                            .as_mut()
+                            .and_then(|runtime| runtime.stop().err());
+                        if let Some(e) = stop_error {
+                            (*ptr).model.lock().unwrap().runtime = owned_runtime;
+                            show_fatal(&format!("Could not stop local services safely: {e:#}"));
+                            return LRESULT(0);
+                        }
+                    }
+                    local::CloseRequest::Close => {}
                 }
             }
             let _ = DestroyWindow(hwnd);
@@ -1642,6 +1673,11 @@ unsafe fn follow_game_with_music(hwnd: HWND, state: &mut Window) {
 }
 
 fn stop_services_after_game(hwnd: HWND, state: &mut Window) {
+    // MessageBox pumps this timer. Taking the runtime here lets WM_CLOSE
+    // destroy the window while stop() still owns the kill-on-close job.
+    if state.confirming_close {
+        return;
+    }
     let (mut runtime, events) = {
         let mut model = state.model.lock().unwrap();
         if model.stopping {
@@ -1665,6 +1701,8 @@ fn stop_services_after_game(hwnd: HWND, state: &mut Window) {
 
 unsafe fn finish_services_stopped(hwnd: HWND, state: &mut Window, result: Result<()>) {
     state.model.lock().unwrap().stopping = false;
+    let close_when_stopped = state.close_when_stopped;
+    state.close_when_stopped = false;
     let message = match result {
         Ok(()) => "Local server and MongoDB stopped".to_owned(),
         Err(error) => {
@@ -1675,6 +1713,11 @@ unsafe fn finish_services_stopped(hwnd: HWND, state: &mut Window, result: Result
     };
     append_log(hwnd, state, &message);
     update_view(hwnd, &state.model);
+    // Posted, not sent: this runs on the UI thread inside WM_EVENT, and
+    // WM_CLOSE destroys the window only after the in-flight stop has released it.
+    if close_when_stopped {
+        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+    }
 }
 
 unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {

@@ -159,6 +159,17 @@ mod summary_tests {
         assert!(!super::game_exit_stops_services(false, true));
         assert!(!super::game_exit_stops_services(true, true));
     }
+
+    #[test]
+    fn close_waits_for_an_in_flight_stop() {
+        use super::CloseRequest;
+        assert_eq!(super::close_request(true, false, true), CloseRequest::Wait);
+        assert_eq!(super::close_request(true, true, false), CloseRequest::Wait);
+        assert_eq!(super::close_request(false, true, false), CloseRequest::AfterStop);
+        assert_eq!(super::close_request(false, true, true), CloseRequest::AfterStop);
+        assert_eq!(super::close_request(false, false, true), CloseRequest::StopServices);
+        assert_eq!(super::close_request(false, false, false), CloseRequest::Close);
+    }
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -635,6 +646,33 @@ impl LocalRuntime {
 /// a poll that never saw it running.
 pub fn game_exit_stops_services(was_running: bool, is_running: bool) -> bool {
     was_running && !is_running
+}
+
+/// What closing the launcher should do with the local server and MongoDB.
+/// A stop that is already running must finish before the window is destroyed:
+/// the runtime owns a job that kills those processes when the process exits.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CloseRequest {
+    /// Setup, play, or another operation still holds the launcher.
+    Wait,
+    /// Shutdown is in progress. Destroy the window only after it finishes.
+    AfterStop,
+    /// Services are still held and are not shutting down.
+    StopServices,
+    /// Nothing local is running.
+    Close,
+}
+
+pub fn close_request(busy: bool, stopping: bool, has_runtime: bool) -> CloseRequest {
+    if busy {
+        CloseRequest::Wait
+    } else if stopping {
+        CloseRequest::AfterStop
+    } else if has_runtime {
+        CloseRequest::StopServices
+    } else {
+        CloseRequest::Close
+    }
 }
 
 fn mongo_arguments(dbpath: &Path, port: u16, wine: bool) -> Vec<String> {
