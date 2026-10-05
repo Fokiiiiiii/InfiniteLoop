@@ -129,8 +129,12 @@ pub(crate) fn plan(manifest_document: &str) -> Result<InstallPlan> {
     let mut vsix = vec![checked_payload(tool_package)?];
     let headers_id = format!("microsoft.vc.{toolset}.crt.headers.base");
     let desktop_id = format!("microsoft.vc.{toolset}.crt.x64.desktop.base");
+    // Desktop.base is the static CRT. rustc links msvcrt.lib, vcruntime.lib,
+    // and oldnames.lib from the Store package, under lib\x64.
+    let store_id = format!("microsoft.vc.{toolset}.crt.x64.store.base");
     vsix.push(checked_payload(one_package(&manifest.packages, &index, &headers_id, false)?)?);
     vsix.push(checked_payload(one_package(&manifest.packages, &index, &desktop_id, false)?)?);
+    vsix.push(checked_payload(one_package(&manifest.packages, &index, &store_id, false)?)?);
     let redist_id = format!("microsoft.vc.{toolset}.crt.redist.x64.base");
     if index.contains_key(&redist_id) {
         vsix.push(checked_payload(one_package(&manifest.packages, &index, &redist_id, false)?)?);
@@ -267,6 +271,9 @@ pub(crate) fn compiler_vars(root: &Path) -> Result<Vec<(String, String)>> {
     let version = tool.file_name().and_then(|name| name.to_str()).context("MSVC tool directory has no version name")?.to_owned();
     require_file(child_named(&tool, "include").and_then(|dir| child_named(&dir, "vcruntime.h")), "VC include\\vcruntime.h")?;
     require_file(nested(&tool, &["lib", "x64", "libcmt.lib"]), "VC lib\\x64\\libcmt.lib")?;
+    require_file(nested(&tool, &["lib", "x64", "msvcrt.lib"]), "VC lib\\x64\\msvcrt.lib")?;
+    require_file(nested(&tool, &["lib", "x64", "vcruntime.lib"]), "VC lib\\x64\\vcruntime.lib")?;
+    require_file(nested(&tool, &["lib", "x64", "oldnames.lib"]), "VC lib\\x64\\oldnames.lib")?;
     let kits = nested(root, &["Windows Kits", "10"]).context("MSVC layout is missing Windows Kits\\10")?;
     let include_root = child_named(&kits, "Include").context("MSVC layout is missing Windows Kits\\10\\Include")?;
     let sdk_include = highest_numbered_dir(&include_root, "10.").context("MSVC layout is missing a Windows SDK include version")?;
@@ -687,6 +694,7 @@ mod tests {
                 {{"id":"Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base","payloads":[{tool}]}},
                 {{"id":"Microsoft.VC.14.44.17.14.CRT.Headers.base","payloads":[{headers}]}},
                 {{"id":"Microsoft.VC.14.44.17.14.CRT.x64.Desktop.base","payloads":[{desktop}]}},
+                {{"id":"Microsoft.VC.14.44.17.14.CRT.x64.Store.base","payloads":[{store}]}},
                 {{"id":"Microsoft.VC.14.44.17.14.CRT.Redist.X64.base","payloads":[{redist}]}},
                 {{"id":"Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base","language":"de-DE","payloads":[{deu}]}},
                 {{"id":"Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base","language":"en-US","payloads":[{enu}]}},
@@ -699,6 +707,7 @@ mod tests {
             tool = payload("tools.vsix"),
             headers = payload("headers.vsix"),
             desktop = payload("desktop.vsix"),
+            store = payload("store.vsix"),
             redist = payload("redist.vsix"),
             deu = payload("res.deu.vsix"),
             enu = payload("res.enu.vsix"),
@@ -711,7 +720,7 @@ mod tests {
         assert_eq!(selected.toolset, "14.44.17.14");
         assert_eq!(selected.sdk_version, "26100");
         let names: Vec<_> = selected.vsix.iter().map(|item| item.file_name.as_str()).collect();
-        assert_eq!(names, vec!["tools.vsix", "headers.vsix", "desktop.vsix", "redist.vsix", "res.enu.vsix"]);
+        assert_eq!(names, vec!["tools.vsix", "headers.vsix", "desktop.vsix", "store.vsix", "redist.vsix", "res.enu.vsix"]);
         assert!(selected.msi_names.iter().any(|name| name.contains("Desktop Libs x64")));
         assert!(selected.msi_names.iter().any(|name| name.contains("Store Apps Libs")));
         assert!(find_payload(&selected.sdk_payloads, "Windows SDK Desktop Libs x64-x86_en-us.msi").is_ok());
@@ -789,6 +798,10 @@ mod tests {
             fs::create_dir_all(&dir).unwrap();
             fs::write(dir.join(name), b"x").unwrap();
         }
+        assert!(!is_ready(&root));
+        for name in ["msvcrt.lib", "vcruntime.lib", "oldnames.lib"] {
+            fs::write(tool.join("lib/x64").join(name), b"lib").unwrap();
+        }
         let vars = compiler_vars(&root).unwrap();
         let value = |key: &str| vars.iter().find(|(name, _)| name == key).map(|(_, value)| value.as_str()).unwrap_or("");
         assert!(value("Path").to_ascii_lowercase().contains("hostx64\\x64") || value("Path").to_ascii_lowercase().contains("hostx64/x64"), "{}", value("Path"));
@@ -799,6 +812,8 @@ mod tests {
         assert_eq!(value("VCToolsVersion"), "14.44.35207");
         assert_eq!(value("WindowsSDKVersion"), "10.0.26100.0\\");
         assert!(is_ready(&root));
+        fs::remove_file(tool.join("lib/x64/msvcrt.lib")).unwrap();
+        assert!(!is_ready(&root));
         let _ = fs::remove_dir_all(&root);
     }
 

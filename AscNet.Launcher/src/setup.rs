@@ -206,8 +206,20 @@ fn run_logged(
     progress: &mut dyn FnMut(&str),
     log: &mut dyn FnMut(&str) -> Result<()>,
 ) -> Result<()> {
+    let shown = command_line(command);
+    run_logged_shown(command, &shown, description, deadline, progress, log)
+}
+
+fn run_logged_shown(
+    command: &mut Command,
+    shown: &str,
+    description: &str,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<()> {
     ensure_time(deadline)?;
-    note(progress, log, &format!("+ {}", command_line(command)))?;
+    note(progress, log, &format!("+ {shown}"))?;
     let mut child = crate::local::hide_console(command)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -441,6 +453,7 @@ fn download_file(
     dest: &Path,
     expect_sha256: Option<&str>,
     expect_sha512: Option<&str>,
+    root: &Path,
     deadline: Instant,
     progress: &mut dyn FnMut(&str),
     log: &mut dyn FnMut(&str) -> Result<()>,
@@ -448,6 +461,21 @@ fn download_file(
     ensure_time(deadline)?;
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
+    }
+    // Scratch archives are deleted after extraction. A verified copy stays in
+    // the cache, keyed by the expected hash, and the next setup hard-links it.
+    let cache = root.join("cache");
+    if let Some(hash) = reuse_hashed_file(dest, dest, expect_sha256, expect_sha512)? {
+        remember_cache(&cache, dest, expect_sha256, expect_sha512)?;
+        note(progress, log, &format!("Reusing {}", display_name(dest)))?;
+        return Ok(hash);
+    }
+    if let Some(key) = cache_key(expect_sha256, expect_sha512) {
+        let cached = cache.join(key);
+        if let Some(hash) = reuse_hashed_file(&cached, dest, expect_sha256, expect_sha512)? {
+            note(progress, log, &format!("Reusing {}", display_name(&cached)))?;
+            return Ok(hash);
+        }
     }
     let partial = partial_path(dest);
     let _ = fs::remove_file(&partial);
@@ -505,7 +533,83 @@ fn download_file(
     }
     let _ = fs::remove_file(dest);
     fs::rename(&partial, dest).with_context(|| format!("store {}", dest.display()))?;
+    remember_cache(&cache, dest, expect_sha256, expect_sha512)?;
     Ok(actual256)
+}
+
+fn display_name(path: &Path) -> String {
+    path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string())
+}
+
+fn cache_key(expect_sha256: Option<&str>, expect_sha512: Option<&str>) -> Option<String> {
+    let key = expect_sha256.or(expect_sha512)?.trim();
+    let hashed = (key.len() == 64 || key.len() == 128) && key.bytes().all(|byte| byte.is_ascii_hexdigit());
+    if hashed { Some(key.to_ascii_lowercase()) } else { None }
+}
+
+fn hash_file(path: &Path) -> Result<(String, String)> {
+    let mut file = fs::File::open(path).with_context(|| format!("hash {}", path.display()))?;
+    let mut sha256 = Sha256::new();
+    let mut sha512 = Sha512::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer).with_context(|| format!("hash {}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        sha256.update(&buffer[..count]);
+        sha512.update(&buffer[..count]);
+    }
+    Ok((format!("{:x}", sha256.finalize()), format!("{:x}", sha512.finalize())))
+}
+
+fn digests_match(sha256: &str, sha512: &str, expect_sha256: Option<&str>, expect_sha512: Option<&str>) -> bool {
+    if expect_sha256.is_none() && expect_sha512.is_none() {
+        return false;
+    }
+    let sha256_ok = expect_sha256.map(|expected| sha256.eq_ignore_ascii_case(expected.trim())).unwrap_or(true);
+    let sha512_ok = expect_sha512.map(|expected| sha512.eq_ignore_ascii_case(expected.trim())).unwrap_or(true);
+    sha256_ok && sha512_ok
+}
+
+/// Copies `source` onto `dest` when `source` is a regular file whose digest
+/// matches the expected hash. Returns the file's SHA-256.
+fn reuse_hashed_file(source: &Path, dest: &Path, expect_sha256: Option<&str>, expect_sha512: Option<&str>) -> Result<Option<String>> {
+    if !source.is_file() {
+        return Ok(None);
+    }
+    let (sha256, sha512) = hash_file(source)?;
+    if !digests_match(&sha256, &sha512, expect_sha256, expect_sha512) {
+        return Ok(None);
+    }
+    if source != dest {
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if dest.exists() {
+            fs::remove_file(dest)?;
+        }
+        if fs::hard_link(source, dest).is_err() {
+            fs::copy(source, dest).with_context(|| format!("reuse {}", source.display()))?;
+        }
+    }
+    Ok(Some(sha256))
+}
+
+fn remember_cache(cache: &Path, source: &Path, expect_sha256: Option<&str>, expect_sha512: Option<&str>) -> Result<()> {
+    let Some(key) = cache_key(expect_sha256, expect_sha512) else { return Ok(()) };
+    fs::create_dir_all(cache)?;
+    let cached = cache.join(key);
+    if cached == source {
+        return Ok(());
+    }
+    if cached.exists() {
+        let _ = fs::remove_file(&cached);
+    }
+    if fs::hard_link(source, &cached).is_err() {
+        fs::copy(source, &cached).with_context(|| format!("cache {}", source.display()))?;
+    }
+    Ok(())
 }
 
 fn partial_path(dest: &Path) -> PathBuf {
@@ -878,6 +982,9 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 fn quoted_response_file(path: &Path) -> String {
+    // cl.exe and link.exe treat these quotes as @file syntax, not as Windows
+    // argument quotes. Escaping them makes Wine search for a name that
+    // includes the quote characters (D8022). Pass the string with raw_arg.
     let text = path.display().to_string().replace('\\', "/");
     format!("@\"{text}\"")
 }
@@ -1018,7 +1125,7 @@ fn ensure_git(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), lo
     }
     note(progress, log, "Installing portable Git")?;
     let archive = scratch_file(root, "mingit.zip");
-    download_file(MINGIT_URL, &archive, Some(MINGIT_SHA256), None, deadline, progress, log)?;
+    download_file(MINGIT_URL, &archive, Some(MINGIT_SHA256), None, root, deadline, progress, log)?;
     let destination = root.join("tools").join("git");
     if destination.exists() {
         fs::remove_dir_all(&destination)?;
@@ -1079,7 +1186,7 @@ fn ensure_dotnet(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str),
     let metadata = read_download_text(DOTNET_RELEASES, deadline)?;
     let selected = select_dotnet_sdk(&metadata)?;
     let archive = scratch_file(root, "dotnet-sdk.zip");
-    download_file(&selected.url, &archive, None, Some(&selected.sha512), deadline, progress, log)?;
+    download_file(&selected.url, &archive, None, Some(&selected.sha512), root, deadline, progress, log)?;
     let destination = root.join("tools").join("dotnet");
     if destination.exists() {
         fs::remove_dir_all(&destination)?;
@@ -1116,7 +1223,7 @@ fn ensure_rust(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), l
         ensure_time(deadline)?;
         let name = component.url.rsplit('/').next().unwrap_or("rust-component.tar.gz");
         let archive = scratch_file(root, name);
-        download_file(component.url, &archive, Some(component.sha256), None, deadline, progress, log)?;
+        download_file(component.url, &archive, Some(component.sha256), None, root, deadline, progress, log)?;
         unpack_rust_component(&archive, &destination)?;
         let _ = fs::remove_file(&archive);
     }
@@ -1209,7 +1316,7 @@ fn install_portable_msvc(root: &Path, dest: &Path, deadline: Instant, progress: 
         for payload in &plan.vsix {
             ensure_time(deadline)?;
             let archive = downloads.join(safe_archive_name(&payload.file_name));
-            download_file(&payload.url, &archive, Some(&payload.sha256), None, deadline, progress, log)?;
+            download_file(&payload.url, &archive, Some(&payload.sha256), None, root, deadline, progress, log)?;
             crate::msvc::extract_vsix(&archive, &stage)?;
             let _ = fs::remove_file(&archive);
         }
@@ -1217,7 +1324,7 @@ fn install_portable_msvc(root: &Path, dest: &Path, deadline: Instant, progress: 
             ensure_time(deadline)?;
             let payload = crate::msvc::find_payload(&plan.sdk_payloads, name)?;
             let msi_path = downloads.join(safe_archive_name(name));
-            download_file(&payload.url, &msi_path, Some(&payload.sha256), None, deadline, progress, log)?;
+            download_file(&payload.url, &msi_path, Some(&payload.sha256), None, root, deadline, progress, log)?;
             let bytes = fs::read(&msi_path).with_context(|| format!("read {}", msi_path.display()))?;
             let cabinets = crate::msvc::cabinet_names(&bytes);
             if cabinets.is_empty() {
@@ -1226,9 +1333,7 @@ fn install_portable_msvc(root: &Path, dest: &Path, deadline: Instant, progress: 
             for cabinet in &cabinets {
                 let cab_payload = crate::msvc::find_payload(&plan.sdk_payloads, cabinet)?;
                 let cab_path = downloads.join(safe_archive_name(cabinet));
-                if !cab_path.is_file() {
-                    download_file(&cab_payload.url, &cab_path, Some(&cab_payload.sha256), None, deadline, progress, log)?;
-                }
+                download_file(&cab_payload.url, &cab_path, Some(&cab_payload.sha256), None, root, deadline, progress, log)?;
             }
             note(progress, log, &format!("Unpacking {name}"))?;
             crate::msvc::extract_msi(&msi_path, &downloads, &stage)?;
@@ -1364,7 +1469,7 @@ fn locate_vs_installed(vswhere: &Path, deadline: Instant, progress: &mut dyn FnM
 #[cfg(windows)]
 fn install_build_tools(root: &Path, install_path: Option<PathBuf>, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
     let bootstrapper = scratch_file(root, "vs_buildtools.exe");
-    let hash = download_file(VS_BOOTSTRAPPER, &bootstrapper, None, None, deadline, progress, log)?;
+    let hash = download_file(VS_BOOTSTRAPPER, &bootstrapper, None, None, root, deadline, progress, log)?;
     note(progress, log, &format!("Visual Studio Build Tools bootstrapper SHA-256 {hash}"))?;
     install_build_tools_at(&bootstrapper, install_path, deadline, progress, log)?;
     let _ = fs::remove_file(&bootstrapper);
@@ -1537,7 +1642,7 @@ fn ensure_mongo(root: &Path, tools: &Path, previous: Option<&Value>, deadline: I
         }
     };
     let archive = scratch_file(root, "mongodb.zip");
-    download_file(&selected.url, &archive, Some(&sha256), None, deadline, progress, log)?;
+    download_file(&selected.url, &archive, Some(&sha256), None, root, deadline, progress, log)?;
     let extracted = scratch_file(root, "mongodb");
     fs::create_dir_all(&extracted)?;
     let extracted_ok = (|| -> Result<PathBuf> {
@@ -1821,8 +1926,14 @@ fn compile_version_shim_with_cl(compiler: &Compiler, checkout: &Path, loader: &P
     let mut compile = Command::new(&cl);
     apply_build_env(&mut compile, compiler, Path::new(""), Path::new("rustc.exe"));
     compile.env_remove("RUSTC");
-    compile.current_dir(&source).arg(quoted_response_file(&response));
-    run_logged(&mut compile, "Compiling version loader", deadline, progress, log)?;
+    compile.current_dir(&source);
+    let compile_argument = quoted_response_file(&response);
+    {
+        use std::os::windows::process::CommandExt;
+        compile.raw_arg(&compile_argument);
+    }
+    let compile_shown = format!("{} {compile_argument}", command_line(&compile));
+    run_logged_shown(&mut compile, &compile_shown, "Compiling version loader", deadline, progress, log)?;
     let produced = loader.join("VersionShim.dll");
     let link_response = loader.join("link.rsp");
     let out = produced.display().to_string().replace('\\', "/");
@@ -1831,8 +1942,14 @@ fn compile_version_shim_with_cl(compiler: &Compiler, checkout: &Path, loader: &P
     let mut linker = Command::new(link);
     apply_build_env(&mut linker, compiler, Path::new(""), Path::new("rustc.exe"));
     linker.env_remove("RUSTC");
-    linker.current_dir(&source).arg(quoted_response_file(&link_response));
-    run_logged(&mut linker, "Linking version loader", deadline, progress, log)?;
+    linker.current_dir(&source);
+    let link_argument = quoted_response_file(&link_response);
+    {
+        use std::os::windows::process::CommandExt;
+        linker.raw_arg(&link_argument);
+    }
+    let link_shown = format!("{} {link_argument}", command_line(&linker));
+    run_logged_shown(&mut linker, &link_shown, "Linking version loader", deadline, progress, log)?;
     Ok(())
 }
 
@@ -1924,6 +2041,32 @@ mod tests {
     #[test]
     fn response_file_argument_quotes_windows_paths() {
         assert_eq!(quoted_response_file(Path::new(r"C:\Users\A B\cl.rsp")), "@\"C:/Users/A B/cl.rsp\"");
+    }
+
+    #[test]
+    fn hashed_file_is_reused_when_the_digest_matches() {
+        let root = env::temp_dir().join(format!("ascnet-cache-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let bytes = b"already-on-disk";
+        let sha256 = format!("{:x}", Sha256::digest(bytes));
+        let sha512 = format!("{:x}", Sha512::digest(bytes));
+        let cached = root.join("cache").join(&sha256);
+        fs::create_dir_all(cached.parent().unwrap()).unwrap();
+        fs::write(&cached, bytes).unwrap();
+        let dest = root.join("tmp").join("package.bin");
+        let reused = reuse_hashed_file(&cached, &dest, Some(&sha256), None).unwrap().unwrap();
+        assert_eq!(reused, sha256);
+        assert_eq!(fs::read(&dest).unwrap(), bytes);
+        let same = reuse_hashed_file(&dest, &dest, Some(&sha256.to_ascii_uppercase()), None).unwrap().unwrap();
+        assert_eq!(same, sha256);
+        let by_sha512 = reuse_hashed_file(&cached, &root.join("other.bin"), None, Some(&sha512)).unwrap().unwrap();
+        assert_eq!(by_sha512, sha256);
+        let wrong = "ab".repeat(32);
+        assert!(reuse_hashed_file(&cached, &root.join("nope.bin"), Some(&wrong), None).unwrap().is_none());
+        assert!(!root.join("nope.bin").exists());
+        assert!(cache_key(None, None).is_none());
+        assert_eq!(cache_key(Some(&sha256), None).as_deref(), Some(sha256.as_str()));
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
