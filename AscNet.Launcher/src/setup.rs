@@ -406,17 +406,16 @@ fn update_checkout(
 }
 
 fn http_client(deadline: Instant) -> Result<reqwest::blocking::Client> {
-    let remaining = deadline.saturating_duration_since(Instant::now());
-    if remaining.is_zero() {
-        bail!("local setup timed out");
-    }
-    Ok(reqwest::blocking::Client::builder()
-        .user_agent(concat!("ascnet-launcher/", env!("CARGO_PKG_VERSION")))
-        .https_only(true)
-        .connect_timeout(remaining.min(Duration::from_secs(30)))
-        .timeout(remaining)
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()?)
+    ensure_time(deadline)?;
+    Ok(crate::download::wine_safe(
+        reqwest::blocking::Client::builder()
+            .user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
+            .https_only(true)
+            .connect_timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(120))
+            .redirect(reqwest::redirect::Policy::limited(10)),
+    )
+    .build()?)
 }
 
 fn download_file(
@@ -435,25 +434,40 @@ fn download_file(
     let partial = partial_path(dest);
     let _ = fs::remove_file(&partial);
     note(progress, log, &format!("Downloading {url}"))?;
-    let response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
-    let mut reader = response;
+    let mut response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
+    let expected = response.content_length();
     let mut file = fs::File::create(&partial).with_context(|| format!("create {}", partial.display()))?;
     let mut sha256 = Sha256::new();
     let mut sha512 = Sha512::new();
     let mut buffer = [0u8; 64 * 1024];
+    let mut received = 0u64;
     loop {
         if Instant::now() >= deadline {
             drop(file);
             let _ = fs::remove_file(&partial);
             bail!("local setup timed out");
         }
-        let count = reader.read(&mut buffer).with_context(|| format!("read {url}"))?;
+        // Content-Length is the end of the body. Another read waits out the
+        // client timeout on a keep-alive connection after the file is complete.
+        if expected.is_some_and(|n| received >= n) {
+            break;
+        }
+        let want = expected.map(|n| buffer.len().min((n - received) as usize)).unwrap_or(buffer.len());
+        let count = response.read(&mut buffer[..want]).with_context(|| format!("read {url}"))?;
         if count == 0 {
             break;
         }
         file.write_all(&buffer[..count])?;
         sha256.update(&buffer[..count]);
         sha512.update(&buffer[..count]);
+        received += count as u64;
+    }
+    if let Some(n) = expected {
+        if received != n {
+            drop(file);
+            let _ = fs::remove_file(&partial);
+            bail!("download {url} ended after {received} bytes, expected {n}");
+        }
     }
     file.sync_all()?;
     drop(file);
@@ -484,8 +498,17 @@ fn partial_path(dest: &Path) -> PathBuf {
 
 fn read_download_text(url: &str, deadline: Instant) -> Result<String> {
     ensure_time(deadline)?;
-    let response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
-    let bytes = response.bytes().with_context(|| format!("read {url}"))?;
+    let mut response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
+    let length = response.content_length();
+    let bytes = crate::download::read_body(&mut response, length, 128 * 1024 * 1024).with_context(|| format!("read {url}"))?;
+    if bytes.len() > 128 * 1024 * 1024 {
+        bail!("download {url} exceeds 128 MiB");
+    }
+    if let Some(n) = length {
+        if bytes.len() as u64 != n {
+            bail!("download {url} ended after {} bytes, expected {n}", bytes.len());
+        }
+    }
     ensure_time(deadline)?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }

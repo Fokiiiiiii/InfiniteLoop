@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     env, fs,
-    io::Read,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -2454,21 +2453,28 @@ fn post_progress(hwnd: HWND, events: &Sender<Event>, text: &str) {
 }
 fn fetch_status(origin: &str) -> Result<ServerStatus> {
     let origin = package::validate_server_origin(origin)?;
-    let mut response = reqwest::blocking::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(15))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?
+    let mut response = download::wine_safe(
+        reqwest::blocking::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(15))
+            .redirect(reqwest::redirect::Policy::none()),
+    )
+    .build()?
         .get(format!("{origin}/api/launcher/status"))
         .send()?
         .error_for_status()?;
-    if response.content_length().is_some_and(|n| n > 65_536) {
+    let length = response.content_length();
+    if length.is_some_and(|n| n > 65_536) {
         anyhow::bail!("server status exceeds 64 KiB")
     }
-    let mut bytes = Vec::new();
-    response.by_ref().take(65_537).read_to_end(&mut bytes)?;
+    let bytes = download::read_body(&mut response, length, 65_536).context("reading server status")?;
     if bytes.len() > 65_536 {
         anyhow::bail!("server status exceeds 64 KiB")
+    }
+    if let Some(n) = length {
+        if bytes.len() as u64 != n {
+            anyhow::bail!("server status ended after {} bytes, expected {n}", bytes.len());
+        }
     }
     let s: ServerStatus = serde_json::from_slice(&bytes)?;
     if s.schema_version != 1 {

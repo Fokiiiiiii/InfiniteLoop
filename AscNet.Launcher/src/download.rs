@@ -979,13 +979,15 @@ struct NetState {
 
 impl Net {
     fn new(data: &SourceData) -> Result<Net> {
-        let client = reqwest::blocking::Client::builder()
-            .user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
-            .connect_timeout(Duration::from_secs(15))
-            .timeout(REQUEST_TIMEOUT)
-            .redirect(reqwest::redirect::Policy::limited(3))
-            .build()
-            .context("creating the HTTP client")?;
+        let client = wine_safe(
+            reqwest::blocking::Client::builder()
+                .user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
+                .connect_timeout(Duration::from_secs(15))
+                .timeout(REQUEST_TIMEOUT)
+                .redirect(reqwest::redirect::Policy::limited(3)),
+        )
+        .build()
+        .context("creating the HTTP client")?;
         Ok(Net {
             client,
             discovery: data.discovery.clone(),
@@ -1017,7 +1019,15 @@ impl Net {
         }
         for url in &self.discovery {
             let Ok(response) = self.client.get(url).send().and_then(|r| r.error_for_status()) else { continue };
-            let Ok(body) = response.bytes() else { continue };
+            let length = response.content_length();
+            if length.is_some_and(|n| n > MAX_LIST_BYTES as u64) {
+                continue;
+            }
+            let mut response = response;
+            let Ok(body) = read_body(&mut response, length, MAX_LIST_BYTES) else { continue };
+            if length.is_some_and(|n| body.len() as u64 != n) || body.len() > MAX_LIST_BYTES {
+                continue;
+            }
             let mut text = Vec::new();
             let raw = if body.starts_with(&[0x1f, 0x8b]) {
                 if flate2::read::GzDecoder::new(&body[..]).take(MAX_LIST_BYTES as u64).read_to_end(&mut text).is_err() {
@@ -1056,6 +1066,10 @@ impl Net {
 
     /// Opens `path` (optionally `bytes=a-b`, inclusive) on the first CDN that answers correctly; rounds with backoff.
     fn open(&self, path: &str, range: Option<(u64, u64)>, cancel: &AtomicBool) -> Result<reqwest::blocking::Response> {
+        self.open_host(path, range, cancel).map(|(_, response)| response)
+    }
+
+    fn open_host(&self, path: &str, range: Option<(u64, u64)>, cancel: &AtomicBool) -> Result<(String, reqwest::blocking::Response)> {
         let encoded = encode_path(path);
         let mut last = anyhow!("no CDN host configured");
         for round in 0..ROUNDS {
@@ -1073,7 +1087,7 @@ impl Net {
                         let status = response.status();
                         if status.as_u16() == if range.is_some() { 206 } else { 200 } {
                             self.mark(&cdn, true);
-                            return Ok(response);
+                            return Ok((cdn, response));
                         }
                         // A missing file is not the host's fault; server errors are.
                         self.mark(&cdn, status.as_u16() < 500 && status.as_u16() != 429);
@@ -1096,12 +1110,85 @@ impl Net {
     }
 
     fn get(&self, path: &str, cancel: &AtomicBool) -> Result<Vec<u8>> {
-        let response = self.open(path, None, cancel)?;
-        let mut body = Vec::new();
-        response.take(MAX_LIST_BYTES as u64 + 1).read_to_end(&mut body)?;
-        ensure!(body.len() <= MAX_LIST_BYTES, "{path} is unexpectedly large");
-        Ok(body)
+        let mut last = anyhow!("download failed");
+        for _ in 0..ROUNDS {
+            if cancel.load(SeqCst) {
+                return Err(cancelled());
+            }
+            let (cdn, mut response) = self.open_host(path, None, cancel)?;
+            let length = response.content_length();
+            if length.is_some_and(|n| n > MAX_LIST_BYTES as u64) {
+                bail!("{path} is unexpectedly large");
+            }
+            match read_body(&mut response, length, MAX_LIST_BYTES) {
+                Ok(body) if body.len() <= MAX_LIST_BYTES && length.map(|n| body.len() as u64 == n).unwrap_or(true) => {
+                    return Ok(body);
+                }
+                Ok(body) if body.len() > MAX_LIST_BYTES => bail!("{path} is unexpectedly large"),
+                Ok(body) => {
+                    self.demote(&cdn);
+                    last = anyhow!("{path} ended after {} bytes, expected {}", body.len(), length.unwrap_or(0));
+                }
+                Err(error) => {
+                    self.demote(&cdn);
+                    last = anyhow!(error).context("connection lost");
+                }
+            }
+        }
+        Err(last)
     }
+
+    /// One failed body is enough to stop preferring this host. `mark` only
+    /// counts, and a host stays first until it has failed `DEMOTE_AFTER` times.
+    fn demote(&self, cdn: &str) {
+        if let Some(entry) = self.state.lock().unwrap().cdns.iter_mut().find(|(name, _)| name == cdn) {
+            entry.1 = entry.1.max(DEMOTE_AFTER);
+        }
+    }
+}
+
+/// Under Wine, a socket read bigger than the bytes still coming does not
+/// return until the client timeout. `Connection: close` makes the server end
+/// the TCP stream after the body, which is what lets that read finish.
+/// HTTP/1.1 is the version that honors the header. Windows keeps keep-alive.
+pub fn wine_safe(builder: reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder {
+    if !crate::install::running_under_wine() {
+        return builder;
+    }
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(reqwest::header::CONNECTION, reqwest::header::HeaderValue::from_static("close"));
+    builder.http1_only().default_headers(headers)
+}
+
+/// Reads a body in 64 KiB chunks and stops at a known Content-Length.
+///
+/// `Read::read_to_end` grows its buffer. Under Wine a read bigger than the
+/// bytes still coming does not return until the client timeout, so a finished
+/// file is reported as `error decoding response body`. Callers also use
+/// [`wine_safe`] so the server closes after the body. Game downloads already
+/// stop at a known range.
+pub fn read_body(reader: &mut impl Read, content_length: Option<u64>, limit: usize) -> std::io::Result<Vec<u8>> {
+    let stop = match content_length {
+        Some(n) => {
+            let n = usize::try_from(n).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "response exceeds limit"))?;
+            if n > limit {
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "response exceeds limit"));
+            }
+            n
+        }
+        None => limit.saturating_add(1),
+    };
+    let mut body = Vec::new();
+    let mut buf = [0u8; 64 * 1024];
+    while body.len() < stop {
+        let want = buf.len().min(stop - body.len());
+        let n = reader.read(&mut buf[..want])?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&buf[..n]);
+    }
+    Ok(body)
 }
 
 fn backoff(attempt: usize) -> Duration {
@@ -1678,6 +1765,61 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::io::{BufRead, BufWriter};
     use std::net::{TcpListener, TcpStream};
+
+    struct Stop {
+        data: &'static [u8],
+        pos: usize,
+        past: Arc<AtomicUsize>,
+    }
+
+    impl Read for Stop {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.pos >= self.data.len() {
+                self.past.fetch_add(1, SeqCst);
+                return Ok(0);
+            }
+            let n = buf.len().min(self.data.len() - self.pos);
+            buf[..n].copy_from_slice(&self.data[self.pos..self.pos + n]);
+            self.pos += n;
+            Ok(n)
+        }
+    }
+
+    #[test]
+    fn read_body_stops_at_content_length() {
+        let past = Arc::new(AtomicUsize::new(0));
+        let mut reader = Stop { data: b"abcdefghij", pos: 0, past: past.clone() };
+        let body = read_body(&mut reader, Some(10), 1024).unwrap();
+        assert_eq!(body, b"abcdefghij");
+        assert_eq!(past.load(SeqCst), 0);
+    }
+
+    #[test]
+    fn read_body_returns_before_a_keep_alive_server_closes() {
+        let body = b"finished-download-body-0123456789";
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else { return };
+            let mut buf = [0u8; 4096];
+            let _ = stream.read(&mut buf);
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(header.as_bytes());
+            let _ = stream.write_all(body);
+            let _ = stream.flush();
+            std::thread::sleep(Duration::from_secs(15));
+        });
+        let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(8)).no_proxy().build().unwrap();
+        let started = Instant::now();
+        let mut response = client.get(format!("http://{addr}/file")).send().unwrap();
+        let length = response.content_length();
+        let got = read_body(&mut response, length, 1024 * 1024).unwrap();
+        assert_eq!(got, body);
+        assert!(started.elapsed() < Duration::from_secs(2), "still waiting after the body: {:?}", started.elapsed());
+    }
 
     const PREFIX: &str = "PGR_Data/StreamingAssets/resource";
     const SDK_DLL: &str = "PGR_Data/Plugins/KRSDK.dll";
@@ -2530,8 +2672,9 @@ mod tests {
             let probe = format!("{}{}", source.data.base_url, "version.json");
             for cdn in &source.data.cdns {
                 let one = Net { client: net.client.clone(), discovery: vec![], state: Mutex::new(NetState { cdns: vec![(cdn.clone(), 0)], discovered: true }) };
-                let mut body = Vec::new();
-                one.open(&probe, Some((0, 7)), &cancel).unwrap().read_to_end(&mut body).unwrap();
+                let mut response = one.open(&probe, Some((0, 7)), &cancel).unwrap();
+                let length = response.content_length();
+                let body = read_body(&mut response, length, 8).unwrap();
                 assert_eq!(body.len(), 8, "{cdn}");
             }
             eprintln!("{} ok: {} files, {} patches", source.region.label(), full.resource.len(), source.data.patches.len());

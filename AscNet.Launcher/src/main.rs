@@ -86,7 +86,7 @@ fn run() -> Result<()> {
         "--check-server" => {
             require_len(&args, 2, "--check-server <origin>")?;
             let origin = package::validate_server_origin(&args[1])?;
-            let response = reqwest::blocking::Client::builder().no_proxy().build()?
+            let response = ascnet_launcher::download::wine_safe(reqwest::blocking::Client::builder().no_proxy()).build()?
                 .get(format!("{origin}/api/launcher/status")).send()?.error_for_status()?;
             let value: serde_json::Value = response.json()?;
             println!("{}", serde_json::to_string_pretty(&value)?);

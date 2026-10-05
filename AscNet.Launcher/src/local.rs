@@ -879,10 +879,10 @@ fn wait_tcp(child: &mut Child, port: u16, name: &str) -> Result<()> {
 }
 
 fn wait_server(child: &mut Child, origin: &str, game_port: u16) -> Result<()> {
-    let client = reqwest::blocking::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(2))
-        .build()?;
+    let client = crate::download::wine_safe(
+        reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(2)),
+    )
+    .build()?;
     let deadline = Instant::now() + START_TIMEOUT;
     loop {
         if let Some(status) = child.try_wait()? {
@@ -897,13 +897,19 @@ fn wait_server(child: &mut Child, origin: &str, game_port: u16) -> Result<()> {
             .get(format!("{origin}/api/launcher/status"))
             .send()
             .and_then(reqwest::blocking::Response::error_for_status)
-            .and_then(|response| response.json::<serde_json::Value>())
             .ok()
-            .and_then(|value| {
-                value
-                    .get("schemaVersion")
-                    .and_then(serde_json::Value::as_u64)
+            .and_then(|mut response| {
+                let length = response.content_length();
+                if length.is_some_and(|n| n > 65_536) {
+                    return None;
+                }
+                let bytes = crate::download::read_body(&mut response, length, 65_536).ok()?;
+                if bytes.len() > 65_536 || length.is_some_and(|n| bytes.len() as u64 != n) {
+                    return None;
+                }
+                serde_json::from_slice::<serde_json::Value>(&bytes).ok()
             })
+            .and_then(|value| value.get("schemaVersion").and_then(serde_json::Value::as_u64))
             == Some(1);
         if game_ready && api_ready {
             return Ok(());

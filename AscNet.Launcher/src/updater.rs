@@ -65,7 +65,7 @@ fn stable_version(value: &str) -> Option<semver::Version> {
 }
 
 fn client() -> Result<reqwest::blocking::Client> {
-    Ok(reqwest::blocking::Client::builder().https_only(true).user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
+    Ok(crate::download::wine_safe(reqwest::blocking::Client::builder().https_only(true).user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15)).timeout(Duration::from_secs(180))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             let url = attempt.url();
@@ -73,7 +73,7 @@ fn client() -> Result<reqwest::blocking::Client> {
                 && matches!(url.host_str(), Some("github.com" | "api.github.com" | "release-assets.githubusercontent.com" | "objects.githubusercontent.com")) {
                 attempt.follow()
             } else { attempt.error("untrusted release redirect") }
-        })).build()?)
+        }))).build()?)
 }
 
 #[derive(Deserialize)]
@@ -84,11 +84,14 @@ struct ApiAsset { name: String, browser_download_url: String, size: u64, digest:
 pub fn check(repository: &str, current_version: &str) -> Result<Option<Release>> {
     let repository = repository_path(repository)?;
     let current = stable_version(current_version).context("compiled launcher version is not stable semver")?;
-    let response = client()?.get(format!("https://api.github.com/repos/{repository}/releases?per_page=100"))
+    let mut response = client()?.get(format!("https://api.github.com/repos/{repository}/releases?per_page=100"))
         .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").send()?.error_for_status()?;
-    let mut bytes = Vec::new();
-    response.take(2 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    let length = response.content_length();
+    let bytes = crate::download::read_body(&mut response, length, 2 * 1024 * 1024)?;
     ensure!(bytes.len() <= 2 * 1024 * 1024, "release metadata exceeds limit");
+    if let Some(n) = length {
+        ensure!(bytes.len() as u64 == n, "release metadata ended after {} bytes, expected {n}", bytes.len());
+    }
     let releases: Vec<ApiRelease> = serde_json::from_slice(&bytes)?;
     let Some((version, release)) = releases.into_iter().filter(|r| !r.draft && !r.prerelease)
         .filter_map(|r| stable_version(&r.tag_name).map(|v| (v, r))).filter(|(v, _)| v > &current).max_by(|a,b| a.0.cmp(&b.0)) else { return Ok(None) };
@@ -181,14 +184,20 @@ pub fn stage(release: &Release) -> Result<StagedUpdate> {
     let result = (|| -> Result<()> {
         let archive = root.join("release.zip");
         // Metadata keeps the client's 180 s total; the ~93 MB asset needs slow-link headroom.
-        let response = client()?.get(&release.url).timeout(Duration::from_secs(2 * 60 * 60)).send()?.error_for_status()?;
+        let mut response = client()?.get(&release.url).timeout(Duration::from_secs(2 * 60 * 60)).send()?.error_for_status()?;
         if let Some(length) = response.content_length() { ensure!(length == release.size, "release Content-Length mismatch"); }
-        let mut input = response.take(release.size + 1);
         let mut output = OpenOptions::new().write(true).create_new(true).open(&archive)?;
         let mut hash = Sha256::new();
         let mut buffer = [0u8; 65536];
         let mut size = 0u64;
-        loop { let n = input.read(&mut buffer)?; if n == 0 { break; } size += n as u64; ensure!(size <= release.size, "release download exceeds size"); hash.update(&buffer[..n]); output.write_all(&buffer[..n])?; }
+        while size < release.size {
+            let want = buffer.len().min((release.size - size) as usize);
+            let n = response.read(&mut buffer[..want])?;
+            if n == 0 { break; }
+            size += n as u64;
+            hash.update(&buffer[..n]);
+            output.write_all(&buffer[..n])?;
+        }
         output.sync_all()?;
         ensure!(size == release.size && format!("{:x}", hash.finalize()) == release.digest, "release SHA-256/size verification failed");
         fs::create_dir(root.join("new"))?;
