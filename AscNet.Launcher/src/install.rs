@@ -1093,6 +1093,82 @@ pub(crate) fn running_under_wine() -> bool {
     false
 }
 
+/// `\\?\Z:\home` and `Z:\home` name one directory. A junction's target does not.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+fn windows_paths_match(left: &str, right: &str) -> bool {
+    let left = normalize_windows_path(left);
+    let right = normalize_windows_path(right);
+    !left.is_empty() && left == right
+}
+
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+fn normalize_windows_path(value: &str) -> String {
+    let value = value.replace('/', "\\").to_ascii_lowercase();
+    let value = if let Some(rest) = value.strip_prefix("\\\\?\\unc\\") {
+        format!("\\\\{rest}")
+    } else if let Some(rest) = value.strip_prefix("\\\\?\\") {
+        rest.to_string()
+    } else {
+        value
+    };
+    // `z:\` is the drive root. Every other trailing slash is not part of the name.
+    if value.len() > 3 && value.ends_with('\\') {
+        value.trim_end_matches('\\').to_string()
+    } else {
+        value
+    }
+}
+
+/// Proton bind-mounts `/home` at `Z:\home` and Wine reports that directory as a
+/// junction. Opening it with and without `FILE_FLAG_OPEN_REPARSE_POINT` returns
+/// the same path. A junction that points somewhere else returns its target only
+/// when the reparse point is followed.
+#[cfg(windows)]
+pub(crate) fn wine_mount_keeps_its_path(path: &Path) -> bool {
+    if !running_under_wine() {
+        return false;
+    }
+    let Ok(metadata) = fs::symlink_metadata(path) else { return false };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return false;
+    }
+    match (final_dos_path(path, false), final_dos_path(path, true)) {
+        (Ok(followed), Ok(opened)) => windows_paths_match(&followed, &opened),
+        _ => false,
+    }
+}
+
+#[cfg(windows)]
+fn final_dos_path(path: &Path, open_reparse: bool) -> std::io::Result<String> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Storage::FileSystem::{
+        GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, VOLUME_NAME_DOS,
+    };
+    let mut flags = FILE_FLAG_BACKUP_SEMANTICS.0;
+    if open_reparse {
+        flags |= FILE_FLAG_OPEN_REPARSE_POINT.0;
+    }
+    let file = OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES.0)
+        .share_mode(FILE_SHARE_READ.0 | FILE_SHARE_WRITE.0 | FILE_SHARE_DELETE.0)
+        .custom_flags(flags)
+        .open(path)?;
+    let handle = windows::Win32::Foundation::HANDLE(file.as_raw_handle() as isize);
+    let mut buffer = vec![0u16; 260];
+    loop {
+        let length = unsafe { GetFinalPathNameByHandleW(handle, &mut buffer[..], VOLUME_NAME_DOS) };
+        if length == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        if (length as usize) < buffer.len() {
+            return Ok(String::from_utf16_lossy(&buffer[..length as usize]));
+        }
+        buffer.resize(length as usize, 0);
+    }
+}
+
 fn checked_client(client: &Path) -> Result<PathBuf> {
     #[cfg(windows)]
     pin_worker_directory(&std::path::absolute(client)?)?;
@@ -1128,15 +1204,19 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
         ancestors.reverse();
         for directory in ancestors {
             if pins.contains_key(directory) { continue; }
+            // Decide before taking the share-read pin. That pin denies a later open.
+            let metadata = fs::symlink_metadata(directory)
+                .with_context(|| format!("locking protected write directory {}", directory.display()))?;
+            if !metadata.is_dir()
+                || (metadata.file_attributes() & 0x400 != 0 && !wine_mount_keeps_its_path(directory))
+            {
+                bail!("refusing link/reparse write directory: {}", directory.display());
+            }
             // Metadata-only opens do not participate in Windows share checks.
             let handle = OpenOptions::new().read(true)
                 .share_mode(FILE_SHARE_READ.0)
                 .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
                 .open(directory).with_context(|| format!("locking protected write directory {}", directory.display()))?;
-            let metadata = handle.metadata()?;
-            if !metadata.is_dir() || metadata.file_attributes() & 0x400 != 0 {
-                bail!("refusing link/reparse write directory: {}", directory.display());
-            }
             pins.insert(directory.to_path_buf(), handle);
         }
         Ok(())
@@ -1147,9 +1227,26 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
 fn refuse_ancestor_reparse(path: &Path) -> Result<()> {
     for ancestor in path.ancestors() {
         if ancestor.as_os_str().is_empty() { continue; }
-        refuse_reparse(ancestor)?;
+        if ancestor_redirects(ancestor)? {
+            bail!("refusing link/reparse path: {}", ancestor.display());
+        }
     }
     Ok(())
+}
+
+/// A symlink or a junction whose target is a different path. Wine's own mount
+/// junctions (`Z:\`, `Z:\home`) are not redirects.
+#[cfg(windows)]
+fn ancestor_redirects(path: &Path) -> Result<bool> {
+    let metadata = fs::symlink_metadata(path)?;
+    let reparse = metadata.file_type().is_symlink() || {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    };
+    if !reparse {
+        return Ok(false);
+    }
+    Ok(!wine_mount_keeps_its_path(path))
 }
 
 fn validate_package_paths(package: &PatchPackage) -> Result<()> {
@@ -1878,6 +1975,19 @@ mod tests {
     fn traversal_and_links_are_refused() {
         assert!(validate_relative("../PGR.exe").is_err());
         assert!(validate_relative("a\\b").is_err());
+    }
+    #[test]
+    fn wine_bind_mount_path_matches_and_a_junction_target_does_not() {
+        assert!(windows_paths_match(r"\\?\Z:\home", r"\\?\Z:\home"));
+        assert!(windows_paths_match(r"Z:\home", r"\\?\Z:\home"));
+        assert!(windows_paths_match(r"\\?\Z:\", r"Z:\"));
+        assert!(windows_paths_match(r"\\?\Z:\Home\", r"z:\home"));
+        assert!(windows_paths_match(r"\\?\UNC\server\share\", r"\\server\share"));
+        assert!(!windows_paths_match(r"\\?\C:\ascnet-reparse-junc", r"\\?\C:\windows"));
+        assert!(!windows_paths_match(r"\\?\Z:\home", r"\\?\Z:\home\saku"));
+        assert!(!windows_paths_match(r"Z:\home", r"Z:\home2"));
+        assert!(!windows_paths_match("", ""));
+        assert!(!windows_paths_match(r"\\?\Z:\home", r""));
     }
     #[test]
     fn unknown_state_is_not_overwritten() {

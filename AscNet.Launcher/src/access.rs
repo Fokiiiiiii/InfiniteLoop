@@ -73,7 +73,19 @@ fn pin_ancestors(path: &Path) -> Result<Vec<File>> {
     ancestors.reverse();
     let mut pins = Vec::with_capacity(ancestors.len());
     for ancestor in ancestors {
-        let file = open_pinned(ancestor, FILE_GENERIC_READ.0)?;
+        // Ancestors above the game can be Proton bind mounts. The document tree
+        // itself still goes through open_pinned and rejects every reparse point.
+        let metadata = fs::symlink_metadata(ancestor)
+            .with_context(|| format!("opening document access path {}", ancestor.display()))?;
+        ensure!(
+            metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0
+                || crate::install::wine_mount_keeps_its_path(ancestor),
+            "refusing document access through reparse point: {}",
+            ancestor.display()
+        );
+        let file = OpenOptions::new().access_mode(FILE_GENERIC_READ.0).share_mode(FILE_SHARE_READ.0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
+            .open(ancestor).with_context(|| format!("opening document access path {}", ancestor.display()))?;
         ensure!(file.metadata()?.is_dir(), "document ancestor is not a directory");
         pins.push(file);
     }

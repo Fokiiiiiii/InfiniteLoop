@@ -121,7 +121,11 @@ fn directory(path: &Path) -> Result<()> {
         ensure!(metadata.is_dir() && !metadata.file_type().is_symlink(), "linked update directory refused");
         #[cfg(windows)] {
             use std::os::windows::fs::MetadataExt;
-            ensure!(metadata.file_attributes() & 0x400 == 0, "reparse directory refused");
+            ensure!(
+                metadata.file_attributes() & 0x400 == 0
+                    || crate::install::wine_mount_keeps_its_path(ancestor),
+                "reparse directory refused"
+            );
         }
     }
     Ok(())
