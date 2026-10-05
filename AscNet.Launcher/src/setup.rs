@@ -396,13 +396,28 @@ fn update_checkout(
     if !dirty.is_empty() {
         bail!("Checkout has local changes. Commit or remove them before updating; setup will not reset, clean, or stash files.\n{dirty}");
     }
-    let mut pull = Command::new(git);
-    pull.env("GIT_TERMINAL_PROMPT", "0")
+    let mut fetch = Command::new(git);
+    fetch
+        .env("GIT_TERMINAL_PROMPT", "0")
         .env("GCM_INTERACTIVE", "Never")
         .args(["-c", "credential.interactive=false", "-C"])
         .arg(checkout)
-        .args(["pull", "--ff-only", "origin", branch]);
-    run_logged(&mut pull, "Fast-forward repository update", deadline, progress, log)
+        .args(["fetch", "origin", branch]);
+    if let Err(error) = run_logged(&mut fetch, "Fetch repository update", deadline, progress, log) {
+        // A clean checkout already on the branch can be built when GitHub is
+        // unreachable. The next setup that can fetch still fast-forwards.
+        let local = git_text(git, Some(checkout), &["rev-parse".into(), "--short".into(), "HEAD".into()], "git rev-parse --short HEAD", deadline, progress, log)?;
+        note(progress, log, &format!("WARNING: could not reach {repository} ({error:#}); continuing with the local checkout at {local}."))?;
+        return Ok(());
+    }
+    let mut merge = Command::new(git);
+    merge
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GCM_INTERACTIVE", "Never")
+        .args(["-c", "credential.interactive=false", "-C"])
+        .arg(checkout)
+        .args(["merge", "--ff-only", "FETCH_HEAD"]);
+    run_logged(&mut merge, "Fast-forward repository update", deadline, progress, log)
 }
 
 fn http_client(deadline: Instant) -> Result<reqwest::blocking::Client> {
@@ -1861,6 +1876,14 @@ mod tests {
         run(&["-C", origin.to_str().unwrap(), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "-am", "two"]);
         update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap();
         assert_eq!(fs::read_to_string(checkout.join("value.txt")).unwrap(), "two");
+
+        let synced = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
+        let hidden = temp.join("origin-offline");
+        fs::rename(&origin, &hidden).unwrap();
+        update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap();
+        let stayed = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
+        assert_eq!(synced, stayed);
+        fs::rename(&hidden, &origin).unwrap();
 
         fs::write(checkout.join("value.txt"), "user changes").unwrap();
         let error = update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap_err().to_string();
