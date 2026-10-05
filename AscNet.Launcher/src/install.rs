@@ -1174,9 +1174,11 @@ fn final_dos_path(path: &Path, open_reparse: bool) -> std::io::Result<String> {
 
 fn checked_client(client: &Path) -> Result<PathBuf> {
     #[cfg(windows)]
-    pin_worker_directory(&std::path::absolute(client)?)?;
-    #[cfg(windows)]
-    refuse_ancestor_reparse(&std::path::absolute(client)?)?;
+    {
+        let absolute = std::path::absolute(client)?;
+        pin_worker_directory(&absolute)?;
+        refuse_ancestor_reparse(&absolute)?;
+    }
     let client = fs::canonicalize(client)
         .with_context(|| format!("invalid game directory: {}", client.display()))?;
     if !client.is_dir() {
