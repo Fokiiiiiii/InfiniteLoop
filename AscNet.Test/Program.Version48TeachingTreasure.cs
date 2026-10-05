@@ -216,15 +216,19 @@ internal static partial class Program
         Reload();
         while (harness.TryReadAvailablePacket("Teaching drain", out _)) { }
         login.Invoke(null, [harness.Session]);
-        JObject? info = null;
-        while (info is null && harness.TryReadAvailablePacket("Teaching login push", out Packet packet))
+        JObject info;
+        while (true)
         {
-            if (packet.Type != Packet.ContentType.Push) continue;
+            Packet packet = harness.ReadPacket("NotifyTeachingActivityInfo login push");
+            if (packet.Type != Packet.ContentType.Push)
+                continue;
             Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-            if (push.Name == "NotifyTeachingActivityInfo")
-                info = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
+            if (push.Name != "NotifyTeachingActivityInfo")
+                continue;
+            info = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
+            break;
         }
-        JObject entry = info!["ActivityInfo"]!.OfType<JObject>().Single(row => row.Value<int>("Id") == 51);
+        JObject entry = info["ActivityInfo"]!.OfType<JObject>().Single(row => row.Value<int>("Id") == 51);
         AssertIntegerList([284, 285, 287, 288], entry["TreasureRecord"]!.Select(id => id.Value<long>()).Order().ToArray(), "Teaching TreasureRecord after reload");
         Console.WriteLine("Teaching treasure 4.8 passed: boundaries, registered success/duplicate, closed-window login resume, reload TreasureRecord.");
     }
