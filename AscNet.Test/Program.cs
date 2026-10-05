@@ -11847,6 +11847,7 @@ namespace AscNet.Test
                 player,
                 CreateDrawCompatibilityInventory(playerId, []),
                 "team-prefab-compat");
+            harness.Session.stage = AscNet.Common.Database.Stage.FromUid(playerId);
 
             TeamPrefabData capturedEmpty = new()
             {
@@ -12436,6 +12437,11 @@ namespace AscNet.Test
                     CharacterId = secondCharacterId,
                     GroupId = chipGroup.GroupId
                 });
+            Packet chipGroupEquipPacket = harness.ReadPacket("memory preset equip push");
+            AssertEqual(Packet.ContentType.Push, chipGroupEquipPacket.Type, "memory preset equip push packet type");
+            Packet.Push chipGroupEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(chipGroupEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), chipGroupEquipPush.Name, "memory preset equip push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnChipGroupResponse>(
                 harness, 71_082, nameof(EquipPutOnChipGroupResponse), "memory preset equip").Code,
                 "memory preset equip Code");
@@ -12497,7 +12503,7 @@ namespace AscNet.Test
                 {
                     if (equipment is null)
                         continue;
-                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values)
+                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values.Where(preset => preset.EquipId != 0))
                         AssertEqual(applied.TeamData[position],
                             equipPush.EquipDataList.Single(equip => equip.Id == preset.EquipId).CharacterId,
                             $"{name} client receives preset equipment ownership before acknowledgement");
@@ -16895,14 +16901,15 @@ namespace AscNet.Test
             AssertCallIsConditionallyGuarded(characterFromUid, characterSave, "Character.FromUid saves only changed normalized equips");
 
             Type accountModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule");
-            MethodInfo doLogin = RequiredMethod(
-                accountModule,
-                "DoLogin",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(Session)]);
             MethodInfo buildNotifyLogin = RequiredMethod(
                 accountModule,
                 "BuildNotifyLogin",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                [typeof(Session), typeof(long)]);
+
+            MethodInfo doLogin = RequiredMethod(
+                accountModule,
+                "DoLogin",
                 BindingFlags.Static | BindingFlags.NonPublic,
                 [typeof(Session)]);
             MethodInfo sendLoginState = RequiredMethod(
@@ -16956,14 +16963,6 @@ namespace AscNet.Test
                 typeof(AscNet.Common.Database.Character),
                 $"get_{nameof(AscNet.Common.Database.Character.Equips)}",
                 BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo playerDataGetter = RequiredMethod(
-                typeof(AscNet.Common.Database.Player),
-                $"get_{nameof(AscNet.Common.Database.Player.PlayerData)}",
-                BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo playerDataIdGetter = RequiredMethod(
-                typeof(PlayerData),
-                $"get_{nameof(PlayerData.Id)}",
-                BindingFlags.Instance | BindingFlags.Public);
             MethodInfo notifyLoginEquipListSetter = RequiredMethod(
                 typeof(NotifyLogin),
                 $"set_{nameof(NotifyLogin.EquipList)}",
@@ -16975,6 +16974,15 @@ namespace AscNet.Test
                 sessionCharacter,
                 characterEquipsGetter,
                 "AccountModule.BuildNotifyLogin NotifyLogin.EquipList source");
+
+            MethodInfo playerDataGetter = RequiredMethod(
+                typeof(AscNet.Common.Database.Player),
+                $"get_{nameof(AscNet.Common.Database.Player.PlayerData)}",
+                BindingFlags.Instance | BindingFlags.Public);
+            MethodInfo playerDataIdGetter = RequiredMethod(
+                typeof(PlayerData),
+                $"get_{nameof(PlayerData.Id)}",
+                BindingFlags.Instance | BindingFlags.Public);
             AssertEquipCommandSyncContract(
                 equipCommandType,
                 equipCommandExecute,
@@ -26322,6 +26330,41 @@ namespace AscNet.Test
 
             throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {target.DeclaringType?.FullName}.{target.Name}.");
         }
+        private static void AssertSessionCharacterEquipsFeedsCall(MethodInfo method, MethodInfo consumer, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
+        {
+            List<IlInstruction> instructions = ReadIlInstructions(method).ToList();
+            int consumerIndex = FindCallIndex(instructions, consumer, startIndex: 0);
+            if (consumerIndex < 0)
+                throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {consumer.DeclaringType?.FullName}.{consumer.Name}.");
+
+            AssertRecentSessionCharacterEquipsSource(instructions, consumerIndex, sessionCharacter, characterEquipsGetter, name);
+        }
+
+        private static void AssertRecentSessionCharacterEquipsSource(List<IlInstruction> instructions, int consumerIndex, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
+        {
+            int equipsGetterIndex = -1;
+            int firstGetterCandidate = Math.Max(0, consumerIndex - 24);
+            for (int index = consumerIndex - 1; index >= firstGetterCandidate; index--)
+            {
+                if (instructions[index].Operand is MethodBase calledMethod && MethodsMatch(calledMethod, characterEquipsGetter))
+                {
+                    equipsGetterIndex = index;
+                    break;
+                }
+            }
+
+            if (equipsGetterIndex < 0)
+                throw new InvalidDataException($"{name}: expected the consumed equip list to come from Character.Equips.");
+
+            int firstCharacterCandidate = Math.Max(0, equipsGetterIndex - 8);
+            for (int index = equipsGetterIndex - 1; index >= firstCharacterCandidate; index--)
+            {
+                if (instructions[index].Operand is FieldInfo loadedField && FieldsMatch(loadedField, sessionCharacter))
+                    return;
+            }
+
+            throw new InvalidDataException($"{name}: expected Character.Equips to be loaded from Session.character.");
+        }
 
         private static void AssertCallPrecedes(MethodInfo method, MethodInfo firstTarget, MethodInfo secondTarget, string name)
         {
@@ -26349,15 +26392,6 @@ namespace AscNet.Test
                 throw new InvalidDataException($"{name}: expected {target.DeclaringType?.FullName}.{target.Name} to be reached through a conditional branch.");
         }
 
-        private static void AssertSessionCharacterEquipsFeedsCall(MethodInfo method, MethodInfo consumer, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
-        {
-            List<IlInstruction> instructions = ReadIlInstructions(method).ToList();
-            int consumerIndex = FindCallIndex(instructions, consumer, startIndex: 0);
-            if (consumerIndex < 0)
-                throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {consumer.DeclaringType?.FullName}.{consumer.Name}.");
-
-            AssertRecentSessionCharacterEquipsSource(instructions, consumerIndex, sessionCharacter, characterEquipsGetter, name);
-        }
 
 
         private static void AssertEquipDataPayloadEquals(EquipData expected, EquipData actual, string name)
@@ -26706,6 +26740,11 @@ namespace AscNet.Test
 
             InvokeRegisteredRequestHandler(nameof(EquipPutOnRequest), harness.Session, 934,
                 new EquipPutOnRequest { EquipId = (int)targetEquip.Id, CharacterId = targetCharacter.Id, Site = targetTable.Site });
+            Packet validEquipPacket = harness.ReadPacket("EquipPutOn valid equipment push");
+            AssertEqual(Packet.ContentType.Push, validEquipPacket.Type, "EquipPutOn valid equipment push packet type");
+            Packet.Push validEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(validEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), validEquipPush.Name, "EquipPutOn valid equipment push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnResponse>(
                 harness, 934, nameof(EquipPutOnResponse), "EquipPutOn valid response").Code,
                 "EquipPutOn valid equipment succeeds");
@@ -26714,6 +26753,11 @@ namespace AscNet.Test
 
             InvokeRegisteredRequestHandler(nameof(EquipPutOnRequest), harness.Session, 935,
                 new EquipPutOnRequest { EquipId = (int)memoryEquip.Id, CharacterId = targetCharacter.Id, Site = memoryTable.Site });
+            Packet memoryEquipPacket = harness.ReadPacket("EquipPutOn valid Memory push");
+            AssertEqual(Packet.ContentType.Push, memoryEquipPacket.Type, "EquipPutOn valid Memory push packet type");
+            Packet.Push memoryEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(memoryEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), memoryEquipPush.Name, "EquipPutOn valid Memory push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnResponse>(
                 harness, 935, nameof(EquipPutOnResponse), "EquipPutOn valid Memory response").Code,
                 "EquipPutOn valid Memory succeeds");
@@ -28365,31 +28409,6 @@ namespace AscNet.Test
         }
 
 
-        private static void AssertRecentSessionCharacterEquipsSource(List<IlInstruction> instructions, int consumerIndex, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
-        {
-            int equipsGetterIndex = -1;
-            int firstGetterCandidate = Math.Max(0, consumerIndex - 24);
-            for (int index = consumerIndex - 1; index >= firstGetterCandidate; index--)
-            {
-                if (instructions[index].Operand is MethodBase calledMethod && MethodsMatch(calledMethod, characterEquipsGetter))
-                {
-                    equipsGetterIndex = index;
-                    break;
-                }
-            }
-
-            if (equipsGetterIndex < 0)
-                throw new InvalidDataException($"{name}: expected the consumed equip list to come from Character.Equips.");
-
-            int firstCharacterCandidate = Math.Max(0, equipsGetterIndex - 8);
-            for (int index = equipsGetterIndex - 1; index >= firstCharacterCandidate; index--)
-            {
-                if (instructions[index].Operand is FieldInfo loadedField && FieldsMatch(loadedField, sessionCharacter))
-                    return;
-            }
-
-            throw new InvalidDataException($"{name}: expected Character.Equips to be loaded from Session.character.");
-        }
 
         private static void AssertLevelUpMaxCapResponsePrecedesInventoryMutation(MethodInfo method, MethodInfo inventoryDo, MethodInfo inventorySave, string name)
         {
