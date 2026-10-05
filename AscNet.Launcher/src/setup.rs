@@ -1,5 +1,7 @@
 //! Local source setup runs inside the launcher. It installs Git, the .NET 8 SDK,
 //! Rust, and MongoDB from official archives and never starts PowerShell or WinGet.
+//! Under Wine it also unpacks the MSVC toolset and Windows SDK from the Visual
+//! Studio release channel instead of running the Build Tools installer.
 #![cfg_attr(not(windows), allow(dead_code))]
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
@@ -23,6 +25,7 @@ const MINGIT_SHA256: &str = "064b440ff870ed5198527e8f3a92cdf5bd2fd0fedf5e718af95
 const DOTNET_RELEASES: &str = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json";
 const MONGO_CATALOG: &str = "https://downloads.mongodb.org/full.json";
 const VS_BOOTSTRAPPER: &str = "https://aka.ms/vs/17/release/vs_buildtools.exe";
+const VS_CHANNEL: &str = "https://aka.ms/vs/17/release/channel";
 const NUGET_INDEX: &str = "https://api.nuget.org/v3/index.json";
 
 struct RustComponent {
@@ -1156,17 +1159,122 @@ struct Compiler {
 }
 
 #[cfg(windows)]
+fn vcvars_bat(root: &Path) -> PathBuf {
+    root.join("VC").join("Auxiliary").join("Build").join("vcvars64.bat")
+}
+
+#[cfg(windows)]
+fn compiler_from_vcvars(msvc: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Compiler> {
+    let bat = vcvars_bat(msvc);
+    let vars = capture_vcvars(&bat, deadline, progress, log)?;
+    register_windows_sdk(msvc)?;
+    Ok(Compiler { vars, msbuild: None, wine: true })
+}
+
+#[cfg(windows)]
+fn compiler_from_tree(msvc: &Path) -> Result<Compiler> {
+    let vars = crate::msvc::compiler_vars(msvc)?;
+    register_windows_sdk(msvc)?;
+    Ok(Compiler { vars, msbuild: None, wine: true })
+}
+
+#[cfg(windows)]
+fn safe_archive_name(name: &str) -> String {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let mut clean = String::new();
+    for character in base.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
+            clean.push(character);
+        } else {
+            clean.push('_');
+        }
+    }
+    if clean.is_empty() { "package.bin".to_owned() } else { clean }
+}
+
+#[cfg(windows)]
+fn install_portable_msvc(root: &Path, dest: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    let channel = read_download_text(VS_CHANNEL, deadline)?;
+    let info = crate::msvc::channel_info(&channel)?;
+    note(progress, log, &format!("Visual Studio license: {}", info.license))?;
+    note(progress, log, "Installing the MSVC toolset and Windows SDK")?;
+    let manifest = read_download_text(&info.manifest_url, deadline)?;
+    let plan = crate::msvc::plan(&manifest)?;
+    note(progress, log, &format!("MSVC {} and Windows SDK {}", plan.toolset, plan.sdk_version))?;
+    let stage = scratch_file(root, "msvc");
+    let downloads = scratch_file(root, "msvc-pkg");
+    fs::create_dir_all(&stage)?;
+    fs::create_dir_all(&downloads)?;
+    let installed = (|| -> Result<()> {
+        for payload in &plan.vsix {
+            ensure_time(deadline)?;
+            let archive = downloads.join(safe_archive_name(&payload.file_name));
+            download_file(&payload.url, &archive, Some(&payload.sha256), None, deadline, progress, log)?;
+            crate::msvc::extract_vsix(&archive, &stage)?;
+            let _ = fs::remove_file(&archive);
+        }
+        for name in &plan.msi_names {
+            ensure_time(deadline)?;
+            let payload = crate::msvc::find_payload(&plan.sdk_payloads, name)?;
+            let msi_path = downloads.join(safe_archive_name(name));
+            download_file(&payload.url, &msi_path, Some(&payload.sha256), None, deadline, progress, log)?;
+            let bytes = fs::read(&msi_path).with_context(|| format!("read {}", msi_path.display()))?;
+            let cabinets = crate::msvc::cabinet_names(&bytes);
+            if cabinets.is_empty() {
+                bail!("{name} did not reference any cabinet files");
+            }
+            for cabinet in &cabinets {
+                let cab_payload = crate::msvc::find_payload(&plan.sdk_payloads, cabinet)?;
+                let cab_path = downloads.join(safe_archive_name(cabinet));
+                if !cab_path.is_file() {
+                    download_file(&cab_payload.url, &cab_path, Some(&cab_payload.sha256), None, deadline, progress, log)?;
+                }
+            }
+            note(progress, log, &format!("Unpacking {name}"))?;
+            crate::msvc::extract_msi(&msi_path, &downloads, &stage)?;
+            let _ = fs::remove_file(&msi_path);
+        }
+        crate::msvc::remove_telemetry(&stage);
+        crate::msvc::compiler_vars(&stage)?;
+        Ok(())
+    })();
+    if let Err(error) = installed {
+        let _ = fs::remove_dir_all(&stage);
+        let _ = fs::remove_dir_all(&downloads);
+        return Err(error);
+    }
+    let _ = fs::remove_dir_all(&downloads);
+    if dest.exists() {
+        fs::remove_dir_all(dest)?;
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(&stage, dest).with_context(|| format!("install MSVC into {}", dest.display()))?;
+    Ok(())
+}
+
+#[cfg(windows)]
 fn ensure_compiler(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Compiler> {
     let wine = crate::install::running_under_wine();
     if wine {
-        let msvc = env::var_os("ASCNET_MSVC").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\msvc"));
-        let bat = msvc.join("VC").join("Auxiliary").join("Build").join("vcvars64.bat");
-        if !bat.is_file() {
-            bail!("Wine builds need an unpacked MSVC at C:\\msvc or ASCNET_MSVC (missing {})", bat.display());
+        if let Some(msvc) = env::var_os("ASCNET_MSVC") {
+            let msvc = PathBuf::from(msvc);
+            let bat = vcvars_bat(&msvc);
+            if !bat.is_file() {
+                bail!("ASCNET_MSVC is set but {} is missing", bat.display());
+            }
+            return compiler_from_vcvars(&msvc, deadline, progress, log);
         }
-        let vars = capture_vcvars(&bat, deadline, progress, log)?;
-        register_windows_sdk(&msvc)?;
-        return Ok(Compiler { vars, msbuild: None, wine: true });
+        let preset = PathBuf::from(r"C:\msvc");
+        if vcvars_bat(&preset).is_file() {
+            return compiler_from_vcvars(&preset, deadline, progress, log);
+        }
+        let bundled = root.join("tools").join("msvc");
+        if !crate::msvc::is_ready(&bundled) {
+            install_portable_msvc(root, &bundled, deadline, progress, log)?;
+        }
+        return compiler_from_tree(&bundled);
     }
     if let Some(found) = locate_vs(deadline, progress, log)? {
         let vars = capture_vcvars(&found.bat, deadline, progress, log)?;

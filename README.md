@@ -359,7 +359,7 @@ Minimum local tooling:
 - mitmproxy/mitmdump for Steam/PC bridge mode
 - A local Punishing: Gray Raven PC/Steam installation for client testing
 
-The .NET server and `run_steam.py` run natively on Linux. The game client and `AscNet.Launcher` are Windows programs. Under Wine, the launcher installs Git, the .NET 8 SDK, Rust 1.92 (MSVC), and MongoDB from official archives. It does not use PowerShell or WinGet. It passes `diagnosticDataCollectionEnabled=false` to Windows `mongod`. Building `version.dll` still needs an unpacked MSVC at `C:\msvc` or `ASCNET_MSVC`. The launcher does not download Visual Studio. When the configured Git remote cannot be fetched, a clean checkout that is already on that branch is built at its current revision.
+The .NET server and `run_steam.py` run natively on Linux. The game client and `AscNet.Launcher` are Windows programs. Under Wine, the launcher installs Git, the .NET 8 SDK, Rust 1.92 (MSVC), and MongoDB from official archives. It does not use PowerShell or WinGet. It passes `diagnosticDataCollectionEnabled=false` to Windows `mongod`. Under Wine it also downloads the MSVC toolset and Windows SDK from the Visual Studio 2022 release channel into the local tools directory. It does not run the Visual Studio installer. An existing unpacked tree at `C:\msvc` or `ASCNET_MSVC` is used when `VC\Auxiliary\Build\vcvars64.bat` is already there. When the configured Git remote cannot be fetched, a clean checkout that is already on that branch is built at its current revision.
 
 Optional/macOS-specific:
 
