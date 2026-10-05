@@ -439,6 +439,7 @@ namespace AscNet.GameServer.Handlers.BigWorld
             {
                 BigWorldPlayerState s = session.player.BigWorldState;
                 s.CommanderGender = req.Gender;
+                SyncCommandantTeam(s);
                 s.CurCommanderOutfitType = req.OutfitType;
                 s.CommanderFashionOutfits[req.OutfitType] = req.CommanderFashionList!
                     .OrderBy(p => p.Key)
@@ -609,9 +610,27 @@ namespace AscNet.GameServer.Handlers.BigWorld
                     .Where(m => m.CharacterId > 0).ToList();
                 changed = teamsSeeded = true;
             }
+            changed |= SyncCommandantTeam(s);
             if (changed)
                 player.Save();
             return teamsSeeded;
+        }
+
+        // The body follows the team member's character (2011001 male NPC 3004 / 2011002 female NPC 3005) while DIY parts follow
+        // CommanderGender; a mismatch rigs female hair on the male skeleton ("Bone_HairBoneNN is not in sourceBone"), so teams
+        // always carry the commandant of the current gender.
+        private static bool SyncCommandantTeam(BigWorldPlayerState s)
+        {
+            int male = BigWorldModule.ConfigInt("PlayerMaleCharacterId"), female = BigWorldModule.ConfigInt("PlayerFemaleCharacterId");
+            int want = s.CommanderGender == 2 ? female : male;
+            bool changed = false;
+            foreach (BigWorldTeamMemberState m in s.Teams.Values.SelectMany(t => t))
+                if (m.CharacterId is var id && (id == male || id == female) && id != want)
+                {
+                    m.CharacterId = want;
+                    changed = true;
+                }
+            return changed;
         }
 
         private static void EnsureAndNotify(Session session)

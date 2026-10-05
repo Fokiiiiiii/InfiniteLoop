@@ -115,6 +115,8 @@ namespace AscNet.Test
             AssertEqual(false, s.CharacterInitialized, "rejected DIY does not initialize");
             Code(nameof(BigWorldCommanderFashionUpdateRequest), Diy(1, 2, (1, 29001002, 1002202), (2, 29002001, 0), (3, 29003001, 3001201)), 0, nameof(BigWorldCommanderFashionUpdateResponse));
             AssertEqual(2, s.CommanderGender, "gender persisted");
+            AssertEqual((2011002, 3005, 2), (s.Teams[1][0].CharacterId, BigWorldCharacterModule.BuildWorldNpcList(h.Session.player)[0].Id, BigWorldCharacterModule.BuildWorldNpcList(h.Session.player)[0].Gender),
+                "female DIY switches the team commandant to the female body (male body + female hair lacks hair bones)");
             AssertEqual(true, s.CharacterInitialized, "DIY initialized");
             Code(nameof(BigWorldCommanderFashionUpdateRequest), Diy(2, 2, (99, 29990002, 0)), 25201002, nameof(BigWorldCommanderFashionUpdateResponse));
             Code(nameof(BigWorldCommanderFashionUpdateRequest), Diy(2, 2, (99, 29990001, 0)), 0, nameof(BigWorldCommanderFashionUpdateResponse));
