@@ -436,6 +436,10 @@ namespace AscNet.GameServer.Handlers.BigWorld
             (BigWorldVector3 Position, double? RotationY)? pose = null)
         {
             Player player = session.player;
+            // A team without the commandant (constructs only) still gets the standing, backstage IsPlayerSelf actor outside the team
+            // (Pos = team size): XDrama.ClonePlayerNpc needs XController.PlayerSelfNpc or every drama with the player fails to start.
+            if (!npcs.Any(npc => npc.IsPlayerSelf))
+                npcs = [.. npcs, BigWorldCharacterModule.BuildCommandantNpc(player, npcs.Count)];
             int playerId = checked((int)player.PlayerData.Id);
             List<LevelSceneObjectTable> sceneObjects = ReplicatedSceneObjects(player, levelId);
             List<LevelNpcTable> levelNpcs = ReplicatedLevelNpcs(player, levelId);

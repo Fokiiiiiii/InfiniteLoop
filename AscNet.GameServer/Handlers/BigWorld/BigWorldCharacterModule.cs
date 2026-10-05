@@ -218,36 +218,50 @@ namespace AscNet.GameServer.Handlers.BigWorld
             Ensure(player);
             BigWorldPlayerState s = player.BigWorldState;
             List<BigWorldTeamMemberState> team = s.Teams.GetValueOrDefault(s.CurrentTeamId) ?? new();
-            return team.OrderBy(m => m.Pos).Where(m => Characters.Value.ContainsKey(m.CharacterId)).Select(m =>
+            return team.OrderBy(m => m.Pos).Where(m => Characters.Value.ContainsKey(m.CharacterId)).Select(m => WorldNpc(s, m.CharacterId, m.Pos)).ToList();
+        }
+
+        // The commandant (IsPlayerSelf) outside the team. A team of constructs only has none, but the client's drama system clones
+        // XController.PlayerSelfNpc (XDrama.ClonePlayerNpc, "找不到玩家Npc" otherwise) and XController.SyncTeamDataInternal maps a later
+        // IsPlayerSelf entry onto the existing PlayerSelfNpc, so the self NPC is a standing actor (installed client 4.8).
+        internal static Theatre5WorldNpcData BuildCommandantNpc(Player player, int pos)
+        {
+            Ensure(player);
+            int characterId = BigWorldModule.ConfigInt(player.BigWorldState.CommanderGender == 2 ? "PlayerFemaleCharacterId" : "PlayerMaleCharacterId");
+            Theatre5WorldNpcData npc = WorldNpc(player.BigWorldState, characterId, pos);
+            npc.IsPlayerSelf = true;
+            return npc;
+        }
+
+        private static Theatre5WorldNpcData WorldNpc(BigWorldPlayerState s, int characterId, int pos)
+        {
+            BigWorldCharacterTable row = Characters.Value[characterId];
+            BigWorldCharacterFashionState? wear = s.CharacterFashions.GetValueOrDefault(characterId);
+            bool commandant = row.IsCommandant == 1;
+            return new Theatre5WorldNpcData
             {
-                BigWorldCharacterTable row = Characters.Value[m.CharacterId];
-                BigWorldCharacterFashionState? wear = s.CharacterFashions.GetValueOrDefault(m.CharacterId);
-                bool commandant = row.IsCommandant == 1;
-                return new Theatre5WorldNpcData
+                Id = row.NpcId,
+                // AscNet policy: BigWorld stats come from BigWorldCharacter.AttribId, not main-game growth; level fixed at 1.
+                Level = 1,
+                Pos = pos,
+                Gender = commandant ? s.CommanderGender : 0,
+                Character = new Theatre5DlcCharacterData
                 {
-                    Id = row.NpcId,
-                    // AscNet policy: BigWorld stats come from BigWorldCharacter.AttribId, not main-game growth; level fixed at 1.
-                    Level = 1,
-                    Pos = m.Pos,
-                    Gender = commandant ? s.CommanderGender : 0,
-                    Character = new Theatre5DlcCharacterData
+                    Id = characterId,
+                    FashionId = wear?.FashionId ?? row.DefaultFashionId,
+                    FashionColorId = wear?.FashionColorId ?? 0
+                },
+                PartData = commandant
+                    ? new Theatre5WorldNpcPartData
                     {
-                        Id = m.CharacterId,
-                        FashionId = wear?.FashionId ?? row.DefaultFashionId,
-                        FashionColorId = wear?.FashionColorId ?? 0
-                    },
-                    PartData = commandant
-                        ? new Theatre5WorldNpcPartData
-                        {
-                            PartList = (s.CommanderFashionOutfits.GetValueOrDefault(s.CurCommanderOutfitType) ?? new())
-                                .Select(p => new Theatre5BigWorldCommanderFashion { PartId = p.PartId, ColourId = p.ColourId }).ToList()
-                        }
-                        : null,
-                    // nil like retail: the engine builds attributes from tables. An empty blob makes XAttrib.Deserialize
-                    // overrun when a drama clones the player NPC (XDrama.ClonePlayerNpc), locking the player mid-dialogue.
-                    AttribsData = null
-                };
-            }).ToList();
+                        PartList = (s.CommanderFashionOutfits.GetValueOrDefault(s.CurCommanderOutfitType) ?? new())
+                            .Select(p => new Theatre5BigWorldCommanderFashion { PartId = p.PartId, ColourId = p.ColourId }).ToList()
+                    }
+                    : null,
+                // nil like retail: the engine builds attributes from tables. An empty blob makes XAttrib.Deserialize
+                // overrun when a drama clones the player NPC (XDrama.ClonePlayerNpc), locking the player mid-dialogue.
+                AttribsData = null
+            };
         }
 
         // Applies DIY-part goods (29xxxxxx) returned unapplied by BigWorldRewardService.Grant.

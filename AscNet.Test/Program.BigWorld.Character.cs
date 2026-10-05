@@ -256,6 +256,27 @@ namespace AscNet.Test
                 }
                 AssertEqual(("Engine01:1,Engine02:1", "SGHide:1", "SGHide:1", "nil"), (Joints(1021006), Joints(1021007), Joints(1031005), Joints(2011001)), "model joints equal retail (979/1276) for 1021006, 1021007, 1031005 and the commandant");
                 AssertEqual(("Chain:1", "nil"), (Joints(1071005), Joints(1071004)), "Karenina Effulgence hides Chain; Karenina Babylonia Test hides nothing");
+
+                // A constructs-only team (no IsPlayerSelf member) entering the world: the client's XDrama.ClonePlayerNpc needs
+                // XController.PlayerSelfNpc ("找不到玩家Npc" otherwise, live Drama_200207 never started and the player froze on leave), so the
+                // snapshot carries a hidden IsPlayerSelf commandant outside the team (Pos = team size) with a decodable move snapshot.
+                client.Call<object?>(nameof(BigWorldTeamChangeRequest), new BigWorldTeamChangeRequest { ChangeTeam = Team(ws.CurrentTeamId, (0, 1021006), (1, 1021007)) });
+                BigWorldEnterWorldResponse constructs = client.Call<BigWorldEnterWorldResponse>("BigWorldEnterWorldRequest", new BigWorldEnterWorldRequest());
+                AssertEqual("1021006,1021007", string.Join(",", constructs.EnterResultData!.WorldData.Players[0].NpcList.Select(n => n.Character!.Id)), "the team itself stays constructs-only");
+                List<(bool Self, long Pos, long Hide, bool Move)> actors = ((object?[])((object?[])MessagePack.MessagePackSerializer.Deserialize<object?[]>(constructs.EnterResultData.LevelData!)[2]!)[0]!)
+                    .Cast<object?[]>().Where(r => (string)r[0]! == "XNpc" && BwInt(r[9]) != 0).Select(r =>
+                    {
+                        object?[] rep = MessagePack.MessagePackSerializer.Deserialize<object?[]>((byte[])r[1]!);
+                        var data = (IDictionary<object, object>)rep[0]!;
+                        byte[]? move = MessagePack.MessagePackSerializer.Deserialize<object?[]>((byte[])r[7]!).Cast<object?[]>().Single(c => (string)c[1]! == "XNpcMoveComponent")[0] as byte[];
+                        return ((bool)data["IsPlayerSelf"], BwInt(data["Pos"]), BwInt(rep[12]), move is not null && MessagePack.MessagePackSerializer.Deserialize<object?[]>(move).Length == 5);
+                    }).ToList();
+                AssertEqual("False:0:True;False:1:True;True:2:True", string.Join(";", actors.Select(a => $"{a.Self}:{a.Pos}:{a.Move}")), "constructs-only enter: two team members plus the standing self NPC outside the team");
+                AssertEqual(2L, actors.Single(a => a.Self).Hide, "the self NPC waits backstage (ENpcHideFlags.Backstage)");
+                // A team with the commandant gets no extra actor.
+                client.Call<object?>(nameof(BigWorldTeamChangeRequest), new BigWorldTeamChangeRequest { ChangeTeam = Team(ws.CurrentTeamId, (0, 2011001), (1, 1021006)) });
+                BigWorldEnterWorldResponse withSelf = client.Call<BigWorldEnterWorldResponse>("BigWorldEnterWorldRequest", new BigWorldEnterWorldRequest());
+                AssertEqual(2, ((object?[])((object?[])MessagePack.MessagePackSerializer.Deserialize<object?[]>(withSelf.EnterResultData!.LevelData!)[2]!)[0]!).Cast<object?[]>().Count(r => (string)r[0]! == "XNpc" && BwInt(r[9]) != 0), "commandant team: no extra self actor");
             }
             Console.WriteLine("BigWorld character: PASS");
 
