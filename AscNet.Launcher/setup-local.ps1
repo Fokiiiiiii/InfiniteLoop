@@ -75,7 +75,18 @@ function Update-Checkout([string]$Git, [string]$Checkout) {
     if ($current -cne $Branch) { Fail "Checkout is on branch '$current', expected '$Branch'. Switch it manually; setup will not reset your work." }
     $dirty = Git-Output $Git $Checkout @('status', '--porcelain', '--untracked-files=normal')
     if ($dirty) { Fail "Checkout has local changes. Commit or remove them before updating; setup will not reset, clean, or stash files.`n$dirty" }
-    Invoke-Checked $Git @('-C', $Checkout, 'pull', '--ff-only', 'origin', $Branch) 'Fast-forward repository update'
+    Write-Host "+ $Git -C $Checkout fetch origin $Branch"
+    & $Git -C $Checkout fetch origin $Branch | Out-Host
+    $fetchExit = $LASTEXITCODE
+    if ($fetchExit -ne 0) {
+        # GitHub can be unreachable (e.g. from mainland China). The checkout was verified clean and on $Branch
+        # above, so build its current revision instead of failing; the next reachable Setup fast-forwards it.
+        $local = Git-Output $Git $Checkout @('rev-parse', '--short', 'HEAD')
+        Write-Host "WARNING: could not reach $Repository (git fetch exit code $fetchExit); continuing with the local checkout at $local."
+        return
+    }
+    # Reachable remote: a non-fast-forward (diverged) checkout still fails.
+    Invoke-Checked $Git @('-C', $Checkout, 'merge', '--ff-only', 'FETCH_HEAD') 'Fast-forward repository update'
 }
 function Ensure-DotNet {
     $dotnet = Find-Command 'dotnet.exe' @("$env:ProgramFiles\dotnet\dotnet.exe")

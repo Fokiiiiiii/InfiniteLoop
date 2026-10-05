@@ -63,6 +63,14 @@ try {
     try { Update-Checkout $git $checkout } catch { $refused = $true }
     if (-not $refused -or (Git-Output $git $checkout @('rev-parse', 'HEAD')) -ne $before) { throw 'divergent history was modified' }
 
+    # Unreachable remote (GitHub blocked): a clean checkout on the branch builds its current revision.
+    $hidden = "$Repository.offline"
+    Move-Item -LiteralPath $Repository -Destination $hidden
+    try {
+        Update-Checkout $git $checkout
+        if ((Git-Output $git $checkout @('rev-parse', 'HEAD')) -ne $before) { throw 'offline update changed the checkout' }
+    } finally { Move-Item -LiteralPath $hidden -Destination $Repository }
+
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
     $listener.Start()
     try {
