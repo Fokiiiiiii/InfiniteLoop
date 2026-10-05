@@ -292,10 +292,17 @@ namespace AscNet.GameServer.Handlers.BigWorld
 
         // The team's saved pose in its current level: the instance pose inside an instance (a resumed instance otherwise put
         // the team at open-world coordinates: live 4008 spawned in the sky), else the open-world pose.
-        internal static (BigWorldVector3 Position, double? RotationY)? CurrentPose(BigWorldPlayerState state) =>
-            state.InstLevelId != 0
-                ? state.InstPosition is { } inst ? (inst, state.InstRotationY) : null
-                : state.LastPosition is { } last ? (last, state.LastRotationY) : null;
+        // A player without a saved pose (first entry) stands at the level's authored start (Level.tsv PositionX/Y/Z, RotationY):
+        // XNpcMoveComponent.Deserialize throws on a nil snapshot, so a team actor always needs one.
+        internal static (BigWorldVector3 Position, double? RotationY)? CurrentPose(BigWorldPlayerState state)
+        {
+            int levelId = state.InstLevelId != 0 ? state.InstLevelId : state.LastLevelId;
+            if (state.InstLevelId != 0 ? state.InstPosition is { } inst : state.LastPosition is { })
+                return state.InstLevelId != 0 ? (state.InstPosition!, state.InstRotationY) : (state.LastPosition!, state.LastRotationY);
+            return Levels.Value.TryGetValue(levelId, out AscNet.Table.V2.share.statussyncfight.level.LevelTable? level)
+                ? (new BigWorldVector3 { X = level.PositionX, Y = level.PositionY, Z = level.PositionZ }, level.RotationY)
+                : null;
+        }
 
         internal delegate void PackBody(ref MessagePackWriter writer);
 
@@ -308,7 +315,7 @@ namespace AscNet.GameServer.Handlers.BigWorld
             return buffer.WrittenMemory.ToArray();
         }
 
-        // [Position, Rotation quaternion, nil, nil, 0.0]; nil snapshot before the first saved position (BornData spawns).
+        // [Position, Rotation quaternion, nil, nil, 0.0]; nil only when the level has no authored start.
         private static byte[]? BuildMoveSnapshot((BigWorldVector3 Position, double? RotationY)? pose)
         {
             if (pose is not { } value)

@@ -18,6 +18,7 @@ namespace AscNet.Test
             try
             {
                 Environment.SetEnvironmentVariable("ASCNET_BIGWORLD_ENGINE", null);
+                ValidateBigWorldFreshOpeningGuide();
                 ValidateBigWorldCoreOnline();
                 ValidateBigWorldSceneObjects();
                 Environment.SetEnvironmentVariable("ASCNET_BIGWORLD_ENGINE", "offline");
@@ -217,6 +218,53 @@ namespace AscNet.Test
             AssertEqual(1, player.BigWorldState.ActorOverrides.Count(o => o.BeScanned == true), "only the scannable object persisted");
         }
 
+        // Fresh account (never entered Babylonia): enter, opening guide 101 -> DIY -> 102 -> 103, re-fetch, save data, LoadComplete.
+        private static void ValidateBigWorldFreshOpeningGuide()
+        {
+            foreach (long playerId in new long[] { 99_921, 99_922 })
+            {
+                using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(out _, out _, out _);
+                Player player = CreateDrawCompatibilityPlayer(playerId);
+                using LoopbackSessionHarness harness = new(CreateDrawCompatibilityCharacter(playerId), player,
+                    CreateDrawCompatibilityInventory(playerId, []), "big-world-fresh-guide");
+                BigWorldCoreClient client = new(harness);
+                BigWorldEnterWorldResponse enter = client.Call<BigWorldEnterWorldResponse>("BigWorldEnterWorldRequest", new BigWorldEnterWorldRequest());
+                AssertEqual((0, 0, false), (enter.Code, enter.PlayerData!.BigWorldGuideData.Count, enter.PlayerData.CharacterInitialized), "fresh enter: no guide, DIY not initialized");
+                AssertEqual((true, false), (client.HasPush(nameof(NotifyNewEnteredBigWorldId)), client.HasPush(nameof(NotifyNewEnteredBigWorldLevelId))), "fresh enter pushes: world yes, level no (map model not built yet)");
+                AssertEqual("4001", string.Join(",", enter.PlayerData.EnteredLevelIds), "fresh enter level in PlayerData");
+                // Every team actor needs a decodable move snapshot (XNpcMoveComponent.Deserialize throws on nil).
+                object?[] replicates = (object?[])((object?[])MessagePackSerializer.Deserialize<object?[]>(enter.EnterResultData!.LevelData!)[2]!)[0]!;
+                foreach (object?[] actor in replicates.Cast<object?[]>().Where(r => (string)r[0]! == "XNpc" && BwInt(r[9]) == playerId))
+                {
+                    byte[]? move = MessagePackSerializer.Deserialize<object?[]>((byte[])actor[7]!).Cast<object?[]>().Single(c => (string)c[1]! == "XNpcMoveComponent")[0] as byte[];
+                    AssertEqual(true, move is not null && MessagePackSerializer.Deserialize<object?[]>(move).Length == 5, "team actor move snapshot present");
+                }
+                AssertEqual(0, client.Call<BigWorldOnModuleLoadCompleteResponse>("BigWorldOnModuleLoadCompleteRequest", null).Code, "module load complete");
+
+                // 101 (CG) -> 102 (DIY confirm with the outfit the client shows by default, XBigWorldCommanderDIYControl:RequestUpdate) -> 103 (CG).
+                AssertEqual(0, client.Call<BigWorldGuideOpenResponse>("BigWorldGuideOpenRequest", new BigWorldGuideOpenRequest { GuideId = 101 }).Code, "guide 101");
+                // First DIY save inside the guide opens UiBigWorldFirstPerson; its confirm sends BigWorldSaveFovDataRequest for level 4001's
+                // perspective group (no BigWorldLevelFovSave row -> default group 0) and only continues on Code 0.
+                AssertEqual(0, client.Call<BigWorldSaveFovDataResponse>("BigWorldSaveFovDataRequest", new BigWorldSaveFovDataRequest { FovType = 1, FovGroupId = 0 }).Code, "perspective confirm in the guide");
+                int outfit = enter.PlayerData.CurCommanderOutfitType;
+                AssertEqual(0, client.Call<AscNet.GameServer.Handlers.BigWorld.BigWorldCommanderFashionUpdateResponse>("BigWorldCommanderFashionUpdateRequest", new AscNet.GameServer.Handlers.BigWorld.BigWorldCommanderFashionUpdateRequest
+                {
+                    OutfitType = outfit, Gender = enter.PlayerData.Gender,
+                    CommanderFashionList = enter.PlayerData.CommanderFashionOutfits[outfit].WearFashionDict
+                }).Code, "DIY confirm with the default outfit");
+                AssertEqual(0, client.Call<BigWorldGuideOpenResponse>("BigWorldGuideOpenRequest", new BigWorldGuideOpenRequest { GuideId = 102 }).Code, "guide 102");
+                AssertEqual(0, client.Call<BigWorldGuideOpenResponse>("BigWorldGuideOpenRequest", new BigWorldGuideOpenRequest { GuideId = 103 }).Code, "guide 103");
+
+                // XBigWorldOpenGuide:Finish (DIY ran) -> RequestGetEnterBigWorldData; OnOpenGuideFinished -> DlcWorldSaveData -> LoadComplete.
+                BigWorldGetEnterWorldDataResponse again = client.Call<BigWorldGetEnterWorldDataResponse>("BigWorldGetEnterWorldDataRequest", null);
+                AssertEqual(("101,102,103", true), (string.Join(",", again.PlayerData!.BigWorldGuideData), again.PlayerData.CharacterInitialized), "refetched enter data after the guide");
+                AssertEqual(0, client.Call<DlcWorldSaveDataResponse>("DlcWorldSaveDataRequest", new DlcWorldSaveDataRequest { WorldId = 400 }).Code, "save data after the guide");
+                harness.Session.BigWorldFightStartedAt = DateTime.UtcNow.AddSeconds(-5);
+                InvokeRegisteredRequestHandler("LoadCompleteRequest", harness.Session, 41_000, new Dictionary<string, object>());
+                AssertEqual("StartFightNotify", MessagePackSerializer.Deserialize<Packet.Push>(harness.ReadPacket("start fight").Content).Name, "StartFightNotify after the guide");
+            }
+        }
+
         private static void ValidateBigWorldCoreOnline()
         {
             const long playerId = 99_901;
@@ -247,7 +295,8 @@ namespace AscNet.Test
             AssertEqual(player.PlayerData.Name, world.Players[0].Name, "world player name");
             AssertEqual(true, client.HasPush("NotifyBigWorldMapData") && client.HasPush("NotifySgDormData"), "enter pushes");
             AssertEqual(400, client.Pushed<NotifyNewEnteredBigWorldId>(nameof(NotifyNewEnteredBigWorldId)).WorldId, "new world push");
-            AssertEqual(4001, client.Pushed<NotifyNewEnteredBigWorldLevelId>(nameof(NotifyNewEnteredBigWorldLevelId)).LevelId, "new level push");
+            // XBigWorldMapModel._UnlockLevelMap exists only after UpdatePlayerData (BigWorldOnModuleLoadComplete): a level push in the enter burst throws in the client.
+            AssertEqual(false, client.HasPush(nameof(NotifyNewEnteredBigWorldLevelId)), "enter announces its level through PlayerData, not a push");
             NotifyBigWorldMapData map = client.Pushed<NotifyBigWorldMapData>(nameof(NotifyBigWorldMapData));
             AssertEqual(0, map.BoxRewardedCntData[4001], "map box count 4001 before collect");
             AssertEqual(false, map.BoxRewardedCntData.ContainsKey(9999), "map data only lists this world's levels");
@@ -303,7 +352,12 @@ namespace AscNet.Test
             foreach (((string name, byte[]? want), (_, byte[]? got)) in expected.Zip(actual))
             {
                 if (name == "XNpcMoveComponent")
-                    AssertEqual(true, got is null, "move snapshot absent before a saved pose");
+                {
+                    // XNpcMoveComponent.Deserialize throws on nil: a player without a saved pose stands at the level's authored start.
+                    var start = AscNet.GameServer.Handlers.BigWorld.BigWorldModule.Levels.Value[4001];
+                    object?[] pose = (object?[])MessagePackSerializer.Deserialize<object?[]>(got!)[0]!;
+                    AssertEqual(((float)start.PositionX, (float)start.PositionY, (float)start.PositionZ), (Convert.ToSingle(pose[0]), Convert.ToSingle(pose[1]), Convert.ToSingle(pose[2])), "move snapshot at the level start before a saved pose");
+                }
                 else if (name == "XPartComponent")
                     AssertEqual("0,100201", string.Join(",", ((object?[])MessagePackSerializer.Deserialize<object?[]>(got!)[0]!).Select(p => BwInt(((object?[])p!)[0]))), "part ids from Part rows");
                 else if (name == "XAttribComponent")

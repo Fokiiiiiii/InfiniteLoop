@@ -214,7 +214,9 @@ namespace AscNet.GameServer.Handlers.BigWorld
             bool newWorld = !state.EnteredWorldIds.Contains(worldId);
             if (newWorld)
                 state.EnteredWorldIds.Add(worldId);
-            bool newLevel = MarkLevelEntered(state, levelId);
+            // The level is announced through PlayerData.EnteredLevelIds: XBigWorldMapModel._UnlockLevelMap does not exist until
+            // BigWorldOnModuleLoadComplete runs UpdatePlayerData, so a NotifyNewEnteredBigWorldLevelId pushed here would throw.
+            MarkLevelEntered(state, levelId);
             session.BigWorldWorldId = worldId;
             session.player.Save();
 
@@ -234,8 +236,6 @@ namespace AscNet.GameServer.Handlers.BigWorld
             SkyGardenStreetModule.SendWorldEnterPushes(session);
             if (newWorld)
                 session.SendPush(new NotifyNewEnteredBigWorldId { WorldId = worldId });
-            if (newLevel)
-                session.SendPush(new NotifyNewEnteredBigWorldLevelId { LevelId = levelId });
             BigWorldQuestModule.OnLevelEntered(session, levelId);
         }
 
