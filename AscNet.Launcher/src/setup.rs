@@ -429,6 +429,26 @@ fn update_checkout(
         note(progress, log, &format!("WARNING: could not reach {repository} ({error:#}); continuing with the local checkout at {local}."))?;
         return Ok(());
     }
+    // A reachable remote is never reset over local commits. Name them and how to recover.
+    let local_only = git_text(
+        git,
+        Some(checkout),
+        &["log".into(), "--oneline".into(), "FETCH_HEAD..HEAD".into()],
+        "git log --oneline FETCH_HEAD..HEAD",
+        deadline,
+        progress,
+        log,
+    )?;
+    if !local_only.is_empty() {
+        bail!(
+            "The source checkout has commits that are not on {repository} ({branch}), so it cannot be updated:\n{local_only}\n\
+             Setup will not discard them. To continue, either reset it (this deletes those commits):\n  \
+             git -C \"{}\" reset --hard FETCH_HEAD\n\
+             or delete the folder \"{}\" and run Setup again to download a fresh copy.",
+            checkout.display(),
+            checkout.display()
+        );
+    }
     let mut merge = Command::new(git);
     merge
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -2304,7 +2324,10 @@ mod tests {
         let before = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
         let error = update_checkout(git, &checkout, origin.to_str().unwrap(), "master", deadline, &mut progress, &mut log).unwrap_err();
         let after = String::from_utf8(Command::new(git).args(["-C", checkout.to_str().unwrap(), "rev-parse", "HEAD"]).output().unwrap().stdout).unwrap();
-        assert!(format!("{error:#}").contains("Fast-forward") || format!("{error:#}").contains("exit code"), "{error:#}");
+        let message = format!("{error:#}");
+        assert!(message.contains("commits that are not on"), "{message}");
+        assert!(message.contains("reset --hard FETCH_HEAD"), "{message}");
+        assert!(message.contains("local"), "{message}");
         assert_eq!(before, after);
         fs::remove_dir_all(temp).unwrap();
     }
