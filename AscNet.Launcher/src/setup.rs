@@ -9,7 +9,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
 use std::{
     env, fs,
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{Ipv4Addr, TcpListener},
     path::{Component, Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -27,6 +27,10 @@ const MONGO_CATALOG: &str = "https://downloads.mongodb.org/full.json";
 const VS_BOOTSTRAPPER: &str = "https://aka.ms/vs/17/release/vs_buildtools.exe";
 const VS_CHANNEL: &str = "https://aka.ms/vs/17/release/channel";
 const NUGET_INDEX: &str = "https://api.nuget.org/v3/index.json";
+/// A connection that closes before the body arrives is fetched again.
+/// Three attempts matches the game downloader's CDN rounds. A checksum
+/// mismatch or the setup deadline still fails on the first try.
+const DOWNLOAD_ATTEMPTS: u32 = 3;
 
 struct RustComponent {
     url: &'static str,
@@ -477,12 +481,55 @@ fn download_file(
             return Ok(hash);
         }
     }
+    let mut last_error = None;
+    for attempt in 1..=DOWNLOAD_ATTEMPTS {
+        match receive_download(url, dest, expect_sha256, expect_sha512, &cache, deadline, progress, log) {
+            Ok(hash) => return Ok(hash),
+            Err(error) if attempt < DOWNLOAD_ATTEMPTS && download_interrupted(&error) => {
+                note(progress, log, &format!("Download interrupted ({}); retrying {url}", error.root_cause()))?;
+                last_error = Some(error);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last_error.expect("an interrupted download keeps its last error"))
+}
+
+fn receive_download(
+    url: &str,
+    dest: &Path,
+    expect_sha256: Option<&str>,
+    expect_sha512: Option<&str>,
+    cache: &Path,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<String> {
+    ensure_time(deadline)?;
     let partial = partial_path(dest);
     let _ = fs::remove_file(&partial);
+    let result = receive_download_inner(url, dest, &partial, expect_sha256, expect_sha512, cache, deadline, progress, log);
+    if result.is_err() {
+        let _ = fs::remove_file(&partial);
+    }
+    result
+}
+
+fn receive_download_inner(
+    url: &str,
+    dest: &Path,
+    partial: &Path,
+    expect_sha256: Option<&str>,
+    expect_sha512: Option<&str>,
+    cache: &Path,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<String> {
     note(progress, log, &format!("Downloading {url}"))?;
     let mut response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
     let expected = response.content_length();
-    let mut file = fs::File::create(&partial).with_context(|| format!("create {}", partial.display()))?;
+    let mut file = fs::File::create(partial).with_context(|| format!("create {}", partial.display()))?;
     let mut sha256 = Sha256::new();
     let mut sha512 = Sha512::new();
     let mut buffer = [0u8; 64 * 1024];
@@ -490,7 +537,6 @@ fn download_file(
     loop {
         if Instant::now() >= deadline {
             drop(file);
-            let _ = fs::remove_file(&partial);
             bail!("local setup timed out");
         }
         // Content-Length is the end of the body. Another read waits out the
@@ -511,8 +557,7 @@ fn download_file(
     if let Some(n) = expected {
         if received != n {
             drop(file);
-            let _ = fs::remove_file(&partial);
-            bail!("download {url} ended after {received} bytes, expected {n}");
+            return Err(std::io::Error::new(ErrorKind::UnexpectedEof, format!("download {url} ended after {received} bytes, expected {n}")).into());
         }
     }
     file.sync_all()?;
@@ -521,20 +566,54 @@ fn download_file(
     let actual512 = format!("{:x}", sha512.finalize());
     if let Some(expected) = expect_sha256 {
         if !actual256.eq_ignore_ascii_case(expected) {
-            let _ = fs::remove_file(&partial);
             bail!("checksum mismatch for {url} (expected {expected}, received {actual256})");
         }
     }
     if let Some(expected) = expect_sha512 {
         if !actual512.eq_ignore_ascii_case(expected) {
-            let _ = fs::remove_file(&partial);
             bail!("checksum mismatch for {url} (expected {expected}, received {actual512})");
         }
     }
     let _ = fs::remove_file(dest);
-    fs::rename(&partial, dest).with_context(|| format!("store {}", dest.display()))?;
-    remember_cache(&cache, dest, expect_sha256, expect_sha512)?;
+    fs::rename(partial, dest).with_context(|| format!("store {}", dest.display()))?;
+    remember_cache(cache, dest, expect_sha256, expect_sha512)?;
     Ok(actual256)
+}
+
+/// A dropped transfer can be fetched again. The body error from static.rust-lang.org
+/// is `end of file before message length reached`: the socket closed before
+/// Content-Length bytes arrived. Reqwest wraps that as `ErrorKind::Other`.
+fn download_interrupted(error: &anyhow::Error) -> bool {
+    for cause in error.chain() {
+        if cause.to_string().contains("local setup timed out") {
+            return false;
+        }
+        if let Some(io_error) = cause.downcast_ref::<std::io::Error>() {
+            if matches!(
+                io_error.kind(),
+                ErrorKind::UnexpectedEof
+                    | ErrorKind::ConnectionReset
+                    | ErrorKind::ConnectionAborted
+                    | ErrorKind::BrokenPipe
+                    | ErrorKind::TimedOut
+                    | ErrorKind::Interrupted
+            ) {
+                return true;
+            }
+        }
+        if let Some(http) = cause.downcast_ref::<reqwest::Error>() {
+            if http.is_timeout() || http.is_connect() || http.is_request() || http.is_body() || http.is_decode() {
+                return true;
+            }
+            if matches!(http.status().map(|status| status.as_u16()), Some(408 | 429 | 500 | 502 | 503 | 504)) {
+                return true;
+            }
+        }
+        if cause.to_string().contains("end of file before message length reached") {
+            return true;
+        }
+    }
+    false
 }
 
 fn display_name(path: &Path) -> String {
@@ -2270,5 +2349,23 @@ mod tests {
         assert_eq!(dumped_get("INCLUDE"), Some(r"C:\vc\include"));
         assert_eq!(dumped_get("CARGO_BUILD_JOBS"), None);
         assert_eq!(dumped_get("RUSTC"), Some(r"C:\rust\bin\rustc.exe"));
+    }
+
+    #[test]
+    fn dropped_download_is_transient_and_a_checksum_mismatch_is_not() {
+        let eof = anyhow::Error::from(std::io::Error::new(ErrorKind::UnexpectedEof, "end of file before message length reached"));
+        let wrapped = eof.context("read https://static.rust-lang.org/dist/rustc.tar.gz");
+        assert!(download_interrupted(&wrapped));
+        let outer = std::io::Error::new(ErrorKind::Other, std::io::Error::new(ErrorKind::UnexpectedEof, "end of file before message length reached"));
+        assert!(download_interrupted(&anyhow::Error::from(outer)));
+        assert!(download_interrupted(&anyhow::Error::from(std::io::Error::new(ErrorKind::ConnectionReset, "connection reset"))));
+        let short = anyhow::Error::from(std::io::Error::new(ErrorKind::UnexpectedEof, "download https://example.invalid/rustc.tar.gz ended after 10 bytes, expected 99"));
+        assert!(download_interrupted(&short));
+        let recorded = anyhow::anyhow!("read https://static.rust-lang.org/dist/rustc.tar.gz: request or response body error: error reading a body from connection: end of file before message length reached");
+        assert!(download_interrupted(&recorded));
+        assert!(!download_interrupted(&anyhow::anyhow!("checksum mismatch for https://static.rust-lang.org/dist/rustc.tar.gz (expected abc, received def)")));
+        assert!(!download_interrupted(&anyhow::anyhow!("local setup timed out")));
+        assert!(!download_interrupted(&anyhow::anyhow!("download https://example.invalid/missing: HTTP status client error (404 Not Found)")));
+        assert!(!download_interrupted(&anyhow::Error::from(std::io::Error::other("disk full"))));
     }
 }
