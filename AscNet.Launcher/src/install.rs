@@ -1119,17 +1119,20 @@ fn normalize_windows_path(value: &str) -> String {
     }
 }
 
-/// Proton bind-mounts `/home` at `Z:\home` and Wine reports that directory as a
-/// junction. Opening it with and without `FILE_FLAG_OPEN_REPARSE_POINT` returns
-/// the same path. A junction that points somewhere else returns its target only
-/// when the reparse point is followed.
+/// Proton bind-mounts `/home` at `Z:\home`. Wine reports that directory as a
+/// junction. Rust then reports it as a symlink, so `is_dir()` is false even
+/// though the directory attribute is set. Opening it with and without
+/// `FILE_FLAG_OPEN_REPARSE_POINT` returns the same path. A junction that points
+/// somewhere else returns its target only when the reparse point is followed.
 #[cfg(windows)]
 pub(crate) fn wine_mount_keeps_its_path(path: &Path) -> bool {
     if !running_under_wine() {
         return false;
     }
     let Ok(metadata) = fs::symlink_metadata(path) else { return false };
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+    use std::os::windows::fs::MetadataExt;
+    // `FILE_ATTRIBUTE_DIRECTORY`. Do not use `is_dir()`: it is false for junctions.
+    if metadata.file_attributes() & 0x10 == 0 {
         return false;
     }
     match (final_dos_path(path, false), final_dos_path(path, true)) {
@@ -1207,9 +1210,11 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
             // Decide before taking the share-read pin. That pin denies a later open.
             let metadata = fs::symlink_metadata(directory)
                 .with_context(|| format!("locking protected write directory {}", directory.display()))?;
-            if !metadata.is_dir()
-                || (metadata.file_attributes() & 0x400 != 0 && !wine_mount_keeps_its_path(directory))
-            {
+            let attributes = metadata.file_attributes();
+            // `is_dir()` is false for a junction. The directory attribute is what matters.
+            let allows = attributes & 0x10 != 0
+                && (attributes & 0x400 == 0 || wine_mount_keeps_its_path(directory));
+            if !allows {
                 bail!("refusing link/reparse write directory: {}", directory.display());
             }
             // Metadata-only opens do not participate in Windows share checks.

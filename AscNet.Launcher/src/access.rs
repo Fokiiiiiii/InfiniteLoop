@@ -86,7 +86,11 @@ fn pin_ancestors(path: &Path) -> Result<Vec<File>> {
         let file = OpenOptions::new().access_mode(FILE_GENERIC_READ.0).share_mode(FILE_SHARE_READ.0)
             .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
             .open(ancestor).with_context(|| format!("opening document access path {}", ancestor.display()))?;
-        ensure!(file.metadata()?.is_dir(), "document ancestor is not a directory");
+        // `is_dir()` is false for a junction even when the directory attribute is set.
+        ensure!(
+            file.metadata()?.file_attributes() & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
+            "document ancestor is not a directory"
+        );
         pins.push(file);
     }
     Ok(pins)

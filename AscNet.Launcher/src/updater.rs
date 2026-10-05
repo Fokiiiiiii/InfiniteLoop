@@ -118,15 +118,16 @@ fn regular(path: &Path) -> Result<()> {
 fn directory(path: &Path) -> Result<()> {
     for ancestor in path.ancestors() {
         let metadata = fs::symlink_metadata(ancestor)?;
-        ensure!(metadata.is_dir() && !metadata.file_type().is_symlink(), "linked update directory refused");
         #[cfg(windows)] {
             use std::os::windows::fs::MetadataExt;
-            ensure!(
-                metadata.file_attributes() & 0x400 == 0
-                    || crate::install::wine_mount_keeps_its_path(ancestor),
-                "reparse directory refused"
-            );
+            let attributes = metadata.file_attributes();
+            // Rust reports a Wine bind-mount junction as a symlink, so `is_dir()` is false.
+            let allows = attributes & 0x10 != 0
+                && (attributes & 0x400 == 0 || crate::install::wine_mount_keeps_its_path(ancestor));
+            ensure!(allows, "reparse directory refused");
         }
+        #[cfg(not(windows))]
+        ensure!(metadata.is_dir() && !metadata.file_type().is_symlink(), "linked update directory refused");
     }
     Ok(())
 }
