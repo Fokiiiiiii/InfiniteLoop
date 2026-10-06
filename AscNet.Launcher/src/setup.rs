@@ -1472,34 +1472,90 @@ fn rust_root(root: &Path) -> PathBuf {
     root.join("tools").join(format!("rust-{RUST_VERSION}-{RUST_HOST}"))
 }
 
-#[cfg(windows)]
-fn rust_ready(root: &Path) -> bool {
-    root.join("bin").join("cargo.exe").is_file() && root.join("bin").join("rustc.exe").is_file() && root.join("lib").join("rustlib").join(RUST_HOST).is_dir()
+/// `lib/rustlib/<host>` appears as soon as rustc is unpacked. The standard library
+/// is a separate archive, so a finished install is the one that contains `libstd`.
+fn rust_installation_ready(root: &Path) -> bool {
+    root.join("bin").join("cargo.exe").is_file()
+        && root.join("bin").join("rustc.exe").is_file()
+        && rust_std_rlib(root)
+}
+
+fn rust_std_rlib(root: &Path) -> bool {
+    let lib = root.join("lib").join("rustlib").join(RUST_HOST).join("lib");
+    let Ok(entries) = fs::read_dir(lib) else { return false };
+    entries.flatten().any(|entry| {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        entry.path().is_file() && name.starts_with("libstd-") && name.ends_with(".rlib")
+    })
+}
+
+fn publish_written_file(output: &Path, write: impl FnOnce(&mut fs::File) -> std::io::Result<()>) -> Result<()> {
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut temporary_name = output.as_os_str().to_owned();
+    temporary_name.push(".partial");
+    let temporary = PathBuf::from(temporary_name);
+    let result = (|| -> Result<()> {
+        let mut file = fs::File::create(&temporary).with_context(|| format!("create {}", temporary.display()))?;
+        write(&mut file).with_context(|| format!("write {}", output.display()))?;
+        file.sync_all()?;
+        drop(file);
+        if output.exists() {
+            fs::remove_file(output)?;
+        }
+        fs::rename(&temporary, output).with_context(|| format!("install {}", output.display()))?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 #[cfg(windows)]
 fn ensure_rust(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<PathBuf> {
     let destination = rust_root(root);
-    if rust_ready(&destination) {
+    if rust_installation_ready(&destination) {
         return Ok(destination);
     }
     note(progress, log, &format!("Installing Rust {RUST_VERSION}"))?;
-    fs::create_dir_all(&destination)?;
-    for component in RUST_COMPONENTS {
-        ensure_time(deadline)?;
-        let name = component.url.rsplit('/').next().unwrap_or("rust-component.tar.gz");
-        let archive = scratch_file(root, name);
-        download_file(component.url, &archive, Some(component.sha256), None, root, deadline, progress, log)?;
-        unpack_rust_component(&archive, &destination)?;
-        let _ = fs::remove_file(&archive);
+    if destination.exists() {
+        fs::remove_dir_all(&destination)?;
     }
-    if !rust_ready(&destination) {
-        bail!("Rust {RUST_VERSION} archive did not produce cargo.exe, rustc.exe, and the MSVC standard library");
+    let mut stage_name = destination.file_name().context("Rust install path has no file name")?.to_os_string();
+    stage_name.push(".partial");
+    let stage = destination.with_file_name(stage_name);
+    if stage.exists() {
+        fs::remove_dir_all(&stage)?;
     }
+    fs::create_dir_all(&stage)?;
+    let installed = (|| -> Result<()> {
+        for component in RUST_COMPONENTS {
+            ensure_time(deadline)?;
+            let name = component.url.rsplit('/').next().unwrap_or("rust-component.tar.gz");
+            let archive = scratch_file(root, name);
+            download_file(component.url, &archive, Some(component.sha256), None, root, deadline, progress, log)?;
+            unpack_rust_component(&archive, &stage)?;
+            let _ = fs::remove_file(&archive);
+        }
+        if !rust_installation_ready(&stage) {
+            bail!("Rust {RUST_VERSION} archive did not produce cargo.exe, rustc.exe, and the MSVC standard library");
+        }
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::rename(&stage, &destination).with_context(|| format!("install Rust into {}", destination.display()))?;
+        Ok(())
+    })();
+    if installed.is_err() {
+        let _ = fs::remove_dir_all(&stage);
+    }
+    installed?;
     Ok(destination)
 }
 
-#[cfg(windows)]
 fn unpack_rust_component(archive: &Path, dest: &Path) -> Result<()> {
     let file = fs::File::open(archive)?;
     let decoder = flate2::read::GzDecoder::new(file);
@@ -1515,11 +1571,7 @@ fn unpack_rust_component(archive: &Path, dest: &Path) -> Result<()> {
             continue;
         }
         let output = dest.join(&relative);
-        if let Some(parent) = output.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let mut file = fs::File::create(&output)?;
-        std::io::copy(&mut entry, &mut file)?;
+        publish_written_file(&output, |file| std::io::copy(&mut entry, file).map(|_| ()))?;
     }
     Ok(())
 }
@@ -2315,6 +2367,50 @@ mod tests {
     #[test]
     fn response_file_argument_quotes_windows_paths() {
         assert_eq!(quoted_response_file(Path::new(r"C:\Users\A B\cl.rsp")), "@\"C:/Users/A B/cl.rsp\"");
+    }
+
+    #[test]
+    fn rust_install_is_ready_only_when_the_standard_library_is_present() {
+        let root = env::temp_dir().join(format!("ascnet-rust-ready-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(root.join("bin")).unwrap();
+        fs::write(root.join("bin").join("cargo.exe"), b"cargo").unwrap();
+        fs::write(root.join("bin").join("rustc.exe"), b"rustc").unwrap();
+        fs::create_dir_all(root.join("lib").join("rustlib").join(RUST_HOST)).unwrap();
+        assert!(!rust_installation_ready(&root));
+        let lib = root.join("lib").join("rustlib").join(RUST_HOST).join("lib");
+        fs::create_dir_all(&lib).unwrap();
+        fs::create_dir(lib.join("libstd-not-a-file.rlib")).unwrap();
+        assert!(!rust_installation_ready(&root));
+        fs::write(lib.join("libstd-test.rlib"), b"std").unwrap();
+        assert!(rust_installation_ready(&root));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn rust_component_publish_leaves_no_partial_file() {
+        let root = env::temp_dir().join(format!("ascnet-rust-unpack-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let archive = root.join("component.tar.gz");
+        let mut encoded = Vec::new();
+        {
+            let mut encoder = flate2::write::GzEncoder::new(&mut encoded, flate2::Compression::default());
+            let mut builder = tar::Builder::new(&mut encoder);
+            let payload = b"std-bytes";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(payload.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            let name = format!("rust-std-{RUST_VERSION}-{RUST_HOST}/rust-std-{RUST_HOST}/lib/rustlib/{RUST_HOST}/lib/libstd-test.rlib");
+            builder.append_data(&mut header, name, &payload[..]).unwrap();
+            builder.finish().unwrap();
+        }
+        fs::write(&archive, encoded).unwrap();
+        let dest = root.join("stage");
+        unpack_rust_component(&archive, &dest).unwrap();
+        let installed = dest.join("lib").join("rustlib").join(RUST_HOST).join("lib").join("libstd-test.rlib");
+        assert_eq!(fs::read(&installed).unwrap(), b"std-bytes");
+        assert!(!PathBuf::from(format!("{}.partial", installed.display())).exists());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
