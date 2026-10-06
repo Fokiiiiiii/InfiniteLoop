@@ -5,7 +5,9 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs::{self, File, OpenOptions}, io::{Read, Write}, path::{Path, PathBuf}, process::Command, time::{Duration, Instant}};
 use crate::package::sha256_file;
 
-const FILES: [&str; 6] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "supported-client.json"];
+// Launchers 1.0.8 through 1.0.11 reject an archive that is not these seven names.
+// The script is not started. Setup runs inside this executable.
+const FILES: [&str; 7] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "setup-local.ps1", "supported-client.json"];
 const MAX_ARCHIVE: u64 = 128 * 1024 * 1024;
 const MAX_EXPANDED: u64 = 256 * 1024 * 1024;
 const TRANSACTION: &str = ".ascnet-launcher-update";
