@@ -1110,12 +1110,16 @@ namespace AscNet.GameServer.Handlers
         {
             stageData = null;
             SimulatedBattlefieldState state = session.player.SimulatedBattlefield;
-            if (!TryResolveFightStage(state, pending.StageId, pending.StageType, out _, out _))
+            if (!TryResolveFightStage(state, pending.StageId, pending.StageType, out int sectionId, out _))
                 return false;
             if (pending.StageType == 2 || pending.StageType == 4)
             {
                 Dictionary<int, int> scores = pending.StageType == 2 ? state.BossTrialScores : state.BossBestiaryScores;
                 scores[pending.StageId] = Math.Max(scores.GetValueOrDefault(pending.StageId), pending.Result.TotalScore);
+                TaskModule.RecordBossSectionScore(session, sectionId,
+                    ResolveSection(sectionId, currentOnly: false).StageId
+                        .Where(stageId => stageId > 0).Distinct()
+                        .Sum(stageId => scores.GetValueOrDefault(stageId)));
                 // Codex clears are recorded in BossTrialScores/BossBestiaryScores: stageType 2 is the codex
                 // "Ultimate Zone" list, stageType 4 the codex "Current Threats" list, whose stage ids are the same
                 // as the current Ultimate rotation's. Each mode's best is also what the client's non-Trial
@@ -1177,6 +1181,9 @@ namespace AscNet.GameServer.Handlers
             state.BossResetStageIds.Remove(pending.StageId);
             state.BossNormalStageTeams[pending.SectionId] = pending.Characters.ToList();
             RecalculateNormalTotals(state);
+            TaskModule.RecordBossSectionScore(session, sectionId,
+                ResolveSection(sectionId).StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                    state.BossStageRecords.Find(value => value.StageId == stageId)?.Score ?? 0));
             state.BossLastScoreTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             stageData = UpdateStageDatum(session, pending, record.MaxScore);
             session.stage.Save();

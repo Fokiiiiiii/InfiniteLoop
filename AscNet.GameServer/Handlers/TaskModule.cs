@@ -2576,6 +2576,17 @@ namespace AscNet.GameServer.Handlers
             return session.stage.Stages.TryGetValue((uint)stageId, out StageDatum? stage) && stage.Passed;
         }
 
+        internal static void RecordBossSectionScore(Session session, int sectionId, int sectionTotal)
+        {
+            foreach (CurrentConditionTable condition in CurrentConditionsById.Value.Values
+                .Where(condition => condition.Type == 25001
+                    && condition.Params.Count > 1 && condition.Params[1] == sectionId))
+            {
+                int current = session.player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id);
+                session.player.MissionProgress.ConditionCounters[condition.Id] = Math.Max(current, sectionTotal);
+            }
+        }
+
         private static void AddConditionProgress(Session session, int conditionId, int increment)
         {
             int current = session.player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId);
