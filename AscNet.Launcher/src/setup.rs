@@ -4,6 +4,7 @@
 //! Studio release channel instead of running the Build Tools installer.
 #![cfg_attr(not(windows), allow(dead_code))]
 use anyhow::{bail, Context, Result};
+use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
@@ -1014,42 +1015,8 @@ fn pem_certificates(text: &str) -> Result<Vec<Vec<u8>>> {
 }
 
 fn decode_base64(input: &str) -> Result<Vec<u8>> {
-    fn value(byte: u8) -> Option<u8> {
-        match byte {
-            b'A'..=b'Z' => Some(byte - b'A'),
-            b'a'..=b'z' => Some(byte - b'a' + 26),
-            b'0'..=b'9' => Some(byte - b'0' + 52),
-            b'+' => Some(62),
-            b'/' => Some(63),
-            _ => None,
-        }
-    }
-    let bytes: Vec<u8> = input.bytes().filter(|byte| !byte.is_ascii_whitespace()).collect();
-    if bytes.is_empty() || bytes.len() % 4 != 0 {
-        bail!("invalid certificate encoding");
-    }
-    let mut output = Vec::new();
-    for chunk in bytes.chunks(4) {
-        let pad = chunk.iter().filter(|byte| **byte == b'=').count();
-        if pad > 2 || chunk[..4 - pad].contains(&b'=') {
-            bail!("invalid certificate encoding");
-        }
-        let mut parts = [0u8; 4];
-        for (index, byte) in chunk.iter().enumerate() {
-            if *byte == b'=' {
-                continue;
-            }
-            parts[index] = value(*byte).context("invalid certificate encoding")?;
-        }
-        output.push((parts[0] << 2) | (parts[1] >> 4));
-        if pad < 2 {
-            output.push((parts[1] << 4) | (parts[2] >> 2));
-        }
-        if pad < 1 {
-            output.push((parts[2] << 6) | parts[3]);
-        }
-    }
-    Ok(output)
+    let stripped: String = input.chars().filter(|character| !character.is_whitespace()).collect();
+    base64::engine::general_purpose::STANDARD.decode(stripped).context("invalid certificate encoding")
 }
 
 fn parse_environment_block(text: &str) -> Vec<(String, String)> {
@@ -2331,7 +2298,7 @@ mod tests {
 
     #[test]
     fn pem_decoder_reads_a_certificate_body() {
-        let body = pem_certificates("-----BEGIN CERTIFICATE-----\nAQIDBA==\n-----END CERTIFICATE-----\nnoise\n").unwrap();
+        let body = pem_certificates("-----BEGIN CERTIFICATE-----\nAQID\nBA==\n-----END CERTIFICATE-----\nnoise\n").unwrap();
         assert_eq!(body, vec![vec![1, 2, 3, 4]]);
     }
 
