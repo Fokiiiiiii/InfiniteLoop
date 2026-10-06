@@ -1103,7 +1103,7 @@ impl Net {
                 self.discover();
             }
             if round + 1 < ROUNDS {
-                sleep_cancellable(backoff(round), cancel)?;
+                sleep_cancellable(retry_backoff(round), cancel)?;
             }
         }
         Err(last.context(format!("all download servers failed for {path}")))
@@ -1191,7 +1191,7 @@ pub fn read_body(reader: &mut impl Read, content_length: Option<u64>, limit: usi
     Ok(body)
 }
 
-fn backoff(attempt: usize) -> Duration {
+pub(crate) fn retry_backoff(attempt: usize) -> Duration {
     Duration::from_millis((RETRY_BASE_MS << attempt.min(4)).min(8000))
 }
 
@@ -1727,7 +1727,7 @@ fn fetch_segment(ctx: &Ctx, net: &Net, url: &str, file: &mut File, start: u64, e
                 last = e;
             }
         }
-        sleep_cancellable(backoff(attempt), ctx.cancel)?;
+        sleep_cancellable(retry_backoff(attempt), ctx.cancel)?;
     }
     Err(last.context(format!("giving up on {url}")))
 }
@@ -1761,6 +1761,17 @@ fn transfer(ctx: &Ctx, net: &Net, url: &str, file: &mut File, from: u64, end: u6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_backoff_doubles_then_stops_growing() {
+        assert_eq!(retry_backoff(0), Duration::from_millis(RETRY_BASE_MS));
+        assert_eq!(retry_backoff(1), Duration::from_millis(RETRY_BASE_MS * 2));
+        assert_eq!(retry_backoff(2), Duration::from_millis(RETRY_BASE_MS * 4));
+        assert_eq!(retry_backoff(3), Duration::from_millis(RETRY_BASE_MS * 8));
+        assert_eq!(retry_backoff(4), Duration::from_millis(RETRY_BASE_MS * 16));
+        assert_eq!(retry_backoff(20), retry_backoff(4));
+    }
+
     use serde_json::{json, Value};
     use sha2::{Digest, Sha256};
     use std::io::{BufRead, BufWriter};

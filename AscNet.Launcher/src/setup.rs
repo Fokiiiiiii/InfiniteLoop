@@ -9,7 +9,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
 use std::{
     env, fs,
-    io::{ErrorKind, Read, Write},
+    io::{ErrorKind, Read, Seek, SeekFrom, Write},
     net::{Ipv4Addr, TcpListener},
     path::{Component, Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -17,6 +17,8 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+#[cfg(test)]
+use std::cell::Cell;
 
 const RUST_VERSION: &str = "1.92.0";
 const RUST_HOST: &str = "x86_64-pc-windows-msvc";
@@ -28,9 +30,14 @@ const VS_BOOTSTRAPPER: &str = "https://aka.ms/vs/17/release/vs_buildtools.exe";
 const VS_CHANNEL: &str = "https://aka.ms/vs/17/release/channel";
 const NUGET_INDEX: &str = "https://api.nuget.org/v3/index.json";
 /// A connection that closes before the body arrives is fetched again.
-/// Three attempts matches the game downloader's CDN rounds. A checksum
-/// mismatch or the setup deadline still fails on the first try.
-const DOWNLOAD_ATTEMPTS: u32 = 3;
+/// Four attempts, and the pause between them, match the game downloader.
+/// A checksum mismatch or the setup deadline still fails on the first try.
+const DOWNLOAD_ATTEMPTS: u32 = 4;
+
+#[cfg(test)]
+thread_local! {
+    static ALLOW_PLAIN_HTTP: Cell<bool> = const { Cell::new(false) };
+}
 
 struct RustComponent {
     url: &'static str,
@@ -461,15 +468,35 @@ fn update_checkout(
 
 fn http_client(deadline: Instant) -> Result<reqwest::blocking::Client> {
     ensure_time(deadline)?;
+    let https_only = {
+        #[cfg(test)]
+        {
+            !ALLOW_PLAIN_HTTP.with(Cell::get)
+        }
+        #[cfg(not(test))]
+        {
+            true
+        }
+    };
     Ok(crate::download::wine_safe(
         reqwest::blocking::Client::builder()
             .user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
-            .https_only(true)
+            .https_only(https_only)
             .connect_timeout(Duration::from_secs(15))
             .timeout(Duration::from_secs(120))
             .redirect(reqwest::redirect::Policy::limited(10)),
     )
     .build()?)
+}
+
+fn pause_before_retry(failed_attempt: u32, deadline: Instant) -> Result<()> {
+    let wait = crate::download::retry_backoff(failed_attempt.saturating_sub(1) as usize);
+    let now = Instant::now();
+    if now >= deadline {
+        bail!("local setup timed out");
+    }
+    thread::sleep(wait.min(deadline.saturating_duration_since(now)));
+    ensure_time(deadline)
 }
 
 fn download_file(
@@ -507,6 +534,7 @@ fn download_file(
             Ok(hash) => return Ok(hash),
             Err(error) if attempt < DOWNLOAD_ATTEMPTS && download_interrupted(&error) => {
                 note(progress, log, &format!("Download interrupted ({}); retrying {url}", error.root_cause()))?;
+                pause_before_retry(attempt, deadline)?;
                 last_error = Some(error);
             }
             Err(error) => return Err(error),
@@ -527,12 +555,58 @@ fn receive_download(
 ) -> Result<String> {
     ensure_time(deadline)?;
     let partial = partial_path(dest);
-    let _ = fs::remove_file(&partial);
     let result = receive_download_inner(url, dest, &partial, expect_sha256, expect_sha512, cache, deadline, progress, log);
-    if result.is_err() {
-        let _ = fs::remove_file(&partial);
+    if let Err(error) = &result {
+        if !download_interrupted(error) {
+            let _ = fs::remove_file(&partial);
+        }
     }
     result
+}
+
+struct DownloadBody {
+    response: reqwest::blocking::Response,
+    /// Offset in the destination file where this body continues. Zero means the body is the whole file.
+    start_at: u64,
+}
+
+fn open_download(url: &str, deadline: Instant, have: u64) -> Result<DownloadBody> {
+    fn send(url: &str, deadline: Instant, have: u64) -> Result<reqwest::blocking::Response> {
+        ensure_time(deadline)?;
+        let mut request = http_client(deadline)?.get(url);
+        if have > 0 {
+            request = request.header(reqwest::header::RANGE, format!("bytes={have}-"));
+        }
+        request.send().with_context(|| format!("download {url}"))
+    }
+    let response = send(url, deadline, have)?;
+    if response.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE && have > 0 {
+        let response = send(url, deadline, 0)?.error_for_status().with_context(|| format!("download {url}"))?;
+        return Ok(DownloadBody { response, start_at: 0 });
+    }
+    let status = response.status();
+    let response = response.error_for_status().with_context(|| format!("download {url}"))?;
+    let start_at = if status == reqwest::StatusCode::PARTIAL_CONTENT { have } else { 0 };
+    Ok(DownloadBody { response, start_at })
+}
+
+fn hash_prefix(file: &mut fs::File, len: u64) -> Result<(Sha256, Sha512)> {
+    file.seek(SeekFrom::Start(0)).context("read partial download")?;
+    let mut sha256 = Sha256::new();
+    let mut sha512 = Sha512::new();
+    let mut left = len;
+    let mut buffer = [0u8; 64 * 1024];
+    while left > 0 {
+        let want = buffer.len().min(left as usize);
+        let count = file.read(&mut buffer[..want]).context("read partial download")?;
+        if count == 0 {
+            bail!("partial download ended early");
+        }
+        sha256.update(&buffer[..count]);
+        sha512.update(&buffer[..count]);
+        left -= count as u64;
+    }
+    Ok((sha256, sha512))
 }
 
 fn receive_download_inner(
@@ -547,24 +621,31 @@ fn receive_download_inner(
     log: &mut dyn FnMut(&str) -> Result<()>,
 ) -> Result<String> {
     note(progress, log, &format!("Downloading {url}"))?;
-    let mut response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
-    let expected = response.content_length();
-    let mut file = fs::File::create(partial).with_context(|| format!("create {}", partial.display()))?;
-    let mut sha256 = Sha256::new();
-    let mut sha512 = Sha512::new();
+    let mut file = fs::OpenOptions::new().read(true).write(true).create(true).open(partial).with_context(|| format!("create {}", partial.display()))?;
+    let have = file.metadata().with_context(|| format!("read {}", partial.display()))?.len();
+    let opened = open_download(url, deadline, have)?;
+    let start_at = if opened.start_at > have { 0 } else { opened.start_at };
+    if start_at == 0 && have > 0 {
+        file.set_len(0).with_context(|| format!("reset {}", partial.display()))?;
+    }
+    let (mut sha256, mut sha512) = hash_prefix(&mut file, start_at)?;
+    file.seek(SeekFrom::Start(start_at)).with_context(|| format!("write {}", partial.display()))?;
+    let mut response = opened.response;
+    let body_len = response.content_length();
     let mut buffer = [0u8; 64 * 1024];
-    let mut received = 0u64;
+    let mut received = start_at;
+    let mut body_got = 0u64;
     loop {
         if Instant::now() >= deadline {
             drop(file);
             bail!("local setup timed out");
         }
-        // Content-Length is the end of the body. Another read waits out the
-        // client timeout on a keep-alive connection after the file is complete.
-        if expected.is_some_and(|n| received >= n) {
+        // Content-Length is the end of this body. Another read waits out the
+        // client timeout on a keep-alive connection after the body is complete.
+        if body_len.is_some_and(|n| body_got >= n) {
             break;
         }
-        let want = expected.map(|n| buffer.len().min((n - received) as usize)).unwrap_or(buffer.len());
+        let want = body_len.map(|n| buffer.len().min((n - body_got) as usize)).unwrap_or(buffer.len());
         let count = response.read(&mut buffer[..want]).with_context(|| format!("read {url}"))?;
         if count == 0 {
             break;
@@ -573,11 +654,12 @@ fn receive_download_inner(
         sha256.update(&buffer[..count]);
         sha512.update(&buffer[..count]);
         received += count as u64;
+        body_got += count as u64;
     }
-    if let Some(n) = expected {
-        if received != n {
+    if let Some(n) = body_len {
+        if body_got != n {
             drop(file);
-            return Err(std::io::Error::new(ErrorKind::UnexpectedEof, format!("download {url} ended after {received} bytes, expected {n}")).into());
+            return Err(std::io::Error::new(ErrorKind::UnexpectedEof, format!("download {url} ended after {received} bytes, expected {}", start_at + n)).into());
         }
     }
     file.sync_all()?;
@@ -717,21 +799,75 @@ fn partial_path(dest: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
-fn read_download_text(url: &str, deadline: Instant) -> Result<String> {
-    ensure_time(deadline)?;
-    let mut response = http_client(deadline)?.get(url).send().with_context(|| format!("download {url}"))?.error_for_status().with_context(|| format!("download {url}"))?;
-    let length = response.content_length();
-    let bytes = crate::download::read_body(&mut response, length, 128 * 1024 * 1024).with_context(|| format!("read {url}"))?;
-    if bytes.len() > 128 * 1024 * 1024 {
-        bail!("download {url} exceeds 128 MiB");
+fn read_download_text(
+    url: &str,
+    deadline: Instant,
+    progress: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<()>,
+) -> Result<String> {
+    let mut have = Vec::new();
+    let mut last_error = None;
+    for attempt in 1..=DOWNLOAD_ATTEMPTS {
+        match read_download_text_more(url, deadline, &mut have) {
+            Ok(()) => {
+                if have.len() > 128 * 1024 * 1024 {
+                    bail!("download {url} exceeds 128 MiB");
+                }
+                return Ok(String::from_utf8_lossy(&have).into_owned());
+            }
+            Err(error) if attempt < DOWNLOAD_ATTEMPTS && download_interrupted(&error) => {
+                note(progress, log, &format!("Download interrupted ({}); retrying {url}", error.root_cause()))?;
+                pause_before_retry(attempt, deadline)?;
+                last_error = Some(error);
+            }
+            Err(error) => return Err(error),
+        }
     }
-    if let Some(n) = length {
-        if bytes.len() as u64 != n {
-            bail!("download {url} ended after {} bytes, expected {n}", bytes.len());
+    Err(last_error.expect("an interrupted download keeps its last error"))
+}
+
+fn read_download_text_more(url: &str, deadline: Instant, have: &mut Vec<u8>) -> Result<()> {
+    ensure_time(deadline)?;
+    let opened = open_download(url, deadline, have.len() as u64)?;
+    if opened.start_at == 0 {
+        have.clear();
+    }
+    let mut response = opened.response;
+    let body_len = response.content_length();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut body_got = 0u64;
+    loop {
+        if Instant::now() >= deadline {
+            bail!("local setup timed out");
+        }
+        // A read error still leaves the bytes already copied into `have`, so the
+        // next attempt can ask for the remainder. `read_body` would drop them.
+        if body_len.is_some_and(|n| body_got >= n) {
+            break;
+        }
+        let room = (128 * 1024 * 1024usize).saturating_sub(have.len());
+        if room == 0 {
+            bail!("download {url} exceeds 128 MiB");
+        }
+        let want = body_len.map(|n| buffer.len().min((n - body_got) as usize)).unwrap_or(buffer.len()).min(room);
+        let count = response.read(&mut buffer[..want]).with_context(|| format!("read {url}"))?;
+        if count == 0 {
+            break;
+        }
+        have.extend_from_slice(&buffer[..count]);
+        body_got += count as u64;
+    }
+    if let Some(n) = body_len {
+        if body_got != n {
+            return Err(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                format!("download {url} ended after {} bytes, expected {}", have.len(), have.len() - body_got as usize + n as usize),
+            )
+            .into());
         }
     }
     ensure_time(deadline)?;
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
+    Ok(())
 }
 
 fn first_sha256(text: &str) -> Option<String> {
@@ -1352,7 +1488,7 @@ fn ensure_dotnet(root: &Path, deadline: Instant, progress: &mut dyn FnMut(&str),
         }
     }
     note(progress, log, "Installing the .NET 8 SDK")?;
-    let metadata = read_download_text(DOTNET_RELEASES, deadline)?;
+    let metadata = read_download_text(DOTNET_RELEASES, deadline, progress, log)?;
     let selected = select_dotnet_sdk(&metadata)?;
     let archive = scratch_file(root, "dotnet-sdk.zip");
     download_file(&selected.url, &archive, None, Some(&selected.sha512), root, deadline, progress, log)?;
@@ -1471,11 +1607,11 @@ fn safe_archive_name(name: &str) -> String {
 
 #[cfg(windows)]
 fn install_portable_msvc(root: &Path, dest: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
-    let channel = read_download_text(VS_CHANNEL, deadline)?;
+    let channel = read_download_text(VS_CHANNEL, deadline, progress, log)?;
     let info = crate::msvc::channel_info(&channel)?;
     note(progress, log, &format!("Visual Studio license: {}", info.license))?;
     note(progress, log, "Installing the MSVC toolset and Windows SDK")?;
-    let manifest = read_download_text(&info.manifest_url, deadline)?;
+    let manifest = read_download_text(&info.manifest_url, deadline, progress, log)?;
     let plan = crate::msvc::plan(&manifest)?;
     note(progress, log, &format!("MSVC {} and Windows SDK {}", plan.toolset, plan.sdk_version))?;
     let stage = scratch_file(root, "msvc");
@@ -1802,12 +1938,12 @@ fn ensure_mongo(root: &Path, tools: &Path, previous: Option<&Value>, deadline: I
         return Ok(existing);
     }
     note(progress, log, "Installing MongoDB 8.0")?;
-    let catalog = read_download_text(MONGO_CATALOG, deadline)?;
+    let catalog = read_download_text(MONGO_CATALOG, deadline, progress, log)?;
     let selected = select_mongo_archive(&catalog)?;
     let sha256 = match selected.sha256 {
         Some(hash) => hash,
         None => {
-            let sidecar = read_download_text(&format!("{}.sha256", selected.url), deadline)?;
+            let sidecar = read_download_text(&format!("{}.sha256", selected.url), deadline, progress, log)?;
             first_sha256(&sidecar).with_context(|| format!("MongoDB's official metadata did not provide a valid SHA-256 for {}", selected.url))?
         }
     };
@@ -2399,6 +2535,8 @@ mod tests {
         assert!(download_interrupted(&short));
         let recorded = anyhow::anyhow!("read https://static.rust-lang.org/dist/rustc.tar.gz: request or response body error: error reading a body from connection: end of file before message length reached");
         assert!(download_interrupted(&recorded));
+        let releases = anyhow::anyhow!("read https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json: request or response body error: error reading a body from connection: end of file before message length reached");
+        assert!(download_interrupted(&releases));
         assert!(!download_interrupted(&anyhow::anyhow!("checksum mismatch for https://static.rust-lang.org/dist/rustc.tar.gz (expected abc, received def)")));
         assert!(!download_interrupted(&anyhow::anyhow!("local setup timed out")));
         assert!(!download_interrupted(&anyhow::anyhow!("download https://example.invalid/missing: HTTP status client error (404 Not Found)")));
@@ -2414,5 +2552,155 @@ mod tests {
         let env = command.get_envs().map(|(key, value)| (key.to_string_lossy().into_owned(), value.map(|item| item.to_string_lossy().into_owned()))).collect::<Vec<_>>();
         assert!(env.contains(&("MSBUILDDISABLENODEREUSE".to_owned(), Some("1".to_owned()))));
         assert!(env.contains(&("DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER".to_owned(), Some("1".to_owned()))));
+    }
+
+    struct PlainHttp;
+    impl PlainHttp {
+        fn enable() -> Self {
+            ALLOW_PLAIN_HTTP.with(|flag| flag.set(true));
+            Self
+        }
+    }
+    impl Drop for PlainHttp {
+        fn drop(&mut self) {
+            ALLOW_PLAIN_HTTP.with(|flag| flag.set(false));
+        }
+    }
+
+    /// Serves `payload`, closing early `drops` times, then honoring `Range`.
+    fn serve_resumable(payload: &[u8], drops: usize) -> (u16, std::sync::Arc<std::sync::Mutex<Vec<Option<String>>>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let ranges = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorded = std::sync::Arc::clone(&ranges);
+        let payload = payload.to_vec();
+        thread::spawn(move || {
+            for _ in 0..8 {
+                let Ok((mut socket, _)) = listener.accept() else { break };
+                socket.set_read_timeout(Some(Duration::from_secs(5))).ok();
+                let mut request = Vec::new();
+                let mut buffer = [0u8; 1024];
+                loop {
+                    match socket.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(count) => {
+                            request.extend_from_slice(&buffer[..count]);
+                            if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+                let text = String::from_utf8_lossy(&request);
+                let range = text.lines().find(|line| line.to_ascii_lowercase().starts_with("range:")).map(|line| line.to_owned());
+                let start = range.as_deref().and_then(|line| line.split('=').nth(1)).and_then(|value| value.split('-').next()).and_then(|value| value.trim().parse::<usize>().ok()).unwrap_or(0);
+                let seen = {
+                    let mut guard = recorded.lock().unwrap();
+                    guard.push(range);
+                    guard.len()
+                };
+                let fail = seen <= drops;
+                let end = if fail { (start + 10).min(payload.len().saturating_sub(1).max(start)) } else { payload.len() };
+                let body = payload.get(start..end).unwrap_or_default();
+                let header = if start == 0 {
+                    format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len())
+                } else {
+                    format!(
+                        "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        payload.len().saturating_sub(1),
+                        payload.len(),
+                        payload.len() - start
+                    )
+                };
+                let _ = socket.write_all(header.as_bytes());
+                let _ = socket.write_all(body);
+            }
+        });
+        (port, ranges)
+    }
+
+    #[test]
+    fn interrupted_download_resumes_from_the_partial() {
+        let payload = b"abcdefghijklmnopqrstuvwxyz0123456789";
+        let (port, ranges) = serve_resumable(payload, 2);
+        let dir = env::temp_dir().join(format!("ascnet-resume-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let dest = dir.join("payload.bin");
+        let sha = format!("{:x}", Sha256::digest(payload));
+        let _http = PlainHttp::enable();
+        let mut notes = Vec::new();
+        let hash = download_file(
+            &format!("http://127.0.0.1:{port}/payload.bin"),
+            &dest,
+            Some(&sha),
+            None,
+            &dir,
+            Instant::now() + Duration::from_secs(20),
+            &mut |_| {},
+            &mut |line| {
+                notes.push(line.to_owned());
+                Ok(())
+            },
+        )
+        .unwrap_or_else(|error| panic!("{error:#}\n{notes:?}"));
+        assert_eq!(hash, sha);
+        assert_eq!(fs::read(&dest).unwrap(), payload);
+        assert!(!partial_path(&dest).exists());
+        let seen = ranges.lock().unwrap().clone();
+        assert!(seen.len() >= 3, "{seen:?}");
+        assert!(seen[0].is_none(), "{seen:?}");
+        assert!(seen[1].as_deref().is_some_and(|line| line.contains("bytes=10-")), "{seen:?}");
+        assert!(seen[2].as_deref().is_some_and(|line| line.contains("bytes=20-")), "{seen:?}");
+        assert!(notes.iter().any(|line| line.contains("retrying")), "{notes:?}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn interrupted_text_download_resumes_from_received_bytes() {
+        let payload = b"abcdefghijklmnopqrstuvwxyz0123456789";
+        let (port, ranges) = serve_resumable(payload, 2);
+        let _http = PlainHttp::enable();
+        let mut notes = Vec::new();
+        let text = read_download_text(
+            &format!("http://127.0.0.1:{port}/channel"),
+            Instant::now() + Duration::from_secs(20),
+            &mut |_| {},
+            &mut |line| {
+                notes.push(line.to_owned());
+                Ok(())
+            },
+        )
+        .unwrap_or_else(|error| panic!("{error:#}\n{notes:?}"));
+        assert_eq!(text.as_bytes(), payload);
+        let seen = ranges.lock().unwrap().clone();
+        assert!(seen.len() >= 3, "{seen:?}");
+        assert!(seen[0].is_none(), "{seen:?}");
+        assert!(seen[1].as_deref().is_some_and(|line| line.contains("bytes=10-")), "{seen:?}");
+        assert!(seen[2].as_deref().is_some_and(|line| line.contains("bytes=20-")), "{seen:?}");
+    }
+
+    #[test]
+    fn checksum_mismatch_discards_the_partial() {
+        let (port, _) = serve_resumable(b"hello", 0);
+        let dir = env::temp_dir().join(format!("ascnet-mismatch-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let dest = dir.join("payload.bin");
+        let _http = PlainHttp::enable();
+        let error = download_file(
+            &format!("http://127.0.0.1:{port}/payload.bin"),
+            &dest,
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            None,
+            &dir,
+            Instant::now() + Duration::from_secs(20),
+            &mut |_| {},
+            &mut |_| Ok(()),
+        )
+        .unwrap_err();
+        assert!(format!("{error:#}").contains("checksum mismatch"), "{error:#}");
+        assert!(!partial_path(&dest).exists());
+        assert!(!dest.exists());
+        let _ = fs::remove_dir_all(&dir);
     }
 }
