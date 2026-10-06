@@ -1854,15 +1854,25 @@ fn elevate_and_wait(program: &Path, parameters: &str, deadline: Instant, progres
     result
 }
 
+/// `cmd.exe /c` removes one leading quote and the last quote. Rust's normal
+/// argument quoting would turn the inner quotes into `\"`, which cmd leaves in
+/// the path. The raw command line keeps the quotes cmd expects.
+fn vcvars_command(bat: &str) -> Result<String> {
+    if bat.contains('"') || bat.contains('\n') || bat.contains('\r') {
+        bail!("MSVC vcvars path contains a quote: {bat}");
+    }
+    let script = format!("call \"{bat}\" >nul && set");
+    Ok(format!("/d /c \"{script}\""))
+}
+
 #[cfg(windows)]
 fn capture_vcvars(bat: &Path, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<Vec<(String, String)>> {
-    let text = bat.display().to_string();
-    if text.contains('"') {
-        bail!("MSVC vcvars path contains a quote: {text}");
-    }
-    let script = format!("call \"{text}\" >nul && set");
+    let argument = vcvars_command(&bat.display().to_string())?;
     let mut command = Command::new("cmd.exe");
-    command.args(["/d", "/c", &script]);
+    {
+        use std::os::windows::process::CommandExt;
+        command.raw_arg(&argument);
+    }
     let output = capture_command(&mut command, "Import MSVC environment", deadline, false, progress, log)?;
     let vars = parse_environment_block(&String::from_utf8_lossy(&output.stdout));
     if vars.is_empty() {
@@ -2367,6 +2377,14 @@ mod tests {
     #[test]
     fn response_file_argument_quotes_windows_paths() {
         assert_eq!(quoted_response_file(Path::new(r"C:\Users\A B\cl.rsp")), "@\"C:/Users/A B/cl.rsp\"");
+    }
+
+    #[test]
+    fn vcvars_command_keeps_cmd_quotes_around_a_spaced_path() {
+        let line = vcvars_command(r"C:\Program Files (x86)\x\vcvars64.bat").unwrap();
+        assert_eq!(line, "/d /c \"call \"C:\\Program Files (x86)\\x\\vcvars64.bat\" >nul && set\"");
+        assert!(!line.contains("\\\""));
+        assert!(vcvars_command("C:\\Program Files\\x\\\"vcvars64.bat").is_err());
     }
 
     #[test]
