@@ -2127,7 +2127,11 @@ fn build_patch(rust: &Path, compiler: &Compiler, checkout: &Path, root: &Path, s
     let patch = stage.join("patch");
     fs::create_dir_all(&patch)?;
     fs::copy(release.join("lucia.dll"), patch.join("lucia.dll")).context("copy lucia.dll")?;
-    fs::copy(release.join("KRSDK.dll"), patch.join("KRSDK.dll")).context("copy KRSDK.dll")?;
+    // The crate is named krsdk, so current checkouts emit krsdk.dll. The game
+    // still loads KRSDK.dll, and an older checkout still emits that name.
+    let sdk_built = release.join("krsdk.dll");
+    let sdk_built = if sdk_built.is_file() { sdk_built } else { release.join("KRSDK.dll") };
+    fs::copy(&sdk_built, patch.join("KRSDK.dll")).context("copy KRSDK.dll")?;
     Ok(())
 }
 

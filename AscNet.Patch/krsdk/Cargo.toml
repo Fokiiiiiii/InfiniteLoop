@@ -1,5 +1,5 @@
 [package]
-name = "KRSDK"
+name = "krsdk"
 version.workspace = true
 edition.workspace = true
 

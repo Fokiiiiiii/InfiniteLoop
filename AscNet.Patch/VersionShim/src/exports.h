@@ -7,7 +7,9 @@
 #pragma once
 
 #define FORWARD(dllPath, methodName) __pragma(comment(linker, "/EXPORT:"methodName"="dllPath"."methodName))
+#define FORWARD_PRIVATE(dllPath, methodName) __pragma(comment(linker, "/EXPORT:"methodName"="dllPath"."methodName",PRIVATE"))
 #define FORWARD_SYSTEM32(dllName, methodName) FORWARD("c:\\windows\\system32\\"dllName, methodName)
+#define FORWARD_SYSTEM32_PRIVATE(dllName, methodName) FORWARD_PRIVATE("c:\\windows\\system32\\"dllName, methodName)
 
 FORWARD_SYSTEM32("version", "GetFileVersionInfoA")
 FORWARD_SYSTEM32("version", "GetFileVersionInfoByHandle")
@@ -27,8 +29,8 @@ FORWARD_SYSTEM32("version", "VerLanguageNameW")
 FORWARD_SYSTEM32("version", "VerQueryValueA")
 FORWARD_SYSTEM32("version", "VerQueryValueW")
 
-FORWARD_SYSTEM32("winhttp", "DllCanUnloadNow")
-FORWARD_SYSTEM32("winhttp", "DllGetClassObject")
+FORWARD_SYSTEM32_PRIVATE("winhttp", "DllCanUnloadNow")
+FORWARD_SYSTEM32_PRIVATE("winhttp", "DllGetClassObject")
 FORWARD_SYSTEM32("winhttp", "Private1")
 FORWARD_SYSTEM32("winhttp", "SvchostPushServiceGlobals")
 FORWARD_SYSTEM32("winhttp", "WinHttpAddRequestHeaders")
