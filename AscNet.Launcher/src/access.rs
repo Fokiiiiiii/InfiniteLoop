@@ -1,5 +1,5 @@
 //! The game runs unelevated; only its persistent document directory gets a user grant.
-use anyhow::{ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use std::{fs::{self, File, OpenOptions}, os::windows::{ffi::OsStringExt, fs::{MetadataExt, OpenOptionsExt}, io::AsRawHandle}, path::{Component, Path, PathBuf}};
 use windows::{core::PWSTR, Win32::{Foundation::*, Security::{*, Authorization::*}, Storage::FileSystem::*, System::{SystemServices::{ACCESS_ALLOWED_ACE_TYPE, MAXIMUM_ALLOWED}, Threading::*}}};
 
@@ -77,20 +77,25 @@ fn pin_ancestors(path: &Path) -> Result<Vec<File>> {
         // itself still goes through open_pinned and rejects every reparse point.
         let metadata = fs::symlink_metadata(ancestor)
             .with_context(|| format!("opening document access path {}", ancestor.display()))?;
+        let attributes = metadata.file_attributes();
+        // The Wine result is taken before the share-read pin. The pin denies a later open.
+        let wine_mount = attributes & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0
+            && crate::install::wine_mount_keeps_its_path(ancestor);
         ensure!(
-            metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0
-                || crate::install::wine_mount_keeps_its_path(ancestor),
+            attributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0 || wine_mount,
             "refusing document access through reparse point: {}",
             ancestor.display()
         );
         let file = OpenOptions::new().access_mode(FILE_GENERIC_READ.0).share_mode(FILE_SHARE_READ.0)
             .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
             .open(ancestor).with_context(|| format!("opening document access path {}", ancestor.display()))?;
-        // `is_dir()` is false for a junction even when the directory attribute is set.
-        ensure!(
-            file.metadata()?.file_attributes() & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
-            "document ancestor is not a directory"
-        );
+        // The handle is the object that was pinned. A directory swapped for a junction
+        // after the path check still has the directory attribute, so check this handle too.
+        let pinned = file.metadata()?.file_attributes();
+        if !crate::install::directory_pin_allows(pinned, wine_mount) {
+            ensure!(pinned & FILE_ATTRIBUTE_DIRECTORY.0 != 0, "document ancestor is not a directory");
+            bail!("refusing document access through reparse point: {}", ancestor.display());
+        }
         pins.push(file);
     }
     Ok(pins)

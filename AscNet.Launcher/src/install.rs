@@ -1125,6 +1125,17 @@ fn normalize_windows_path(value: &str) -> String {
     }
 }
 
+/// `FILE_ATTRIBUTE_DIRECTORY` is 0x10 and `FILE_ATTRIBUTE_REPARSE_POINT` is 0x400.
+/// `wine_mount` is the result of checking the path before the pin is taken.
+/// The opened handle has to pass the same test: a directory swapped for a
+/// junction still has the directory attribute.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+pub(crate) fn directory_pin_allows(attributes: u32, wine_mount: bool) -> bool {
+    const DIRECTORY: u32 = 0x10;
+    const REPARSE: u32 = 0x400;
+    attributes & DIRECTORY != 0 && (attributes & REPARSE == 0 || wine_mount)
+}
+
 /// Proton bind-mounts `/home` at `Z:\home`. Wine reports that directory as a
 /// junction. Rust then reports it as a symlink, so `is_dir()` is false even
 /// though the directory attribute is set. Opening it with and without
@@ -1219,10 +1230,10 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
             let metadata = fs::symlink_metadata(directory)
                 .with_context(|| format!("locking protected write directory {}", directory.display()))?;
             let attributes = metadata.file_attributes();
+            // Decide before taking the share-read pin. That pin denies a later open.
             // `is_dir()` is false for a junction. The directory attribute is what matters.
-            let allows = attributes & 0x10 != 0
-                && (attributes & 0x400 == 0 || wine_mount_keeps_its_path(directory));
-            if !allows {
+            let wine_mount = attributes & 0x400 != 0 && wine_mount_keeps_its_path(directory);
+            if !directory_pin_allows(attributes, wine_mount) {
                 bail!("refusing link/reparse write directory: {}", directory.display());
             }
             // Metadata-only opens do not participate in Windows share checks.
@@ -1230,6 +1241,12 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
                 .share_mode(FILE_SHARE_READ.0)
                 .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
                 .open(directory).with_context(|| format!("locking protected write directory {}", directory.display()))?;
+            let pinned = handle.metadata()
+                .with_context(|| format!("locking protected write directory {}", directory.display()))?
+                .file_attributes();
+            if !directory_pin_allows(pinned, wine_mount) {
+                bail!("refusing link/reparse write directory: {}", directory.display());
+            }
             pins.insert(directory.to_path_buf(), handle);
         }
         Ok(())
@@ -1988,6 +2005,14 @@ mod tests {
     fn traversal_and_links_are_refused() {
         assert!(validate_relative("../PGR.exe").is_err());
         assert!(validate_relative("a\\b").is_err());
+    }
+    #[test]
+    fn directory_pin_allows_a_directory_and_a_wine_mount_only() {
+        assert!(directory_pin_allows(0x10, false));
+        assert!(!directory_pin_allows(0x10 | 0x400, false));
+        assert!(directory_pin_allows(0x10 | 0x400, true));
+        assert!(!directory_pin_allows(0x400, true));
+        assert!(!directory_pin_allows(0, false));
     }
     #[test]
     fn wine_bind_mount_path_matches_and_a_junction_target_does_not() {
