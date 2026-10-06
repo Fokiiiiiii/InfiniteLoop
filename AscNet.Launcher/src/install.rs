@@ -210,15 +210,21 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
             _ => {}
         }
         let mut all_target = true;
-        let mut all_tracked = true;
         let mut all_original = true;
+        let mut all_known = true;
         for file in &package.manifest.files {
             let actual = file_hash(&client.join(&file.path))?;
             let old = state.files.get(&file.path);
             let new_base = file.path == "PGRBase.dll" && old.is_none();
-            all_target &= !new_base && actual.as_deref() == Some(&file.sha256);
-            all_tracked &= new_base || old.is_some_and(|old| actual.as_deref() == Some(&old.installed));
-            all_original &= new_base || old.is_some_and(|old| actual.as_deref() == old.original.as_deref());
+            let matches_target = !new_base && actual.as_deref() == Some(&file.sha256);
+            let matches_installed = old.is_some_and(|old| actual.as_deref() == Some(&old.installed));
+            // A saved original of null means the patch added the file. Matching it means the file is absent.
+            let matches_original = new_base || old.is_some_and(|old| actual.as_deref() == old.original.as_deref());
+            all_target &= matches_target;
+            all_original &= matches_original;
+            // Retail copies and the previous patch are both known bytes. An unknown
+            // replacement is not, even when the other files are still intact.
+            all_known &= matches_target || matches_installed || matches_original;
         }
         if all_target {
             return Ok(if has_stray(client) { PatchState::UpdateAvailable } else { PatchState::Current });
@@ -226,7 +232,7 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
         if all_original {
             return Ok(PatchState::Unpatched);
         }
-        if all_tracked {
+        if all_known {
             return Ok(PatchState::UpdateAvailable);
         }
         return Ok(PatchState::RepairRequired(
@@ -2167,6 +2173,18 @@ mod tests {
         install(&client, &package, &mut |_| {}).unwrap();
         assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
         assert_eq!(read_state(&client).unwrap().unwrap().originals, originals);
+        // One retail file restored beside an otherwise intact patch can be updated.
+        // A third, unknown copy of a managed file still cannot.
+        fs::write(client.join("version.dll"), b"tampered").unwrap();
+        assert!(matches!(inspect(&client, &package).unwrap(), PatchState::RepairRequired(_)));
+        assert!(install(&client, &package, &mut |_| {}).is_err());
+        assert_eq!(fs::read(client.join("version.dll")).unwrap(), b"tampered");
+        fs::copy(package.directory.join("version.dll"), client.join("version.dll")).unwrap();
+        fs::write(client.join("PGR_Data/Plugins/KRSDK.dll"), b"retail-sdk").unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::UpdateAvailable);
+        install(&client, &package, &mut |_| {}).unwrap();
+        assert_eq!(fs::read(client.join("PGR_Data/Plugins/KRSDK.dll")).unwrap(), b"patched-sdk");
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
         let payload_v2 = root.join("package-v2");
         fs::create_dir_all(&payload_v2).unwrap();
         let mut manifest_v2 = package.manifest.clone();
