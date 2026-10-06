@@ -441,17 +441,54 @@ internal partial class Program
                 StageDatum expectedCodexStageDatum = MessagePackSerializer.Deserialize<StageDatum>(
                     MessagePackSerializer.Serialize(codexStageDatum));
                 int firstClearTaskProgressBefore = FirstClearTaskProgress();
+                BossSingleTrialGradeTable catalogRow = trialGrades.Single(row =>
+                    row.LevelType == (bestiary ? 8 : 4));
+                int sectionId = catalogRow.SectionId.First(candidateSection => sections
+                    .Where(section => section.SectionId == candidateSection)
+                    .Any(section => section.StageId.Contains(stageId)));
+                BossSingleSectionTable section = sections
+                    .Where(row => row.SectionId == sectionId)
+                    .OrderByDescending(row => row.AfreshId == currentAfreshId)
+                    .First();
+                List<AscNet.Table.V2.share.task.CurrentConditionTable> sectionAchievements =
+                    TableReaderV2.Parse<AscNet.Table.V2.share.task.CurrentConditionTable>()
+                        .Where(condition => condition.Type == 25001 && condition.Params.Count > 1
+                            && condition.Params[1] == sectionId)
+                        .ToList();
+                List<string> savePushes;
+                List<NotifyTask> taskPushes = [];
                 BossSingleSaveScoreResponse save = SaveScore(
                     packetBase + 2,
                     stageId,
                     $"Pain Cage {(bestiary ? "bestiary" : "trial")} save",
-                    out _);
+                    out savePushes,
+                    push =>
+                    {
+                        if (push.Name == nameof(NotifyTask))
+                            taskPushes.Add(MessagePackSerializer.Deserialize<NotifyTask>(push.Content));
+                    });
                 AssertEqual(0, save.Code, $"Pain Cage {(bestiary ? "bestiary" : "trial")} save code");
                 Dictionary<int, int> scores = bestiary
                     ? player.SimulatedBattlefield.BossBestiaryScores
                     : player.SimulatedBattlefield.BossTrialScores;
                 AssertEqual(result.TotalScore, scores[stageId],
                     $"Pain Cage {(bestiary ? "bestiary" : "trial")} score persistence");
+                int sectionTotal = section.StageId.Where(candidateStageId => candidateStageId > 0).Distinct()
+                    .Sum(candidateStageId => scores.GetValueOrDefault(candidateStageId));
+                foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in sectionAchievements)
+                {
+                    AssertEqual(sectionTotal, player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                        $"PPC section {sectionId} records its surface-only 25001 total");
+                    AscNet.Table.V2.share.task.CurrentTaskTable task = TableReaderV2
+                        .Parse<AscNet.Table.V2.share.task.CurrentTaskTable>()
+                        .Single(row => row.Condition == condition.Id);
+                    NotifyTask.NotifyTaskTasks.NotifyTaskTasksTask? synced = taskPushes
+                        .SelectMany(push => push.Tasks.Tasks)
+                        .SingleOrDefault(row => row.Id == (uint)task.Id);
+                    AssertEqual(true, synced is not null, $"PPC section {sectionId} immediately syncs its achievement");
+                    AssertEqual(Math.Min(sectionTotal, task.Result), synced!.Schedule.Single().Value,
+                        $"PPC section {sectionId} syncs its achievement progress");
+                }
                 expectedCodexStageDatum.Score = result.TotalScore;
                 AssertEqual(true, MessagePackSerializer.Serialize(expectedCodexStageDatum)
                     .SequenceEqual(MessagePackSerializer.Serialize(harness.Session.stage.Stages[checked((uint)stageId)])),
@@ -470,6 +507,17 @@ internal partial class Program
                 player = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(
                     playerCollection.LastSuccessfulReplacementBson
                         ?? throw new InvalidDataException("Pain Cage Codex save did not persist Player task progress."));
+                Dictionary<int, int> persistedScores = bestiary
+                    ? player.SimulatedBattlefield.BossBestiaryScores
+                    : player.SimulatedBattlefield.BossTrialScores;
+                AssertEqual(result.TotalScore, persistedScores.GetValueOrDefault(stageId),
+                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} score survives Player reload");
+                AssertEqual(sectionTotal, section.StageId.Where(candidateStageId => candidateStageId > 0).Distinct()
+                    .Sum(candidateStageId => persistedScores.GetValueOrDefault(candidateStageId)),
+                    $"PPC section {sectionId} score store survives in the task-progress Player replacement");
+                foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in sectionAchievements)
+                    AssertEqual(sectionTotal, player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                        $"PPC section {sectionId} score store and 25001 counter coexist in the persisted Player replacement");
                 harness.Session.player = player;
                 harness.Session.stage = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Stage>(
                     stageCollection.LastSuccessfulReplacementBson
@@ -921,6 +969,22 @@ internal partial class Program
             AssertEqual(false, player.SimulatedBattlefield.BossHistory.Any(record =>
                 record.StageId == firstArchivedStage.StageId), "Pain Cage rejected Auto Clear does not create history");
 
+            List<AscNet.Table.V2.share.task.CurrentConditionTable> rolloverAchievements =
+                TableReaderV2.Parse<AscNet.Table.V2.share.task.CurrentConditionTable>()
+                    .Where(condition => condition.Type == 25001 && condition.Params.Count > 1
+                        && condition.Params[1] == attemptSection.SectionId)
+                    .ToList();
+            if (rolloverAchievements.Count == 0)
+                throw new InvalidDataException($"PPC section {attemptSection.SectionId} has no 25001 rollover conditions.");
+            int outgoingPpcSectionScore = attemptSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                player.SimulatedBattlefield.BossStageRecords.Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(true, outgoingPpcSectionScore > 0, "Pain Cage rollover has a scored PPC section");
+            Dictionary<int, int> rolloverPpcHighWater = rolloverAchievements.ToDictionary(
+                condition => condition.Id,
+                condition => player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id));
+            AssertEqual(true, rolloverPpcHighWater.Values.All(value => value >= outgoingPpcSectionScore),
+                "Pain Cage rollover starts with a persisted 25001 section high-water");
+
             int currentBossActivity = player.SimulatedBattlefield.BossActivityNo;
             if (currentBossActivity <= 1)
                 throw new InvalidDataException("Pain Cage weekly rollover fixture requires a prior activity.");
@@ -958,6 +1022,14 @@ internal partial class Program
                 record.StageId == firstArchivedStage.StageId), "Pain Cage rollover archives the manual clear");
             AssertEqual(false, player.SimulatedBattlefield.BossStageRecords.Any(record =>
                 record.StageId == firstArchivedStage.StageId), "Pain Cage rollover resets current-cycle records");
+            int rolledOverSectionScore = attemptSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                player.SimulatedBattlefield.BossStageRecords.Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(0, rolledOverSectionScore, "Pain Cage rollover excludes outgoing PPC scores from current records");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in rolloverAchievements)
+                AssertEqual(rolloverPpcHighWater[condition.Id],
+                    player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                    "Pain Cage rollover retains persisted 25001 high-water");
+
             player.SimulatedBattlefield.BossLevelType = stageHistoryGrade.LevelType;
             player.SimulatedBattlefield.BossList = [attemptSection.SectionId];
             player.Save();
@@ -972,6 +1044,28 @@ internal partial class Program
                 nameof(BossSingleAutoFightResponse),
                 "Pain Cage archived Auto Clear after reload",
                 out _).Code, "Pain Cage archived Auto Clear succeeds after reload");
+            int newWeekPpcSectionScore = attemptSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                player.SimulatedBattlefield.BossStageRecords.Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(player.SimulatedBattlefield.BossStageRecords
+                    .Single(record => record.StageId == firstArchivedStage.StageId).Score,
+                newWeekPpcSectionScore, "Pain Cage new-week Auto Clear sums only current BossStageRecords");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in rolloverAchievements)
+                AssertEqual(Math.Max(rolloverPpcHighWater[condition.Id], newWeekPpcSectionScore),
+                    player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                    "Pain Cage new-week score advances or retains its prior 25001 high-water");
+            AscNet.Common.Database.Player persistedNewWeekAutoPlayer =
+                MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(
+                    playerCollection.LastSuccessfulReplacementBson
+                        ?? throw new InvalidDataException("Pain Cage new-week Auto Clear did not persist Player."));
+            int persistedNewWeekPpcSectionScore = attemptSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                persistedNewWeekAutoPlayer.SimulatedBattlefield.BossStageRecords
+                    .Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(newWeekPpcSectionScore, persistedNewWeekPpcSectionScore,
+                "Pain Cage new-week current score survives the Auto Clear Player replacement");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in rolloverAchievements)
+                AssertEqual(Math.Max(rolloverPpcHighWater[condition.Id], newWeekPpcSectionScore),
+                    persistedNewWeekAutoPlayer.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                    "Pain Cage rollover score and retained 25001 counter share the persisted Player replacement");
             AssertEqual(1, player.SimulatedBattlefield.BossChallengeCount,
                 "Pain Cage new-week first Auto Clear consumes one Attempt");
             int autoClearAttempts = player.SimulatedBattlefield.BossChallengeCount;
@@ -1504,6 +1598,18 @@ internal partial class Program
                 player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
                 "Pain Cage duplicate reset does not refund twice");
 
+            BossSingleSectionTable autoSection = sections.Single(row =>
+                row.SectionId == normalSectionId && row.AfreshId == currentAfreshId);
+            List<AscNet.Table.V2.share.task.CurrentConditionTable> autoAchievements =
+                TableReaderV2.Parse<AscNet.Table.V2.share.task.CurrentConditionTable>()
+                    .Where(condition => condition.Type == 25001 && condition.Params.Count > 1
+                        && condition.Params[1] == normalSectionId)
+                    .ToList();
+            if (autoAchievements.Count == 0)
+                throw new InvalidDataException($"PPC section {normalSectionId} has no 25001 conditions for Auto Fight.");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in autoAchievements)
+                player.MissionProgress.ConditionCounters[condition.Id] = 0;
+
             int playerSavesBeforeAutoFight = playerCollection.ReplaceOneCalls;
             int stageSavesBeforeAutoFight = stageCollection.ReplaceOneCalls;
             const int autoPacketId = 82_039;
@@ -1512,11 +1618,17 @@ internal partial class Program
                 harness.Session,
                 autoPacketId,
                 new BossSingleAutoFightRequest { StageId = normalStage.StageId });
+            List<NotifyTask> autoTaskPushes = [];
             BossSingleAutoFightResponse auto = ReadAfterPushes<BossSingleAutoFightResponse>(
                 autoPacketId,
                 nameof(BossSingleAutoFightResponse),
                 "Pain Cage auto-fight",
-                out List<string> autoPushes);
+                out List<string> autoPushes,
+                onPush: push =>
+                {
+                    if (push.Name == nameof(NotifyTask))
+                        autoTaskPushes.Add(MessagePackSerializer.Deserialize<NotifyTask>(push.Content));
+                });
             AssertEqual(0, auto.Code, "Pain Cage auto-fight code");
             AssertEqual(playerSavesBeforeAutoFight + 1, playerCollection.ReplaceOneCalls,
                 "Pain Cage auto-fight persists Player once");
@@ -1528,6 +1640,35 @@ internal partial class Program
                 player.SimulatedBattlefield.BossStageRecords.Single(record => record.StageId == normalStage.StageId);
             AssertEqual(true, autoRecord.IsUseAutoFight, "Pain Cage auto-fight record marker");
             AssertEqual(savedHistory.Score, autoRecord.Score, "Pain Cage EN-config auto-fight rebate score");
+            int autoSectionTotal = autoSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                player.SimulatedBattlefield.BossStageRecords.Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(true, autoSectionTotal > 0, "Pain Cage Auto Fight produces a current section total");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in autoAchievements)
+            {
+                AssertEqual(autoSectionTotal, player.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                    "Pain Cage Auto Fight advances matching 25001 high-water progress");
+                AscNet.Table.V2.share.task.CurrentTaskTable task = TableReaderV2
+                    .Parse<AscNet.Table.V2.share.task.CurrentTaskTable>()
+                    .Single(row => row.Condition == condition.Id);
+                NotifyTask.NotifyTaskTasks.NotifyTaskTasksTask? synced = autoTaskPushes
+                    .SelectMany(push => push.Tasks.Tasks)
+                    .SingleOrDefault(row => row.Id == (uint)task.Id);
+                AssertEqual(true, synced is not null, "Pain Cage Auto Fight syncs the matching achievement");
+                AssertEqual(Math.Min(autoSectionTotal, task.Result), synced!.Schedule.Single().Value,
+                    "Pain Cage Auto Fight publishes the 25001 progress value");
+            }
+            AscNet.Common.Database.Player persistedAutoPlayer =
+                MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(
+                    playerCollection.LastSuccessfulReplacementBson
+                        ?? throw new InvalidDataException("Pain Cage Auto Fight did not persist Player."));
+            int persistedAutoSectionTotal = autoSection.StageId.Where(stageId => stageId > 0).Distinct().Sum(stageId =>
+                persistedAutoPlayer.SimulatedBattlefield.BossStageRecords.Find(record => record.StageId == stageId)?.Score ?? 0);
+            AssertEqual(autoSectionTotal, persistedAutoSectionTotal,
+                "Pain Cage Auto Fight scores and task counters share the persisted Player replacement");
+            foreach (AscNet.Table.V2.share.task.CurrentConditionTable condition in autoAchievements)
+                AssertEqual(autoSectionTotal,
+                    persistedAutoPlayer.MissionProgress.ConditionCounters.GetValueOrDefault(condition.Id),
+                    "Pain Cage Auto Fight high-water progress survives Player reload");
             int autoRankPushIndex = autoPushes.IndexOf(nameof(NotifyBossSingleRankInfo));
             int autoLoginPushIndex = autoPushes.IndexOf(nameof(NotifyFubenBossSingleData));
             int autoStagePushIndex = autoPushes.IndexOf(nameof(NotifyStageData));
@@ -2290,6 +2431,174 @@ internal partial class Program
                 "Pain Cage StageType 3 cleanup persists score unchanged");
         }
 
+
+        private static void ValidateBossSectionScoreProgress()
+        {
+            using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForBossCompatibility(
+                out RecordingMongoCollectionProxy<Player> playerCollection,
+                out RecordingMongoCollectionProxy<Stage> stageCollection);
+            const long playerId = 99_702;
+            const uint characterId = 1_021_001;
+            Player player = CreateDrawCompatibilityPlayer(playerId);
+            List<AscNet.Table.V2.share.task.CurrentConditionTable> conditions =
+                TableReaderV2.Parse<AscNet.Table.V2.share.task.CurrentConditionTable>()
+                    .Where(condition => condition.Type == 25001 && condition.Params.Count > 1)
+                    .ToList();
+            List<BossSingleSectionTable> sections = TableReaderV2.Parse<BossSingleSectionTable>();
+            int sectionId = conditions.Select(condition => condition.Params[1]).Distinct()
+                .First(id => sections.Any(section => section.SectionId == id && section.AfreshId == 1
+                    && section.StageId.Where(stageId => stageId > 0).Distinct().Count() >= 3));
+            BossSingleSectionTable section = sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1);
+            int[] stageIds = section.StageId.Where(stageId => stageId > 0).Distinct().Take(3).ToArray();
+            int firstStageId = stageIds[0];
+            long currentWeek = TaskModule.CurrentWeeklyResetPeriod(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            player.SimulatedBattlefield = new()
+            {
+                BossActivityNo = checked((int)currentWeek),
+                BossLevelType = TableReaderV2.Parse<BossSingleGradeTable>().First().LevelType,
+                BossList = [sectionId],
+                BossStageRecords = stageIds.Select((stageId, index) => new BossSingleStageRecordState
+                {
+                    StageId = stageId,
+                    Score = (index + 1) * 100,
+                    MaxScore = (index + 1) * 1_000,
+                    Characters = [checked((int)characterId)]
+                }).ToList()
+            };
+            foreach (int stageId in stageIds)
+            {
+                player.SimulatedBattlefield.BossTrialScores[stageId] = 90_000;
+                player.SimulatedBattlefield.BossBestiaryScores[stageId] = 80_000;
+            }
+            Character character = CreateDrawCompatibilityCharacter(playerId);
+            character.Characters.Add(CreateLoginAccountCompatibilityCharacter(characterId, 3_021_001));
+            using LoopbackSessionHarness harness = new(
+                character,
+                player,
+                CreateDrawCompatibilityInventory(playerId, []),
+                "boss-section-score-progress");
+            harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
+            harness.Session.stage.BossSingleActivityNo = checked((int)currentWeek);
+
+            MethodInfo commit = RequiredMethod(
+                RequiredAscNetGameServerType("AscNet.GameServer.Handlers.BossModule"),
+                "TryCommitScore",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                [typeof(Session), typeof(BossSinglePendingScore), typeof(bool), typeof(StageDatum).MakeByRefType()]);
+            bool Commit(int score)
+            {
+                object?[] arguments =
+                [
+                    harness.Session,
+                    new BossSinglePendingScore
+                    {
+                        StageId = firstStageId,
+                        StageType = 1,
+                        IsWin = true,
+                        SectionId = sectionId,
+                        Characters = [checked((int)characterId)],
+                        Result = new BossSingleFightResult { TotalScore = score }
+                    },
+                    false,
+                    null
+                ];
+                return (bool)(commit.Invoke(null, arguments)
+                    ?? throw new InvalidDataException("BossModule.TryCommitScore returned nil."));
+            }
+
+            int[] qualifyingConditions = conditions.Where(condition => condition.Params[1] == sectionId)
+                .Select(condition => condition.Id).ToArray();
+            if (qualifyingConditions.Length == 0)
+                throw new InvalidDataException($"PPC section {sectionId} has no table-backed 25001 conditions.");
+            AssertEqual(true, Commit(400), "Normal PPC score commit succeeds for the selected section");
+            int candidate = player.SimulatedBattlefield.BossStageRecords
+                .Where(record => stageIds.Contains(record.StageId)).Sum(record => record.Score);
+            AssertEqual(900, candidate, "Normal PPC achievement total sums A1+A2+A3 Score, not MaxScore");
+            foreach (int conditionId in qualifyingConditions)
+                AssertEqual(candidate, player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
+                    "Normal PPC commit updates the matching section achievement");
+
+            TaskModule.RecordStageClear(harness.Session, firstStageId, 1, 0, false);
+            Player persisted = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<Player>(
+                playerCollection.LastSuccessfulReplacementBson
+                    ?? throw new InvalidDataException("Normal PPC task recorder did not persist Player."));
+            int persistedScoreTotal = persisted.SimulatedBattlefield.BossStageRecords
+                .Where(record => stageIds.Contains(record.StageId)).Sum(record => record.Score);
+            AssertEqual(candidate, persistedScoreTotal,
+                "Normal PPC scores and task counters share the persisted Player replacement");
+            foreach (int conditionId in qualifyingConditions)
+                AssertEqual(candidate, persisted.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
+                    "Normal PPC achievement survives Player reload");
+            player = persisted;
+            harness.Session.player = player;
+            bool taskSynced = false;
+            while (harness.TryReadAvailablePacket("Normal PPC achievement sync", out Packet packet))
+            {
+                if (packet.Type != Packet.ContentType.Push) continue;
+                Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
+                if (push.Name != nameof(NotifyTask)) continue;
+                NotifyTask notification = MessagePackSerializer.Deserialize<NotifyTask>(push.Content);
+                taskSynced |= notification.Tasks.Tasks.Any(task => qualifyingConditions.Contains(
+                    checked((int)task.Schedule.Single().Id)) && task.Schedule.Single().Value > 0);
+            }
+            AssertEqual(true, taskSynced, "Normal PPC task sync exposes the persisted 25001 progress");
+            InvokeRegisteredRequestHandler(
+                nameof(BossSingleResetStageRequest),
+                harness.Session,
+                99_703,
+                new BossSingleResetStageRequest { StageId = firstStageId });
+            BossSingleResetStageResponse resetResponse = default!;
+            while (harness.TryReadAvailablePacket("Normal PPC reset", out Packet resetPacket))
+            {
+                if (resetPacket.Type != Packet.ContentType.Response) continue;
+                Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(resetPacket.Content);
+                if (response.Id != 99_703) continue;
+                resetResponse = MessagePackSerializer.Deserialize<BossSingleResetStageResponse>(response.Content);
+                break;
+            }
+            AssertEqual(0, resetResponse.Code, "Normal PPC Reset Challenge succeeds");
+            foreach (int conditionId in qualifyingConditions)
+                AssertEqual(candidate, player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
+                    "Reset Challenge preserves earned 25001 progress");
+            AssertEqual(true, Commit(50), "Lower normal PPC replay score commits");
+            int lowerTotal = player.SimulatedBattlefield.BossStageRecords
+                .Where(record => stageIds.Contains(record.StageId)).Sum(record => record.Score);
+            AssertEqual(true, lowerTotal < candidate, "Lower replay section total is below its earned high-water");
+            foreach (int conditionId in qualifyingConditions)
+                AssertEqual(candidate, player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
+                    "Lower replay does not reduce earned 25001 progress");
+
+            player.SimulatedBattlefield.BossStageRecords.Clear();
+            player.SimulatedBattlefield.BossResetStageIds.Clear();
+            player.SimulatedBattlefield.BossStageRecords.AddRange(stageIds.Select((stageId, index) =>
+                new BossSingleStageRecordState
+                {
+                    StageId = stageId,
+                    Score = (index + 1) * 50,
+                    MaxScore = (index + 1) * 1_000,
+                    Characters = [checked((int)characterId)]
+                }));
+            AssertEqual(true, Commit(1_000), "Higher new-week normal score commits");
+            int newWeekTotal = player.SimulatedBattlefield.BossStageRecords
+                .Where(record => stageIds.Contains(record.StageId)).Sum(record => record.Score);
+            AssertEqual(1_250, newWeekTotal, "New-week candidate uses only its three current records");
+            foreach (int conditionId in qualifyingConditions)
+                AssertEqual(newWeekTotal, player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
+                    "Higher valid new-week total advances 25001 high-water without mixing weeks");
+
+
+            int unrelatedSectionId = conditions.Select(condition => condition.Params[1])
+                .First(id => id != sectionId && sections.Any(section => section.SectionId == id && section.AfreshId == 1));
+            int[] unrelatedConditionIds = conditions.Where(condition => condition.Params[1] == unrelatedSectionId)
+                .Select(condition => condition.Id).ToArray();
+            TaskModule.RecordBossSectionScore(harness.Session, sectionId, 1_500);
+            AssertEqual(true, unrelatedConditionIds.All(conditionId =>
+                player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId) == 0),
+                "PPC section score progress does not leak to unrelated sections");
+
+            AssertEqual(true, playerCollection.ReplaceOneCalls > 0 && stageCollection.ReplaceOneCalls > 0,
+                "PPC normal score and task recorder retain existing Player and Stage saves");
+        }
 
         private static void ValidateBossSingleLoginRollover()
         {

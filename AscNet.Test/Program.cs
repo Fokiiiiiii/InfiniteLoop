@@ -820,6 +820,7 @@ namespace AscNet.Test
                 if (args.Contains("--boss-single-compat-only"))
                 {
                     ValidateBossSingleCompatibility();
+                    ValidateBossSectionScoreProgress();
                     ValidateBossSingleIntensiveStageHydration();
                     ValidateBossSingleCycleStageScoreSync();
                     return;
@@ -1203,6 +1204,7 @@ namespace AscNet.Test
                 ValidateBossSingleReconnectStageSnapshot();
                 ValidateBossActivityCompatibility();
                 ValidateBossSingleCompatibility();
+                ValidateBossSectionScoreProgress();
                 ValidateBossSingleIntensiveStageHydration();
                 ValidateBossSingleCycleStageScoreSync();
                 ValidateSimulatedBattlefieldCompatibility();
