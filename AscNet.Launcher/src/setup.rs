@@ -1797,6 +1797,8 @@ fn install_build_tools(root: &Path, install_path: Option<PathBuf>, deadline: Ins
 
 #[cfg(windows)]
 fn install_build_tools_at(program: &Path, install_path: Option<PathBuf>, deadline: Instant, progress: &mut dyn FnMut(&str), log: &mut dyn FnMut(&str) -> Result<()>) -> Result<()> {
+    note(progress, log, "Checking the Visual Studio installer signature")?;
+    verify_microsoft_authenticode(program)?;
     let mut args = Vec::new();
     if let Some(path) = install_path {
         args.extend(["modify".into(), "--installPath".into(), path.display().to_string()]);
@@ -1863,6 +1865,185 @@ fn vcvars_command(bat: &str) -> Result<String> {
     }
     let script = format!("call \"{bat}\" >nul && set");
     Ok(format!("/d /c \"{script}\""))
+}
+
+fn accepts_authenticode_signer(name: &str) -> bool {
+    name == "Microsoft Corporation"
+}
+
+/// `WinVerifyTrust` with whole-chain revocation, then the embedded signer name.
+/// A failure here returns before anything is elevated. Wine never reaches this:
+/// it unpacks the portable toolset instead of running the bootstrapper.
+#[cfg(windows)]
+fn verify_microsoft_authenticode(program: &Path) -> Result<()> {
+    trust_authenticode_file(program)?;
+    let signer = authenticode_signer_name(program)?;
+    if !accepts_authenticode_signer(&signer) {
+        bail!("Visual Studio installer is not signed by Microsoft Corporation ({signer})");
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn trust_authenticode_file(program: &Path) -> Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Security::WinTrust::{
+        WinVerifyTrust, WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_DATA, WINTRUST_FILE_INFO,
+        WTD_CHOICE_FILE, WTD_REVOKE_WHOLECHAIN, WTD_STATEACTION_VERIFY, WTD_UI_NONE,
+    };
+    let wide: Vec<u16> = program.as_os_str().encode_wide().chain(Some(0)).collect();
+    let mut file_info = WINTRUST_FILE_INFO {
+        cbStruct: std::mem::size_of::<WINTRUST_FILE_INFO>() as u32,
+        pcwszFilePath: PCWSTR(wide.as_ptr()),
+        ..Default::default()
+    };
+    let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+    let mut data = WINTRUST_DATA {
+        cbStruct: std::mem::size_of::<WINTRUST_DATA>() as u32,
+        dwUIChoice: WTD_UI_NONE,
+        fdwRevocationChecks: WTD_REVOKE_WHOLECHAIN,
+        dwUnionChoice: WTD_CHOICE_FILE,
+        dwStateAction: WTD_STATEACTION_VERIFY,
+        ..Default::default()
+    };
+    data.Anonymous.pFile = &mut file_info;
+    // CLOSE frees the provider state from VERIFY. The file path has to stay alive until then.
+    struct CloseTrust {
+        action: *mut windows::core::GUID,
+        data: *mut WINTRUST_DATA,
+    }
+    impl Drop for CloseTrust {
+        fn drop(&mut self) {
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::Security::WinTrust::{WinVerifyTrust, WTD_STATEACTION_CLOSE};
+            unsafe {
+                (*self.data).dwStateAction = WTD_STATEACTION_CLOSE;
+                WinVerifyTrust(HWND(0), self.action, self.data.cast());
+            }
+        }
+    }
+    let close = CloseTrust {
+        action: std::ptr::addr_of_mut!(action),
+        data: std::ptr::addr_of_mut!(data),
+    };
+    let status = unsafe { WinVerifyTrust(HWND(0), close.action, close.data.cast()) };
+    drop(close);
+    if status != 0 {
+        bail!("Visual Studio installer signature was not trusted ({:#010x}): {}", status as u32, program.display());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn authenticode_signer_name(program: &Path) -> Result<String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::Win32::Security::Cryptography::{
+        CertFindCertificateInStore, CertGetNameStringW, CryptMsgGetParam, CryptQueryObject,
+        CERT_CONTEXT, CERT_FIND_SUBJECT_CERT,
+        CERT_INFO, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
+        CERT_QUERY_FORMAT_FLAG_BINARY, CERT_QUERY_OBJECT_FILE, CMSG_SIGNER_INFO, CMSG_SIGNER_INFO_PARAM,
+        HCERTSTORE, PKCS_7_ASN_ENCODING, X509_ASN_ENCODING,
+    };
+    let wide: Vec<u16> = program.as_os_str().encode_wide().chain(Some(0)).collect();
+    let mut store = HCERTSTORE::default();
+    let mut message: *mut core::ffi::c_void = std::ptr::null_mut();
+    unsafe {
+        CryptQueryObject(
+            CERT_QUERY_OBJECT_FILE,
+            wide.as_ptr().cast(),
+            CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
+            CERT_QUERY_FORMAT_FLAG_BINARY,
+            0,
+            None,
+            None,
+            None,
+            Some(&mut store),
+            Some(&mut message),
+            None,
+        )
+    }
+    .with_context(|| format!("read the signature on {}", program.display()))?;
+    struct SignedFile {
+        store: HCERTSTORE,
+        message: *mut core::ffi::c_void,
+    }
+    impl Drop for SignedFile {
+        fn drop(&mut self) {
+            use windows::Win32::Security::Cryptography::{CertCloseStore, CryptMsgClose, HCERTSTORE};
+            unsafe {
+                if !self.message.is_null() {
+                    let _ = CryptMsgClose(Some(self.message));
+                    self.message = std::ptr::null_mut();
+                }
+                if !self.store.is_invalid() {
+                    let _ = CertCloseStore(self.store, 0);
+                    self.store = HCERTSTORE::default();
+                }
+            }
+        }
+    }
+    let signed = SignedFile { store, message };
+    let mut size = 0u32;
+    unsafe { CryptMsgGetParam(signed.message, CMSG_SIGNER_INFO_PARAM, 0, None, &mut size) }
+        .with_context(|| format!("read the signer on {}", program.display()))?;
+    if (size as usize) < std::mem::size_of::<CMSG_SIGNER_INFO>() {
+        bail!("Visual Studio installer signer is incomplete");
+    }
+    let mut buffer = vec![0u64; (size as usize).div_ceil(std::mem::size_of::<u64>())];
+    unsafe {
+        CryptMsgGetParam(
+            signed.message,
+            CMSG_SIGNER_INFO_PARAM,
+            0,
+            Some(buffer.as_mut_ptr().cast()),
+            &mut size,
+        )
+    }
+    .with_context(|| format!("read the signer on {}", program.display()))?;
+    if (size as usize) > buffer.len() * std::mem::size_of::<u64>() || (size as usize) < std::mem::size_of::<CMSG_SIGNER_INFO>() {
+        bail!("Visual Studio installer signer is incomplete");
+    }
+    let signer = unsafe { &*buffer.as_ptr().cast::<CMSG_SIGNER_INFO>() };
+    if signer.Issuer.cbData == 0 || signer.Issuer.pbData.is_null() || signer.SerialNumber.cbData == 0 || signer.SerialNumber.pbData.is_null() {
+        bail!("Visual Studio installer signer has no certificate identity");
+    }
+    let mut info = CERT_INFO::default();
+    info.Issuer = signer.Issuer;
+    info.SerialNumber = signer.SerialNumber;
+    let cert = unsafe {
+        CertFindCertificateInStore(
+            signed.store,
+            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+            0,
+            CERT_FIND_SUBJECT_CERT,
+            Some((&info as *const CERT_INFO).cast()),
+            None,
+        )
+    };
+    if cert.is_null() {
+        bail!("Visual Studio installer signature has no signer certificate: {}", std::io::Error::last_os_error());
+    }
+    struct Certificate(*mut CERT_CONTEXT);
+    impl Drop for Certificate {
+        fn drop(&mut self) {
+            use windows::Win32::Security::Cryptography::CertFreeCertificateContext;
+            if !self.0.is_null() {
+                unsafe { let _ = CertFreeCertificateContext(Some(self.0)); }
+                self.0 = std::ptr::null_mut();
+            }
+        }
+    }
+    let cert = Certificate(cert);
+    let mut chars = [0u16; 256];
+    let count = unsafe { CertGetNameStringW(cert.0, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, None, Some(&mut chars)) };
+    if count <= 1 || count as usize > chars.len() || chars[count as usize - 1] != 0 {
+        bail!("Visual Studio installer signer name could not be read");
+    }
+    let name = String::from_utf16(&chars[..count as usize - 1])
+        .with_context(|| format!("read the signer name on {}", program.display()))?;
+    Ok(name)
 }
 
 #[cfg(windows)]
@@ -2385,6 +2566,13 @@ mod tests {
         assert_eq!(line, "/d /c \"call \"C:\\Program Files (x86)\\x\\vcvars64.bat\" >nul && set\"");
         assert!(!line.contains("\\\""));
         assert!(vcvars_command("C:\\Program Files\\x\\\"vcvars64.bat").is_err());
+    }
+
+    #[test]
+    fn authenticode_signer_is_microsoft_corporation() {
+        assert!(accepts_authenticode_signer("Microsoft Corporation"));
+        assert!(!accepts_authenticode_signer("Microsoft Corporation "));
+        assert!(!accepts_authenticode_signer("Contoso"));
     }
 
     #[test]
