@@ -459,6 +459,23 @@ mod update_tests {
     use super::*;
 
     #[test]
+    fn inherited_handle_snapshot_keeps_only_this_process() {
+        let mut snapshot = vec![0u8; 16 + 40 * 3];
+        snapshot[0..8].copy_from_slice(&3usize.to_ne_bytes());
+        let mut write = |index: usize, pid: usize, handle: usize, attributes: u32| {
+            let start = 16 + index * 40;
+            snapshot[start + 8..start + 16].copy_from_slice(&pid.to_ne_bytes());
+            snapshot[start + 16..start + 24].copy_from_slice(&handle.to_ne_bytes());
+            snapshot[start + 32..start + 36].copy_from_slice(&attributes.to_ne_bytes());
+        };
+        write(0, 42, 0x100, 0x2);
+        write(1, 42, 0x200, 0);
+        write(2, 7, 0x300, 0x2);
+        assert_eq!(inherited_handle_values(&snapshot, 42), vec![0x100]);
+        assert!(inherited_handle_values(&snapshot[..10], 42).is_empty());
+    }
+
+    #[test]
     fn advanced_checkout_does_not_hide_failed_build() {
         let directory = env::temp_dir().join(format!("ascnet-source-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&directory).unwrap();
@@ -996,12 +1013,114 @@ pub(crate) fn hide_console(command: &mut Command) -> &mut Command {
     command
 }
 
+/// Spawns `command` without a console window.
+///
+/// Rust 1.95's `CommandExt::inherit_handles` is nightly-only, and `Command`
+/// otherwise passes every inheritable handle to the child. For the duration
+/// of `CreateProcess`, inheritable handles already open in this process are
+/// marked non-inheritable. The standard pipes created inside `spawn` stay
+/// inheritable. A failed handle snapshot still spawns.
+pub(crate) fn spawn_hidden(command: &mut Command) -> std::io::Result<Child> {
+    hide_console(command);
+    #[cfg(windows)]
+    let _restore = suspend_inherited_handles();
+    command.spawn()
+}
+
+/// `SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX` values whose `OBJ_INHERIT` bit is set.
+/// The snapshot is the 64-bit layout Wine writes for `SystemExtendedHandleInformation`.
+fn inherited_handle_values(snapshot: &[u8], pid: usize) -> Vec<isize> {
+    const HEADER: usize = 16;
+    const ENTRY: usize = 40;
+    const OBJ_INHERIT: u32 = 0x2;
+    if snapshot.len() < HEADER || size_of::<usize>() != 8 {
+        return Vec::new();
+    }
+    let count = usize::from_ne_bytes(snapshot[0..8].try_into().unwrap());
+    let mut handles = Vec::new();
+    for index in 0..count {
+        let start = HEADER + index * ENTRY;
+        if start + ENTRY > snapshot.len() {
+            break;
+        }
+        let owner = usize::from_ne_bytes(snapshot[start + 8..start + 16].try_into().unwrap());
+        let handle = usize::from_ne_bytes(snapshot[start + 16..start + 24].try_into().unwrap());
+        let attributes = u32::from_ne_bytes(snapshot[start + 32..start + 36].try_into().unwrap());
+        if owner == pid && handle != 0 && attributes & OBJ_INHERIT != 0 {
+            handles.push(handle as isize);
+        }
+    }
+    handles
+}
+
+#[cfg(windows)]
+struct SuspendedHandles(Vec<windows::Win32::Foundation::HANDLE>);
+
+#[cfg(windows)]
+impl Drop for SuspendedHandles {
+    fn drop(&mut self) {
+        use windows::Win32::Foundation::{SetHandleInformation, HANDLE_FLAG_INHERIT};
+        for handle in &self.0 {
+            unsafe {
+                let _ = SetHandleInformation(*handle, HANDLE_FLAG_INHERIT.0, HANDLE_FLAG_INHERIT);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn suspend_inherited_handles() -> SuspendedHandles {
+    use windows::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, HANDLE_FLAGS};
+    let Some(snapshot) = extended_handle_snapshot() else {
+        return SuspendedHandles(Vec::new());
+    };
+    let pid = unsafe { windows::Win32::System::Threading::GetCurrentProcessId() } as usize;
+    let mut restore = Vec::new();
+    for value in inherited_handle_values(&snapshot, pid) {
+        let handle = HANDLE(value);
+        if unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT.0, HANDLE_FLAGS(0)).is_ok() } {
+            restore.push(handle);
+        }
+    }
+    SuspendedHandles(restore)
+}
+
+#[cfg(windows)]
+fn extended_handle_snapshot() -> Option<Vec<u8>> {
+    use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
+    use windows::Win32::Foundation::STATUS_INFO_LENGTH_MISMATCH;
+    const SYSTEM_EXTENDED_HANDLE_INFORMATION: SYSTEM_INFORMATION_CLASS = SYSTEM_INFORMATION_CLASS(64);
+    let mut buffer = vec![0u8; 256 * 1024];
+    for _ in 0..6 {
+        let mut length = 0u32;
+        let status = unsafe {
+            NtQuerySystemInformation(
+                SYSTEM_EXTENDED_HANDLE_INFORMATION,
+                buffer.as_mut_ptr().cast(),
+                buffer.len() as u32,
+                &mut length,
+            )
+        };
+        if status.is_ok() {
+            let end = (length as usize).min(buffer.len());
+            buffer.truncate(end);
+            return Some(buffer);
+        }
+        if status != STATUS_INFO_LENGTH_MISMATCH {
+            return None;
+        }
+        let next = (length as usize).max(buffer.len().saturating_mul(2));
+        if next <= buffer.len() || next > 32 * 1024 * 1024 {
+            return None;
+        }
+        buffer.resize(next, 0);
+    }
+    None
+}
+
 fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std::process::Output> {
-    let mut child = hide_console(&mut command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("start command")?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = spawn_hidden(&mut command).context("start command")?;
     let deadline = Instant::now() + timeout;
     loop {
         if child.try_wait()?.is_some() {

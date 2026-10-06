@@ -20,6 +20,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 cab = "0.6"
 msi = "0.8"
 windows = { version = "0.57", features = [
+    "Wdk_System_SystemInformation",
     "Wdk_Storage_FileSystem",
     "Win32_System_IO",
     "Win32_Foundation",

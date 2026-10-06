@@ -231,11 +231,8 @@ fn run_logged_shown(
 ) -> Result<()> {
     ensure_time(deadline)?;
     note(progress, log, &format!("+ {shown}"))?;
-    let mut child = crate::local::hide_console(command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .with_context(|| format!("start {description}"))?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = crate::local::spawn_hidden(command).with_context(|| format!("start {description}"))?;
     if let Err(error) = contain(&child) {
         let _ = child.kill();
         let _ = child.wait();
@@ -289,11 +286,8 @@ fn capture_command(
 ) -> Result<std::process::Output> {
     ensure_time(deadline)?;
     note(progress, log, &format!("+ {}", command_line(command)))?;
-    let mut child = crate::local::hide_console(command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .with_context(|| format!("start {description}"))?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = crate::local::spawn_hidden(command).with_context(|| format!("start {description}"))?;
     if let Err(error) = contain(&child) {
         let _ = child.kill();
         let _ = child.wait();
