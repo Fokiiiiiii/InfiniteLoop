@@ -3,19 +3,6 @@
 version = 4
 
 [[package]]
-name = "KRSDK"
-version = "0.1.0"
-dependencies = [
- "libloading",
- "once_cell",
- "reqwest",
- "serde",
- "serde_json",
- "uuid",
- "windows",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -553,6 +540,19 @@ checksum = "b011eec8cc36da2aab2d5cff675ec18454fad408585853910a202391cf9f8e65"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "krsdk"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "once_cell",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "uuid",
+ "windows",
 ]
 
 [[package]]

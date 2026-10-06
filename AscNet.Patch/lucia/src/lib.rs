@@ -31,14 +31,13 @@ unsafe fn initialize() -> bool {
         diag::log(&diag::failed_line("lucia", "module manager", "lock is poisoned by an earlier crash in this process"));
         return false;
     };
-    let assembly_base = game_assembly.0 as usize;
-    if let Err(error) = module_manager.enable(MhyContext::<Http>::new(assembly_base)) {
+    if let Err(error) = module_manager.enable(MhyContext::<Http>::new()) {
         diag::log(&diag::failed_line("lucia", "native routing (all requests stay on retail servers)", &format!("{error:#}")));
         return false;
     }
     // CN keeps the retail KRSDKEx.dll; its HTTP must be routed as well or login talks to Kuro's servers.
     if cn {
-        if let Err(error) = module_manager.enable(MhyContext::<CnSdk>::new(assembly_base)) {
+        if let Err(error) = module_manager.enable(MhyContext::<CnSdk>::new()) {
             diag::log(&diag::failed_line("lucia", "CN SDK routing (login stays on retail servers)", &format!("{error:#}")));
             return false;
         }

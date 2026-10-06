@@ -210,15 +210,21 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
             _ => {}
         }
         let mut all_target = true;
-        let mut all_tracked = true;
         let mut all_original = true;
+        let mut all_known = true;
         for file in &package.manifest.files {
             let actual = file_hash(&client.join(&file.path))?;
             let old = state.files.get(&file.path);
             let new_base = file.path == "PGRBase.dll" && old.is_none();
-            all_target &= !new_base && actual.as_deref() == Some(&file.sha256);
-            all_tracked &= new_base || old.is_some_and(|old| actual.as_deref() == Some(&old.installed));
-            all_original &= new_base || old.is_some_and(|old| actual.as_deref() == old.original.as_deref());
+            let matches_target = !new_base && actual.as_deref() == Some(&file.sha256);
+            let matches_installed = old.is_some_and(|old| actual.as_deref() == Some(&old.installed));
+            // A saved original of null means the patch added the file. Matching it means the file is absent.
+            let matches_original = new_base || old.is_some_and(|old| actual.as_deref() == old.original.as_deref());
+            all_target &= matches_target;
+            all_original &= matches_original;
+            // Retail copies and the previous patch are both known bytes. An unknown
+            // replacement is not, even when the other files are still intact.
+            all_known &= matches_target || matches_installed || matches_original;
         }
         if all_target {
             return Ok(if has_stray(client) { PatchState::UpdateAvailable } else { PatchState::Current });
@@ -226,7 +232,7 @@ fn inspect_prepared(client: &Path, package: &PatchPackage) -> Result<PatchState>
         if all_original {
             return Ok(PatchState::Unpatched);
         }
-        if all_tracked {
+        if all_known {
             return Ok(PatchState::UpdateAvailable);
         }
         return Ok(PatchState::RepairRequired(
@@ -1016,12 +1022,7 @@ pub fn launch(client: &Path, origin: &str, no_camera_fade: bool, fps: Option<i32
     let mut command = launch_command(&client, executable, origin, no_camera_fade, fps);
     if running_under_wine() {
         let old = std::env::var("WINEDLLOVERRIDES").unwrap_or_default();
-        let merged = if old.is_empty() {
-            "version=n,b".into()
-        } else {
-            format!("{old};version=n,b")
-        };
-        command.env("WINEDLLOVERRIDES", merged);
+        command.env("WINEDLLOVERRIDES", merge_version_dll_override(&old));
     }
     command.spawn().context("launching PGR.exe")?;
     Ok(())
@@ -1058,8 +1059,30 @@ fn launch_command(client: &Path, executable: PathBuf, origin: String, no_camera_
     }
     command
 }
+
+/// Keep an existing Wine DLL override list and make sure `version.dll` loads beside the game.
+pub(crate) fn merge_version_dll_override(current: &str) -> String {
+    let mut parts: Vec<String> = current
+        .split(';')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_owned)
+        .collect();
+    let has_version = parts.iter().any(|part| {
+        part.split('=')
+            .next()
+            .unwrap_or("")
+            .split(',')
+            .any(|name| name.trim().eq_ignore_ascii_case("version"))
+    });
+    if !has_version {
+        parts.push("version=n,b".to_owned());
+    }
+    parts.join(";")
+}
+
 #[cfg(windows)]
-fn running_under_wine() -> bool {
+pub(crate) fn running_under_wine() -> bool {
     use windows::core::{s, w};
     use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 
@@ -1072,15 +1095,107 @@ fn running_under_wine() -> bool {
 }
 
 #[cfg(not(windows))]
-fn running_under_wine() -> bool {
+pub(crate) fn running_under_wine() -> bool {
     false
+}
+
+/// `\\?\Z:\home` and `Z:\home` name one directory. A junction's target does not.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+fn windows_paths_match(left: &str, right: &str) -> bool {
+    let left = normalize_windows_path(left);
+    let right = normalize_windows_path(right);
+    !left.is_empty() && left == right
+}
+
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+fn normalize_windows_path(value: &str) -> String {
+    let value = value.replace('/', "\\").to_ascii_lowercase();
+    let value = if let Some(rest) = value.strip_prefix("\\\\?\\unc\\") {
+        format!("\\\\{rest}")
+    } else if let Some(rest) = value.strip_prefix("\\\\?\\") {
+        rest.to_string()
+    } else {
+        value
+    };
+    // `z:\` is the drive root. Every other trailing slash is not part of the name.
+    if value.len() > 3 && value.ends_with('\\') {
+        value.trim_end_matches('\\').to_string()
+    } else {
+        value
+    }
+}
+
+/// `FILE_ATTRIBUTE_DIRECTORY` is 0x10 and `FILE_ATTRIBUTE_REPARSE_POINT` is 0x400.
+/// `wine_mount` is the result of checking the path before the pin is taken.
+/// The opened handle has to pass the same test: a directory swapped for a
+/// junction still has the directory attribute.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+pub(crate) fn directory_pin_allows(attributes: u32, wine_mount: bool) -> bool {
+    const DIRECTORY: u32 = 0x10;
+    const REPARSE: u32 = 0x400;
+    attributes & DIRECTORY != 0 && (attributes & REPARSE == 0 || wine_mount)
+}
+
+/// Proton bind-mounts `/home` at `Z:\home`. Wine reports that directory as a
+/// junction. Rust then reports it as a symlink, so `is_dir()` is false even
+/// though the directory attribute is set. Opening it with and without
+/// `FILE_FLAG_OPEN_REPARSE_POINT` returns the same path. A junction that points
+/// somewhere else returns its target only when the reparse point is followed.
+#[cfg(windows)]
+pub(crate) fn wine_mount_keeps_its_path(path: &Path) -> bool {
+    if !running_under_wine() {
+        return false;
+    }
+    let Ok(metadata) = fs::symlink_metadata(path) else { return false };
+    use std::os::windows::fs::MetadataExt;
+    // `FILE_ATTRIBUTE_DIRECTORY`. Do not use `is_dir()`: it is false for junctions.
+    if metadata.file_attributes() & 0x10 == 0 {
+        return false;
+    }
+    match (final_dos_path(path, false), final_dos_path(path, true)) {
+        (Ok(followed), Ok(opened)) => windows_paths_match(&followed, &opened),
+        _ => false,
+    }
+}
+
+#[cfg(windows)]
+fn final_dos_path(path: &Path, open_reparse: bool) -> std::io::Result<String> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Storage::FileSystem::{
+        GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, VOLUME_NAME_DOS,
+    };
+    let mut flags = FILE_FLAG_BACKUP_SEMANTICS.0;
+    if open_reparse {
+        flags |= FILE_FLAG_OPEN_REPARSE_POINT.0;
+    }
+    let file = OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES.0)
+        .share_mode(FILE_SHARE_READ.0 | FILE_SHARE_WRITE.0 | FILE_SHARE_DELETE.0)
+        .custom_flags(flags)
+        .open(path)?;
+    let handle = windows::Win32::Foundation::HANDLE(file.as_raw_handle() as isize);
+    let mut buffer = vec![0u16; 260];
+    loop {
+        let length = unsafe { GetFinalPathNameByHandleW(handle, &mut buffer[..], VOLUME_NAME_DOS) };
+        if length == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        if (length as usize) < buffer.len() {
+            return Ok(String::from_utf16_lossy(&buffer[..length as usize]));
+        }
+        buffer.resize(length as usize, 0);
+    }
 }
 
 fn checked_client(client: &Path) -> Result<PathBuf> {
     #[cfg(windows)]
-    pin_worker_directory(&std::path::absolute(client)?)?;
-    #[cfg(windows)]
-    refuse_ancestor_reparse(&std::path::absolute(client)?)?;
+    {
+        let absolute = std::path::absolute(client)?;
+        pin_worker_directory(&absolute)?;
+        refuse_ancestor_reparse(&absolute)?;
+    }
     let client = fs::canonicalize(client)
         .with_context(|| format!("invalid game directory: {}", client.display()))?;
     if !client.is_dir() {
@@ -1111,13 +1226,25 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
         ancestors.reverse();
         for directory in ancestors {
             if pins.contains_key(directory) { continue; }
+            // Decide before taking the share-read pin. That pin denies a later open.
+            let metadata = fs::symlink_metadata(directory)
+                .with_context(|| format!("locking protected write directory {}", directory.display()))?;
+            let attributes = metadata.file_attributes();
+            // Decide before taking the share-read pin. That pin denies a later open.
+            // `is_dir()` is false for a junction. The directory attribute is what matters.
+            let wine_mount = attributes & 0x400 != 0 && wine_mount_keeps_its_path(directory);
+            if !directory_pin_allows(attributes, wine_mount) {
+                bail!("refusing link/reparse write directory: {}", directory.display());
+            }
             // Metadata-only opens do not participate in Windows share checks.
             let handle = OpenOptions::new().read(true)
                 .share_mode(FILE_SHARE_READ.0)
                 .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
                 .open(directory).with_context(|| format!("locking protected write directory {}", directory.display()))?;
-            let metadata = handle.metadata()?;
-            if !metadata.is_dir() || metadata.file_attributes() & 0x400 != 0 {
+            let pinned = handle.metadata()
+                .with_context(|| format!("locking protected write directory {}", directory.display()))?
+                .file_attributes();
+            if !directory_pin_allows(pinned, wine_mount) {
                 bail!("refusing link/reparse write directory: {}", directory.display());
             }
             pins.insert(directory.to_path_buf(), handle);
@@ -1130,9 +1257,26 @@ fn pin_worker_directory(path: &Path) -> Result<()> {
 fn refuse_ancestor_reparse(path: &Path) -> Result<()> {
     for ancestor in path.ancestors() {
         if ancestor.as_os_str().is_empty() { continue; }
-        refuse_reparse(ancestor)?;
+        if ancestor_redirects(ancestor)? {
+            bail!("refusing link/reparse path: {}", ancestor.display());
+        }
     }
     Ok(())
+}
+
+/// A symlink or a junction whose target is a different path. Wine's own mount
+/// junctions (`Z:\`, `Z:\home`) are not redirects.
+#[cfg(windows)]
+fn ancestor_redirects(path: &Path) -> Result<bool> {
+    let metadata = fs::symlink_metadata(path)?;
+    let reparse = metadata.file_type().is_symlink() || {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    };
+    if !reparse {
+        return Ok(false);
+    }
+    Ok(!wine_mount_keeps_its_path(path))
 }
 
 fn validate_package_paths(package: &PatchPackage) -> Result<()> {
@@ -1687,6 +1831,15 @@ mod tests {
         fs::remove_dir_all(client).unwrap();
     }
     #[test]
+    fn version_override_is_merged_once() {
+        assert_eq!(merge_version_dll_override(""), "version=n,b");
+        assert_eq!(merge_version_dll_override("d3d11,dxgi=n,b"), "d3d11,dxgi=n,b;version=n,b");
+        assert_eq!(merge_version_dll_override("d3d11,dxgi=n,b;"), "d3d11,dxgi=n,b;version=n,b");
+        assert_eq!(merge_version_dll_override("version=n,b"), "version=n,b");
+        assert_eq!(merge_version_dll_override("Version=b"), "Version=b");
+        assert_eq!(merge_version_dll_override("d3d11,version=n"), "d3d11,version=n");
+    }
+    #[test]
     fn rollback_preserves_previous_managed_state() {
         let client = temp();
         let root = client.join(STATE_DIR);
@@ -1852,6 +2005,27 @@ mod tests {
     fn traversal_and_links_are_refused() {
         assert!(validate_relative("../PGR.exe").is_err());
         assert!(validate_relative("a\\b").is_err());
+    }
+    #[test]
+    fn directory_pin_allows_a_directory_and_a_wine_mount_only() {
+        assert!(directory_pin_allows(0x10, false));
+        assert!(!directory_pin_allows(0x10 | 0x400, false));
+        assert!(directory_pin_allows(0x10 | 0x400, true));
+        assert!(!directory_pin_allows(0x400, true));
+        assert!(!directory_pin_allows(0, false));
+    }
+    #[test]
+    fn wine_bind_mount_path_matches_and_a_junction_target_does_not() {
+        assert!(windows_paths_match(r"\\?\Z:\home", r"\\?\Z:\home"));
+        assert!(windows_paths_match(r"Z:\home", r"\\?\Z:\home"));
+        assert!(windows_paths_match(r"\\?\Z:\", r"Z:\"));
+        assert!(windows_paths_match(r"\\?\Z:\Home\", r"z:\home"));
+        assert!(windows_paths_match(r"\\?\UNC\server\share\", r"\\server\share"));
+        assert!(!windows_paths_match(r"\\?\C:\ascnet-reparse-junc", r"\\?\C:\windows"));
+        assert!(!windows_paths_match(r"\\?\Z:\home", r"\\?\Z:\home\saku"));
+        assert!(!windows_paths_match(r"Z:\home", r"Z:\home2"));
+        assert!(!windows_paths_match("", ""));
+        assert!(!windows_paths_match(r"\\?\Z:\home", r""));
     }
     #[test]
     fn unknown_state_is_not_overwritten() {
@@ -2024,6 +2198,18 @@ mod tests {
         install(&client, &package, &mut |_| {}).unwrap();
         assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
         assert_eq!(read_state(&client).unwrap().unwrap().originals, originals);
+        // One retail file restored beside an otherwise intact patch can be updated.
+        // A third, unknown copy of a managed file still cannot.
+        fs::write(client.join("version.dll"), b"tampered").unwrap();
+        assert!(matches!(inspect(&client, &package).unwrap(), PatchState::RepairRequired(_)));
+        assert!(install(&client, &package, &mut |_| {}).is_err());
+        assert_eq!(fs::read(client.join("version.dll")).unwrap(), b"tampered");
+        fs::copy(package.directory.join("version.dll"), client.join("version.dll")).unwrap();
+        fs::write(client.join("PGR_Data/Plugins/KRSDK.dll"), b"retail-sdk").unwrap();
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::UpdateAvailable);
+        install(&client, &package, &mut |_| {}).unwrap();
+        assert_eq!(fs::read(client.join("PGR_Data/Plugins/KRSDK.dll")).unwrap(), b"patched-sdk");
+        assert_eq!(inspect(&client, &package).unwrap(), PatchState::Current);
         let payload_v2 = root.join("package-v2");
         fs::create_dir_all(&payload_v2).unwrap();
         let mut manifest_v2 = package.manifest.clone();

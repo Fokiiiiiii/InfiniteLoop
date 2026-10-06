@@ -1,10 +1,11 @@
 [package]
 name = "ascnet-launcher"
-version = "1.0.11"
+version = "1.0.12"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
+base64 = "0.22"
 aes = "0.8"
 ctr = "0.9"
 serde = { version = "1.0", features = ["derive"] }
@@ -15,8 +16,12 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 uuid = { version = "1", features = ["v4"] }
 semver = "1"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+tar = "0.4"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+cab = "0.6"
+msi = "0.8"
 windows = { version = "0.57", features = [
+    "Wdk_System_SystemInformation",
     "Wdk_Storage_FileSystem",
     "Win32_System_IO",
     "Win32_Foundation",
@@ -27,6 +32,8 @@ windows = { version = "0.57", features = [
     "Win32_Media_Audio",
     "Win32_Security",
     "Win32_Security_Authorization",
+    "Win32_Security_Cryptography",
+    "Win32_Security_WinTrust",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
     "Win32_System_Diagnostics_ToolHelp",

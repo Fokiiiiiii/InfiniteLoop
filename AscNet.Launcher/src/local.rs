@@ -1,21 +1,26 @@
 use anyhow::{bail, Context, Result};
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::{BufRead, BufReader, Write},
+    io::Write,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Mutex,
+        Mutex,
     },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+#[cfg(test)]
+use std::{
+    io::{BufRead, BufReader},
+    sync::mpsc,
+};
 
-const SCHEMA_VERSION: u32 = 1;
+pub(crate) const SCHEMA_VERSION: u32 = 1;
 const START_TIMEOUT: Duration = Duration::from_secs(45);
 const SETUP_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -114,8 +119,9 @@ fn summarize_error(action: &str, error: &anyhow::Error) -> String {
 
 #[cfg(test)]
 mod summary_tests {
-    use super::summarize_error;
+    use super::{mongo_arguments, summarize_error};
     use anyhow::anyhow;
+    use std::path::Path;
 
     #[test]
     fn network_failures_collapse_to_offline() {
@@ -135,8 +141,37 @@ mod summary_tests {
         let error = anyhow!("disk full").context("Staged update is invalid\nsecond line");
         assert_eq!(summarize_error("do it", &error), "Couldn't do it: Staged update is invalid");
     }
+
+    #[test]
+    fn wine_mongod_disables_diagnostic_collection() {
+        let owned = mongo_arguments(Path::new(r"C:\data\mongo"), 27017, false);
+        let plain: Vec<_> = owned.iter().map(String::as_str).collect();
+        assert_eq!(plain, ["--bind_ip", "127.0.0.1", "--dbpath", r"C:\data\mongo", "--port", "27017"]);
+        let wine = mongo_arguments(Path::new(r"C:\data\mongo"), 27017, true);
+        assert_eq!(wine[wine.len() - 2], "--setParameter");
+        assert_eq!(wine.last().map(String::as_str), Some("diagnosticDataCollectionEnabled=false"));
+    }
+
+    #[test]
+    fn services_stop_only_when_the_game_exits() {
+        assert!(super::game_exit_stops_services(true, false));
+        assert!(!super::game_exit_stops_services(false, false));
+        assert!(!super::game_exit_stops_services(false, true));
+        assert!(!super::game_exit_stops_services(true, true));
+    }
+
+    #[test]
+    fn close_waits_for_an_in_flight_stop() {
+        use super::CloseRequest;
+        assert_eq!(super::close_request(true, false, true), CloseRequest::Wait);
+        assert_eq!(super::close_request(true, true, false), CloseRequest::Wait);
+        assert_eq!(super::close_request(false, true, false), CloseRequest::AfterStop);
+        assert_eq!(super::close_request(false, true, true), CloseRequest::AfterStop);
+        assert_eq!(super::close_request(false, false, true), CloseRequest::StopServices);
+        assert_eq!(super::close_request(false, false, false), CloseRequest::Close);
+    }
 }
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalBuild {
     pub schema_version: u32,
@@ -193,6 +228,7 @@ pub fn prepare(
     log.finish(result)
 }
 
+#[cfg_attr(not(windows), allow(unreachable_code, unused_variables))]
 fn prepare_logged(
     repository: &str,
     branch: &str,
@@ -209,44 +245,27 @@ fn prepare_logged(
     fs::create_dir_all(&root).with_context(|| format!("create {}", root.display()))?;
     #[cfg(windows)]
     let _setup_lock = open_setup_lock(&root)?;
-    let script = env::current_exe()?
+    let launcher_dir = env::current_exe()?
         .parent()
         .context("launcher executable has no parent directory")?
-        .join("setup-local.ps1");
-    if !script.is_file() {
-        bail!("local setup script is missing: {}", script.display());
+        .to_path_buf();
+    let supported = launcher_dir.join("supported-client.json");
+    if !supported.is_file() {
+        bail!("supported client manifest is missing: {}", supported.display());
     }
-    // Refuse before setup-local.ps1 installs dependencies for a client we cannot patch.
-    crate::package::check_supported_client(&script.with_file_name("supported-client.json"), game)?;
+    // Refuse before setup installs dependencies for a client we cannot patch.
+    crate::package::check_supported_client(&supported, game)?;
 
     progress("Starting local source setup");
-    #[cfg(windows)]
-    let setup_job = create_job()?;
-    let mut child = OwnedChild(
-        hide_console(&mut Command::new("powershell.exe"))
-            .args([
-                "-NoLogo",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-            ])
-            .arg(&script)
-            .arg("-Root")
-            .arg(&root)
-            .arg("-Repository")
-            .arg(repository)
-            .arg("-Branch")
-            .arg(branch)
-            .arg("-SetupLockHeld")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .context("start PowerShell local setup")?,
-    );
-    #[cfg(windows)]
-    assign_to_job(&setup_job, &child.0)?;
-    capture_setup(&mut child.0, log, progress, SETUP_TIMEOUT)?;
+    crate::setup::run(
+        &root,
+        repository,
+        branch,
+        &launcher_dir,
+        progress,
+        &mut |line| log.write(line),
+        Instant::now() + SETUP_TIMEOUT,
+    )?;
     let pending = root.join("build-state.pending.json");
     let bytes = fs::read(&pending).with_context(|| format!("read {}", pending.display()))?;
     let build: LocalBuild =
@@ -254,10 +273,7 @@ fn prepare_logged(
     validate_build(&root, &build)?;
     crate::package::refresh_supported_client(
         &build.patch_directory,
-        &script
-            .parent()
-            .context("local setup script has no parent directory")?
-            .join("supported-client.json"),
+        &launcher_dir.join("supported-client.json"),
     )?;
     let package = crate::package::load_package(&build.patch_directory)
         .context("validate prepared patch package")?;
@@ -276,6 +292,7 @@ fn prepare_logged(
     Ok(build)
 }
 
+#[cfg(test)]
 fn capture_setup(
     child: &mut Child,
     log: &mut LauncherLog,
@@ -442,6 +459,23 @@ mod update_tests {
     use super::*;
 
     #[test]
+    fn inherited_handle_snapshot_keeps_only_this_process() {
+        let mut snapshot = vec![0u8; 16 + 40 * 3];
+        snapshot[0..8].copy_from_slice(&3usize.to_ne_bytes());
+        let mut write = |index: usize, pid: usize, handle: usize, attributes: u32| {
+            let start = 16 + index * 40;
+            snapshot[start + 8..start + 16].copy_from_slice(&pid.to_ne_bytes());
+            snapshot[start + 16..start + 24].copy_from_slice(&handle.to_ne_bytes());
+            snapshot[start + 32..start + 36].copy_from_slice(&attributes.to_ne_bytes());
+        };
+        write(0, 42, 0x100, 0x2);
+        write(1, 42, 0x200, 0);
+        write(2, 7, 0x300, 0x2);
+        assert_eq!(inherited_handle_values(&snapshot, 42), vec![0x100]);
+        assert!(inherited_handle_values(&snapshot[..10], 42).is_empty());
+    }
+
+    #[test]
     fn advanced_checkout_does_not_hide_failed_build() {
         let directory = env::temp_dir().join(format!("ascnet-source-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&directory).unwrap();
@@ -451,10 +485,10 @@ mod update_tests {
             String::from_utf8(output.stdout).unwrap().trim().to_owned()
         };
         git(&["init", "--initial-branch=master"]);
-        git(&["-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
+        git(&["-c", "commit.gpgsign=false", "-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
             "commit", "--allow-empty", "-m", "active build"]);
         let active_revision = git(&["rev-parse", "HEAD"]);
-        git(&["-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
+        git(&["-c", "commit.gpgsign=false", "-c", "user.name=Launcher Test", "-c", "user.email=launcher@example.invalid",
             "commit", "--allow-empty", "-m", "checkout advanced before failed build"]);
         let remote_revision = git(&["rev-parse", "HEAD"]);
         let repository = directory.to_str().unwrap();
@@ -511,12 +545,14 @@ impl LocalRuntime {
                 .create(true)
                 .append(true)
                 .open(root.join("logs/mongod.log"))?;
+            let mongo_args = mongo_arguments(
+                &root.join("data/mongo"),
+                build.mongo_port,
+                crate::install::running_under_wine(),
+            );
             let mut mongo = OwnedChild(
                 Command::new(&build.mongod)
-                    .args(["--bind_ip", "127.0.0.1", "--dbpath"])
-                    .arg(root.join("data/mongo"))
-                    .arg("--port")
-                    .arg(build.mongo_port.to_string())
+                    .args(&mongo_args)
                     .stdout(mongo_log.try_clone()?)
                     .stderr(mongo_log)
                     .creation_flags(CREATE_NO_WINDOW.0)
@@ -621,25 +657,120 @@ impl LocalRuntime {
         Ok(())
     }
 }
-fn git_executable() -> Option<PathBuf> {
-    if let Some(path) = env::var_os("PATH").and_then(|path| {
-        env::split_paths(&path)
-            .map(|directory| directory.join("git.exe"))
-            .find(|candidate| candidate.is_file())
-    }) {
-        return Some(path);
+
+/// The local server and MongoDB are for the game session. Stop them when
+/// PGR.exe goes from running to exited, not while it is still open and not on
+/// a poll that never saw it running.
+pub fn game_exit_stops_services(was_running: bool, is_running: bool) -> bool {
+    was_running && !is_running
+}
+
+/// What closing the launcher should do with the local server and MongoDB.
+/// A stop that is already running must finish before the window is destroyed:
+/// the runtime owns a job that kills those processes when the process exits.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CloseRequest {
+    /// Setup, play, or another operation still holds the launcher.
+    Wait,
+    /// Shutdown is in progress. Destroy the window only after it finishes.
+    AfterStop,
+    /// Services are still held and are not shutting down.
+    StopServices,
+    /// Nothing local is running.
+    Close,
+}
+
+pub fn close_request(busy: bool, stopping: bool, has_runtime: bool) -> CloseRequest {
+    if busy {
+        CloseRequest::Wait
+    } else if stopping {
+        CloseRequest::AfterStop
+    } else if has_runtime {
+        CloseRequest::StopServices
+    } else {
+        CloseRequest::Close
     }
-    ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"]
-        .into_iter()
-        .filter_map(env::var_os)
-        .map(PathBuf::from)
-        .flat_map(|base| {
-            [
-                base.join("Git/cmd/git.exe"),
-                base.join("Programs/Git/cmd/git.exe"),
-            ]
-        })
-        .find(|candidate| candidate.is_file())
+}
+
+fn mongo_arguments(dbpath: &Path, port: u16, wine: bool) -> Vec<String> {
+    let mut args = vec![
+        "--bind_ip".to_owned(),
+        "127.0.0.1".to_owned(),
+        "--dbpath".to_owned(),
+        dbpath.display().to_string(),
+        "--port".to_owned(),
+        port.to_string(),
+    ];
+    if wine {
+        args.push("--setParameter".to_owned());
+        args.push("diagnosticDataCollectionEnabled=false".to_owned());
+    }
+    args
+}
+
+enum GitProbe {
+    Ready,
+    IncludeDepth,
+    Failed,
+}
+
+fn probe_git(path: &Path) -> GitProbe {
+    if !path.is_file() {
+        return GitProbe::Failed;
+    }
+    let mut command = Command::new(path);
+    command.arg("--version").env("GIT_TERMINAL_PROMPT", "0");
+    match command_output_timeout(command, Duration::from_secs(20)) {
+        Ok(output) if output.status.success() => GitProbe::Ready,
+        Ok(output) => {
+            let text = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            if text.contains("exceeded maximum include depth") {
+                GitProbe::IncludeDepth
+            } else {
+                GitProbe::Failed
+            }
+        }
+        Err(_) => GitProbe::Failed,
+    }
+}
+
+fn git_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = env::var_os("PATH") {
+        candidates.extend(env::split_paths(&path).map(|directory| directory.join("git.exe")));
+    }
+    for key in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+        if let Some(base) = env::var_os(key) {
+            let base = PathBuf::from(base);
+            candidates.push(base.join("Git/cmd/git.exe"));
+            candidates.push(base.join("Programs/Git/cmd/git.exe"));
+        }
+    }
+    if let Ok(root) = root() {
+        candidates.push(root.join("tools/git/cmd/git.exe"));
+    }
+    candidates
+}
+
+pub(crate) fn git_executable() -> Option<PathBuf> {
+    for candidate in git_candidates() {
+        match probe_git(&candidate) {
+            GitProbe::Ready => return Some(candidate),
+            GitProbe::IncludeDepth
+                if crate::install::running_under_wine() && crate::setup::repair_git_include(&candidate) =>
+            {
+                if matches!(probe_git(&candidate), GitProbe::Ready) {
+                    return Some(candidate);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 struct OwnedChild(Child);
@@ -658,6 +789,7 @@ impl Drop for OperationPermit {
     }
 }
 
+#[cfg(test)]
 fn stream_lines<R: std::io::Read + Send + 'static>(
     stream: R,
     send: mpsc::Sender<std::io::Result<String>>,
@@ -818,10 +950,10 @@ fn wait_tcp(child: &mut Child, port: u16, name: &str) -> Result<()> {
 }
 
 fn wait_server(child: &mut Child, origin: &str, game_port: u16) -> Result<()> {
-    let client = reqwest::blocking::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(2))
-        .build()?;
+    let client = crate::download::wine_safe(
+        reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(2)),
+    )
+    .build()?;
     let deadline = Instant::now() + START_TIMEOUT;
     loop {
         if let Some(status) = child.try_wait()? {
@@ -836,13 +968,19 @@ fn wait_server(child: &mut Child, origin: &str, game_port: u16) -> Result<()> {
             .get(format!("{origin}/api/launcher/status"))
             .send()
             .and_then(reqwest::blocking::Response::error_for_status)
-            .and_then(|response| response.json::<serde_json::Value>())
             .ok()
-            .and_then(|value| {
-                value
-                    .get("schemaVersion")
-                    .and_then(serde_json::Value::as_u64)
+            .and_then(|mut response| {
+                let length = response.content_length();
+                if length.is_some_and(|n| n > 65_536) {
+                    return None;
+                }
+                let bytes = crate::download::read_body(&mut response, length, 65_536).ok()?;
+                if bytes.len() > 65_536 || length.is_some_and(|n| bytes.len() as u64 != n) {
+                    return None;
+                }
+                serde_json::from_slice::<serde_json::Value>(&bytes).ok()
             })
+            .and_then(|value| value.get("schemaVersion").and_then(serde_json::Value::as_u64))
             == Some(1);
         if game_ready && api_ready {
             return Ok(());
@@ -875,12 +1013,114 @@ pub(crate) fn hide_console(command: &mut Command) -> &mut Command {
     command
 }
 
+/// Spawns `command` without a console window.
+///
+/// Rust 1.95's `CommandExt::inherit_handles` is nightly-only, and `Command`
+/// otherwise passes every inheritable handle to the child. For the duration
+/// of `CreateProcess`, inheritable handles already open in this process are
+/// marked non-inheritable. The standard pipes created inside `spawn` stay
+/// inheritable. A failed handle snapshot still spawns.
+pub(crate) fn spawn_hidden(command: &mut Command) -> std::io::Result<Child> {
+    hide_console(command);
+    #[cfg(windows)]
+    let _restore = suspend_inherited_handles();
+    command.spawn()
+}
+
+/// `SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX` values whose `OBJ_INHERIT` bit is set.
+/// The snapshot is the 64-bit layout Wine writes for `SystemExtendedHandleInformation`.
+fn inherited_handle_values(snapshot: &[u8], pid: usize) -> Vec<isize> {
+    const HEADER: usize = 16;
+    const ENTRY: usize = 40;
+    const OBJ_INHERIT: u32 = 0x2;
+    if snapshot.len() < HEADER || size_of::<usize>() != 8 {
+        return Vec::new();
+    }
+    let count = usize::from_ne_bytes(snapshot[0..8].try_into().unwrap());
+    let mut handles = Vec::new();
+    for index in 0..count {
+        let start = HEADER + index * ENTRY;
+        if start + ENTRY > snapshot.len() {
+            break;
+        }
+        let owner = usize::from_ne_bytes(snapshot[start + 8..start + 16].try_into().unwrap());
+        let handle = usize::from_ne_bytes(snapshot[start + 16..start + 24].try_into().unwrap());
+        let attributes = u32::from_ne_bytes(snapshot[start + 32..start + 36].try_into().unwrap());
+        if owner == pid && handle != 0 && attributes & OBJ_INHERIT != 0 {
+            handles.push(handle as isize);
+        }
+    }
+    handles
+}
+
+#[cfg(windows)]
+struct SuspendedHandles(Vec<windows::Win32::Foundation::HANDLE>);
+
+#[cfg(windows)]
+impl Drop for SuspendedHandles {
+    fn drop(&mut self) {
+        use windows::Win32::Foundation::{SetHandleInformation, HANDLE_FLAG_INHERIT};
+        for handle in &self.0 {
+            unsafe {
+                let _ = SetHandleInformation(*handle, HANDLE_FLAG_INHERIT.0, HANDLE_FLAG_INHERIT);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn suspend_inherited_handles() -> SuspendedHandles {
+    use windows::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, HANDLE_FLAGS};
+    let Some(snapshot) = extended_handle_snapshot() else {
+        return SuspendedHandles(Vec::new());
+    };
+    let pid = unsafe { windows::Win32::System::Threading::GetCurrentProcessId() } as usize;
+    let mut restore = Vec::new();
+    for value in inherited_handle_values(&snapshot, pid) {
+        let handle = HANDLE(value);
+        if unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT.0, HANDLE_FLAGS(0)).is_ok() } {
+            restore.push(handle);
+        }
+    }
+    SuspendedHandles(restore)
+}
+
+#[cfg(windows)]
+fn extended_handle_snapshot() -> Option<Vec<u8>> {
+    use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
+    use windows::Win32::Foundation::STATUS_INFO_LENGTH_MISMATCH;
+    const SYSTEM_EXTENDED_HANDLE_INFORMATION: SYSTEM_INFORMATION_CLASS = SYSTEM_INFORMATION_CLASS(64);
+    let mut buffer = vec![0u8; 256 * 1024];
+    for _ in 0..6 {
+        let mut length = 0u32;
+        let status = unsafe {
+            NtQuerySystemInformation(
+                SYSTEM_EXTENDED_HANDLE_INFORMATION,
+                buffer.as_mut_ptr().cast(),
+                buffer.len() as u32,
+                &mut length,
+            )
+        };
+        if status.is_ok() {
+            let end = (length as usize).min(buffer.len());
+            buffer.truncate(end);
+            return Some(buffer);
+        }
+        if status != STATUS_INFO_LENGTH_MISMATCH {
+            return None;
+        }
+        let next = (length as usize).max(buffer.len().saturating_mul(2));
+        if next <= buffer.len() || next > 32 * 1024 * 1024 {
+            return None;
+        }
+        buffer.resize(next, 0);
+    }
+    None
+}
+
 fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std::process::Output> {
-    let mut child = hide_console(&mut command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("start command")?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = spawn_hidden(&mut command).context("start command")?;
     let deadline = Instant::now() + timeout;
     loop {
         if child.try_wait()?.is_some() {
@@ -894,7 +1134,7 @@ fn command_output_timeout(mut command: Command, timeout: Duration) -> Result<std
     }
 }
 #[cfg(windows)]
-fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
+pub(crate) fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows::{
         core::PCWSTR,
@@ -919,7 +1159,7 @@ fn atomic_replace(source: &Path, destination: &Path) -> Result<()> {
 }
 
 #[cfg(windows)]
-struct JobHandle(windows::Win32::Foundation::HANDLE);
+pub(crate) struct JobHandle(windows::Win32::Foundation::HANDLE);
 
 #[cfg(windows)]
 impl Drop for JobHandle {
@@ -933,7 +1173,7 @@ impl Drop for JobHandle {
 }
 
 #[cfg(windows)]
-fn create_job() -> Result<JobHandle> {
+pub(crate) fn create_job() -> Result<JobHandle> {
     use windows::Win32::System::JobObjects::{
         CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -953,7 +1193,7 @@ fn create_job() -> Result<JobHandle> {
 }
 
 #[cfg(windows)]
-fn assign_to_job(job: &JobHandle, child: &Child) -> Result<()> {
+pub(crate) fn assign_to_job(job: &JobHandle, child: &Child) -> Result<()> {
     use std::os::windows::io::AsRawHandle;
     use windows::Win32::{Foundation::HANDLE, System::JobObjects::AssignProcessToJobObject};
     unsafe {

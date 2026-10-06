@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs::{self, File, OpenOptions}, io::{Read, Write}, path::{Path, PathBuf}, process::Command, time::{Duration, Instant}};
 use crate::package::sha256_file;
 
+// Launchers 1.0.8 through 1.0.11 reject an archive that is not these seven names.
+// The script is not started. Setup runs inside this executable.
 const FILES: [&str; 7] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "setup-local.ps1", "supported-client.json"];
 const MAX_ARCHIVE: u64 = 128 * 1024 * 1024;
 const MAX_EXPANDED: u64 = 256 * 1024 * 1024;
@@ -65,7 +67,7 @@ fn stable_version(value: &str) -> Option<semver::Version> {
 }
 
 fn client() -> Result<reqwest::blocking::Client> {
-    Ok(reqwest::blocking::Client::builder().https_only(true).user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
+    Ok(crate::download::wine_safe(reqwest::blocking::Client::builder().https_only(true).user_agent(concat!("AscNetLauncher/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15)).timeout(Duration::from_secs(180))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             let url = attempt.url();
@@ -73,7 +75,7 @@ fn client() -> Result<reqwest::blocking::Client> {
                 && matches!(url.host_str(), Some("github.com" | "api.github.com" | "release-assets.githubusercontent.com" | "objects.githubusercontent.com")) {
                 attempt.follow()
             } else { attempt.error("untrusted release redirect") }
-        })).build()?)
+        }))).build()?)
 }
 
 #[derive(Deserialize)]
@@ -84,11 +86,14 @@ struct ApiAsset { name: String, browser_download_url: String, size: u64, digest:
 pub fn check(repository: &str, current_version: &str) -> Result<Option<Release>> {
     let repository = repository_path(repository)?;
     let current = stable_version(current_version).context("compiled launcher version is not stable semver")?;
-    let response = client()?.get(format!("https://api.github.com/repos/{repository}/releases?per_page=100"))
+    let mut response = client()?.get(format!("https://api.github.com/repos/{repository}/releases?per_page=100"))
         .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").send()?.error_for_status()?;
-    let mut bytes = Vec::new();
-    response.take(2 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    let length = response.content_length();
+    let bytes = crate::download::read_body(&mut response, length, 2 * 1024 * 1024)?;
     ensure!(bytes.len() <= 2 * 1024 * 1024, "release metadata exceeds limit");
+    if let Some(n) = length {
+        ensure!(bytes.len() as u64 == n, "release metadata ended after {} bytes, expected {n}", bytes.len());
+    }
     let releases: Vec<ApiRelease> = serde_json::from_slice(&bytes)?;
     let Some((version, release)) = releases.into_iter().filter(|r| !r.draft && !r.prerelease)
         .filter_map(|r| stable_version(&r.tag_name).map(|v| (v, r))).filter(|(v, _)| v > &current).max_by(|a,b| a.0.cmp(&b.0)) else { return Ok(None) };
@@ -115,11 +120,16 @@ fn regular(path: &Path) -> Result<()> {
 fn directory(path: &Path) -> Result<()> {
     for ancestor in path.ancestors() {
         let metadata = fs::symlink_metadata(ancestor)?;
-        ensure!(metadata.is_dir() && !metadata.file_type().is_symlink(), "linked update directory refused");
         #[cfg(windows)] {
             use std::os::windows::fs::MetadataExt;
-            ensure!(metadata.file_attributes() & 0x400 == 0, "reparse directory refused");
+            let attributes = metadata.file_attributes();
+            // Rust reports a Wine bind-mount junction as a symlink, so `is_dir()` is false.
+            let allows = attributes & 0x10 != 0
+                && (attributes & 0x400 == 0 || crate::install::wine_mount_keeps_its_path(ancestor));
+            ensure!(allows, "reparse directory refused");
         }
+        #[cfg(not(windows))]
+        ensure!(metadata.is_dir() && !metadata.file_type().is_symlink(), "linked update directory refused");
     }
     Ok(())
 }
@@ -142,7 +152,7 @@ fn synced_write(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn extract(archive: &Path, target: &Path, version: &str) -> Result<BTreeMap<String, String>> {
     let mut zip = zip::ZipArchive::new(File::open(archive)?)?;
-    ensure!(zip.len() == FILES.len(), "launcher ZIP must contain exactly seven flat files");
+    ensure!(zip.len() == FILES.len(), "launcher ZIP must contain exactly {} flat files", FILES.len());
     let mut hashes = BTreeMap::new();
     let mut expanded = 0u64;
     for index in 0..zip.len() {
@@ -181,14 +191,20 @@ pub fn stage(release: &Release) -> Result<StagedUpdate> {
     let result = (|| -> Result<()> {
         let archive = root.join("release.zip");
         // Metadata keeps the client's 180 s total; the ~93 MB asset needs slow-link headroom.
-        let response = client()?.get(&release.url).timeout(Duration::from_secs(2 * 60 * 60)).send()?.error_for_status()?;
+        let mut response = client()?.get(&release.url).timeout(Duration::from_secs(2 * 60 * 60)).send()?.error_for_status()?;
         if let Some(length) = response.content_length() { ensure!(length == release.size, "release Content-Length mismatch"); }
-        let mut input = response.take(release.size + 1);
         let mut output = OpenOptions::new().write(true).create_new(true).open(&archive)?;
         let mut hash = Sha256::new();
         let mut buffer = [0u8; 65536];
         let mut size = 0u64;
-        loop { let n = input.read(&mut buffer)?; if n == 0 { break; } size += n as u64; ensure!(size <= release.size, "release download exceeds size"); hash.update(&buffer[..n]); output.write_all(&buffer[..n])?; }
+        while size < release.size {
+            let want = buffer.len().min((release.size - size) as usize);
+            let n = response.read(&mut buffer[..want])?;
+            if n == 0 { break; }
+            size += n as u64;
+            hash.update(&buffer[..n]);
+            output.write_all(&buffer[..n])?;
+        }
         output.sync_all()?;
         ensure!(size == release.size && format!("{:x}", hash.finalize()) == release.digest, "release SHA-256/size verification failed");
         fs::create_dir(root.join("new"))?;

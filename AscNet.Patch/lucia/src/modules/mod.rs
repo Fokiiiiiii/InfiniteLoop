@@ -61,16 +61,14 @@ pub trait MhyModule {
 }
 
 pub struct MhyContext<T> {
-    pub assembly_base: usize,
     pub interceptor: Interceptor,
     _phantom: std::marker::PhantomData<T>,
 }
 
 #[allow(dead_code)]
 impl<T> MhyContext<T> {
-    pub const fn new(assembly_base: usize) -> Self {
+    pub const fn new() -> Self {
         Self {
-            assembly_base,
             interceptor: Interceptor::new(),
             _phantom: std::marker::PhantomData,
         }

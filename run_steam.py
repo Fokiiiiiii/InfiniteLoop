@@ -203,6 +203,44 @@ def resolve_mitm(value: str | None) -> str:
             return candidate
     raise SystemExit("mitmproxy not found. Install mitmproxy or pass --mitm /path/to/mitmdump.")
 
+def merge_version_dll_override(current: str) -> str:
+    parts = [part.strip() for part in current.split(";") if part.strip()]
+    has_version = False
+    for part in parts:
+        names = part.split("=", 1)[0]
+        if any(name.strip().lower() == "version" for name in names.split(",")):
+            has_version = True
+            break
+    if not has_version:
+        parts.append("version=n,b")
+    return ";".join(parts)
+
+
+def executable_basename(path: str) -> str:
+    normalized = path.replace("\\", "/").rstrip("/")
+    return normalized.rsplit("/", 1)[-1]
+
+
+def local_mongod_command(mongod: str, dbpath: str, host: str, port: int, logpath: str) -> list[str]:
+    command = [
+        mongod,
+        "--dbpath",
+        dbpath,
+        "--bind_ip",
+        host,
+        "--port",
+        str(port),
+        "--logpath",
+        logpath,
+        "--logappend",
+        "--quiet",
+    ]
+    # pathlib on Linux does not split Windows paths, and Wine launches mongod.exe that way.
+    if sys.platform != "win32" and executable_basename(mongod).lower() == "mongod.exe":
+        command.extend(["--setParameter", "diagnosticDataCollectionEnabled=false"])
+    return command
+
+
 def resolve_mongod(value: str | None) -> str:
     candidates = [value, shutil.which("mongod")]
     for candidate in candidates:
@@ -591,6 +629,8 @@ def main() -> int:
 
     env = os.environ.copy()
     env["ASCNET_PUBLIC_HTTP_ORIGIN"] = args.sdk_url.rstrip("/")
+    env["ASCNET_PATCH_ORIGIN"] = args.sdk_url.rstrip("/")
+    env["WINEDLLOVERRIDES"] = merge_version_dll_override(env.get("WINEDLLOVERRIDES", ""))
     gate_fallback = gate_fallback_username(args)
     if gate_fallback:
         env["ASCNET_GATE_FALLBACK_USERNAME"] = gate_fallback
@@ -617,19 +657,7 @@ def main() -> int:
             dbpath = (ROOT / args.mongo_dbpath).resolve()
             dbpath.mkdir(parents=True, exist_ok=True)
             logpath = dbpath.parent / "mongod.log"
-            mongo = popen([
-                mongod,
-                "--dbpath",
-                str(dbpath),
-                "--bind_ip",
-                args.mongo_host,
-                "--port",
-                str(args.mongo_port),
-                "--logpath",
-                str(logpath),
-                "--logappend",
-                "--quiet",
-            ], env=env)
+            mongo = popen(local_mongod_command(mongod, str(dbpath), args.mongo_host, args.mongo_port, str(logpath)), env=env)
             processes.append(mongo)
             wait_for_tcp(args.mongo_host, args.mongo_port, 20.0, "MongoDB")
     elif not can_connect(args.mongo_host, args.mongo_port):
