@@ -76,6 +76,24 @@ Play: failed: refusing installation: unsupported client: ...
 The region comes from the SDK files: `KRSDKEx.dll` + `KRSDKRes/KRSDKConfig.json` without `KRSDKRes/KRSDK.bin` is CN, even
 if a `KRSDK.dll` is present.
 
+## Local server logs (`%LOCALAPPDATA%\AscNetLauncher\local\logs\`)
+
+`server.log` and `mongod.log` hold the local backend's output. Each start moves the previous run to `server.previous.log`
+(`mongod.previous.log`), and a file that reaches 32 MiB during a run is moved there too, so each log keeps at most two
+files and the newest lines are always in `server.log`. Send both server files when reporting a bug.
+
+How much the server writes is set by `VerboseLevel` in `%LOCALAPPDATA%\AscNetLauncher\local\config.json`; the change
+applies the next time the launcher starts the server:
+
+| `VerboseLevel` | Logged |
+|---|---|
+| `Silent` | No packet lines; other server messages (startup, warnings, errors) still appear. |
+| `Normal` | One line per request (sizes only), response and push (names only). |
+| `Debug` (default) | Same lines, with the full response/push content that bug reports need. |
+| `SuperDebug` | Also the heartbeats, which every lower level skips. |
+
+Leave the `GameServer` and `Database` entries unchanged; the launcher refuses to start the server if they no longer match Setup.
+
 ## China (CN) client
 
 The CN client (战双帕弥什) has no `KRSDK.dll` and no `KRSDK.bin`, and a CN folder must not contain `KRSDK.dll`: Setup moves a

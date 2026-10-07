@@ -1072,6 +1072,23 @@ fn network_matches(config: &Value, game_port: u16, mongo_port: u16) -> bool {
         && json_string(config, &["Database", "Name"]).as_deref() == Some("asc_net")
 }
 
+/// Copies the persistent `config.json` into the server build before each start, so edits such as
+/// `VerboseLevel` apply on the next start instead of only after the next rebuild. Network fields are
+/// owned by Setup and must still match the build.
+pub(crate) fn install_runtime_config(root: &Path, server_directory: &Path, game_port: u16, mongo_port: u16) -> Result<()> {
+    let source = root.join("config.json");
+    let bytes = fs::read(&source).with_context(|| format!("read {}", source.display()))?;
+    let config: Value = serde_json::from_slice(&bytes).with_context(|| format!("{} is not valid JSON", source.display()))?;
+    if !network_matches(&config, game_port, mongo_port) {
+        bail!("{} has changed GameServer/Database settings; restore them or run Setup again", source.display());
+    }
+    let target = server_directory.join("Configs").join("config.json");
+    if fs::read(&target).ok().as_deref() != Some(bytes.as_slice()) {
+        write_atomic(&target, &bytes)?;
+    }
+    Ok(())
+}
+
 fn json_string(value: &Value, path: &[&str]) -> Option<String> {
     let mut current = value;
     for key in path {
@@ -2661,6 +2678,27 @@ mod tests {
         assert_eq!(config["SkipCommonGuides"], false);
         assert!(network_matches(&config, 2335, 27017));
         assert!(!network_matches(&config, 2336, 27017));
+    }
+
+    #[test]
+    fn edited_config_reaches_the_server_on_start_unless_its_network_changed() {
+        let root = env::temp_dir().join(format!("ascnet-runtime-config-{}", uuid::Uuid::new_v4()));
+        let server = root.join("build").join("server");
+        fs::create_dir_all(server.join("Configs")).unwrap();
+        let mut config = serde_json::json!({"VerboseLevel": "Debug"});
+        apply_network(&mut config, 2335, 27017);
+        fs::write(server.join("Configs").join("config.json"), config.to_string()).unwrap();
+        config["VerboseLevel"] = "Normal".into();
+        fs::write(root.join("config.json"), config.to_string()).unwrap();
+        install_runtime_config(&root, &server, 2335, 27017).unwrap();
+        let installed: Value = serde_json::from_slice(&fs::read(server.join("Configs").join("config.json")).unwrap()).unwrap();
+        assert_eq!(installed["VerboseLevel"], "Normal");
+        config["Database"]["Port"] = 27018.into();
+        fs::write(root.join("config.json"), config.to_string()).unwrap();
+        assert!(install_runtime_config(&root, &server, 2335, 27017).is_err());
+        let kept: Value = serde_json::from_slice(&fs::read(server.join("Configs").join("config.json")).unwrap()).unwrap();
+        assert_eq!(kept["Database"]["Port"], 27017, "a refused config is not installed");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

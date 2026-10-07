@@ -305,7 +305,7 @@ namespace AscNet.GameServer
                                         if (requestPacketHandler is not null)
                                         {
                                             // TODO: with new logger this will be unnecessary
-                                            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+                                            if (ShouldLogPacket(requestName))
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
                                             InvokeRequestHandler(requestPacketHandler, request);
                                         }
@@ -598,7 +598,7 @@ namespace AscNet.GameServer
                 Type = Packet.ContentType.Response,
                 Content = MessagePackSerializer.Serialize(packet)
             });
-            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+            if (ShouldLogPacket(packet.Name))
                 log.Info($"{packet.Name}{(Common.Common.config.VerboseLevel >= VerboseLevel.Debug ? (", " + JsonConvert.SerializeObject(response)) : "")}");
         }
 
@@ -617,9 +617,16 @@ namespace AscNet.GameServer
                 Type = Packet.ContentType.Response,
                 Content = MessagePackSerializer.Serialize(packet)
             });
-            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+            if (ShouldLogPacket(name))
                 log.Info($"{name}{(Common.Common.config.VerboseLevel >= VerboseLevel.Debug ? (", " + FormatMessagePackContent(responseContent)) : "")}");
         }
+
+        // Heartbeats (lobby, fight, guild dorm) arrive every few seconds for the whole session; they are only
+        // logged at SuperDebug so they don't bury the useful lines.
+        private static bool ShouldLogPacket(string? name) =>
+            Common.Common.config.VerboseLevel > VerboseLevel.Silent
+            && (Common.Common.config.VerboseLevel >= VerboseLevel.SuperDebug
+                || name is null || !name.Contains("Heartbeat", StringComparison.Ordinal));
 
         private void Send(Packet packet)
         {

@@ -3,13 +3,13 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::Write,
+    io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -26,6 +26,8 @@ const SETUP_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 static OPERATION: AtomicBool = AtomicBool::new(false);
 static LOG_WRITE: Mutex<()> = Mutex::new(());
+/// A backend log past this size becomes `<name>.previous.log` and a new file starts.
+const BACKEND_LOG_LIMIT: u64 = 32 * 1024 * 1024;
 
 struct LauncherLog {
     path: PathBuf,
@@ -380,6 +382,45 @@ mod log_tests {
         assert_eq!(contents.matches("Setup attempt failed: local setup failed").count(), 2);
         fs::remove_dir_all(directory).unwrap();
     }
+
+    #[test]
+    fn backend_log_keeps_the_newest_output_in_at_most_two_files() {
+        let directory = env::temp_dir().join(format!("ascnet-backend-log-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("server.log");
+        let previous = directory.join("server.previous.log");
+        fs::write(&path, "last-run\n").unwrap();
+        let log = RotatingLog::open(path.clone(), 4096).unwrap();
+        assert_eq!(fs::read_to_string(&previous).unwrap(), "last-run\n", "a start keeps the last run");
+        // ~10 KB of output against a 4 KB limit rotates at least twice during the run.
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = Command::new("cmd.exe");
+            command.args(["/D", "/C", "for /L %i in (1,1,1000) do @echo line-%i"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "i=1; while [ $i -le 1000 ]; do echo line-$i; i=$((i+1)); done"]);
+            command
+        };
+        let mut child = OwnedChild(command.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap());
+        pump_output(&mut child.0, &log);
+        child.0.wait().unwrap();
+        // The pump may be between rename and create, so a missing file just means "not yet".
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !fs::read_to_string(&path).unwrap_or_default().contains("line-1000") && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(20));
+        }
+        let current = fs::read_to_string(&path).unwrap();
+        let older = fs::read_to_string(&previous).unwrap();
+        assert!(current.contains("line-1000"), "newest output is kept");
+        assert!(!older.contains("last-run") && !older.contains("line-1\n"), "the size limit rotated during the run");
+        assert!(current.len() <= 4096 && older.len() <= 4096);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 2);
+        fs::remove_dir_all(directory).unwrap();
+    }
 }
 
 pub fn check_update(
@@ -534,6 +575,7 @@ impl LocalRuntime {
             let operation = operation_lock()?;
             let root = root()?;
             validate_build(&root, build)?;
+            crate::setup::install_runtime_config(&root, &build.server_directory, build.game_port, build.mongo_port)?;
             let _ports = reserve_ports([build.mongo_port, build.sdk_port, build.game_port])?;
             fs::create_dir_all(root.join("data/mongo"))?;
             fs::create_dir_all(root.join("logs"))?;
@@ -541,10 +583,7 @@ impl LocalRuntime {
 
             progress("Starting MongoDB");
             drop(_ports);
-            let mongo_log = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(root.join("logs/mongod.log"))?;
+            let mongo_log = RotatingLog::open(root.join("logs/mongod.log"), BACKEND_LOG_LIMIT)?;
             let mongo_args = mongo_arguments(
                 &root.join("data/mongo"),
                 build.mongo_port,
@@ -553,21 +592,19 @@ impl LocalRuntime {
             let mut mongo = OwnedChild(
                 Command::new(&build.mongod)
                     .args(&mongo_args)
-                    .stdout(mongo_log.try_clone()?)
-                    .stderr(mongo_log)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .creation_flags(CREATE_NO_WINDOW.0)
                     .spawn()
                     .context("start MongoDB")?,
             );
+            pump_output(&mut mongo.0, &mongo_log);
             assign_to_job(&job, &mongo.0)?;
             wait_tcp(&mut mongo.0, build.mongo_port, "MongoDB")?;
 
             progress("Starting AscNet server");
             let origin = format!("http://127.0.0.1:{}", build.sdk_port);
-            let server_log = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(root.join("logs/server.log"))?;
+            let server_log = RotatingLog::open(root.join("logs/server.log"), BACKEND_LOG_LIMIT)?;
             let mut server = OwnedChild(
                 Command::new(&build.dotnet)
                     .arg(build.server_directory.join("AscNet.dll"))
@@ -578,12 +615,13 @@ impl LocalRuntime {
                     .env("ASCNET_GAME_BIND_ADDRESS", "127.0.0.1")
                     .env("ASCNET_MANAGED_STDIN", "1")
                     .stdin(Stdio::piped())
-                    .stdout(server_log.try_clone()?)
-                    .stderr(server_log)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .creation_flags(CREATE_NO_WINDOW.0)
                     .spawn()
                     .context("start AscNet server")?,
             );
+            pump_output(&mut server.0, &server_log);
             assign_to_job(&job, &server.0)?;
             wait_server(&mut server.0, &origin, build.game_port)?;
             progress("Local backend is ready");
@@ -786,6 +824,75 @@ struct OperationPermit;
 impl Drop for OperationPermit {
     fn drop(&mut self) {
         OPERATION.store(false, Ordering::Release);
+    }
+}
+
+/// Backend stdout/stderr go through pipes into this file instead of an ever-growing append, so a long
+/// session (the server logs every packet at Debug) can't fill the disk. Each start keeps the last run as
+/// `<name>.previous.log`; within a run the same rotation happens at `limit`, so the newest lines always
+/// survive and at most two files exist.
+#[cfg_attr(not(windows), allow(dead_code))]
+struct RotatingLog {
+    path: PathBuf,
+    previous: PathBuf,
+    file: fs::File,
+    written: u64,
+    limit: u64,
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+impl RotatingLog {
+    fn open(path: PathBuf, limit: u64) -> Result<Arc<Mutex<Self>>> {
+        let previous = path.with_extension("previous.log");
+        if path.exists() {
+            fs::rename(&path, &previous).with_context(|| format!("rotate {}", path.display()))?;
+        }
+        let file = fs::File::create(&path).with_context(|| format!("create {}", path.display()))?;
+        Ok(Arc::new(Mutex::new(Self { path, previous, file, written: 0, limit })))
+    }
+
+    fn rotate(&mut self) -> std::io::Result<()> {
+        // rename replaces the old previous log; Rust opens files with FILE_SHARE_DELETE, so the live file
+        // can be renamed while this handle is still open.
+        fs::rename(&self.path, &self.previous)?;
+        self.file = fs::File::create(&self.path)?;
+        self.written = 0;
+        Ok(())
+    }
+
+    fn write(&mut self, mut bytes: &[u8]) -> std::io::Result<()> {
+        while !bytes.is_empty() {
+            if self.written >= self.limit {
+                self.rotate()?;
+            }
+            let take = bytes.len().min((self.limit - self.written) as usize);
+            self.file.write_all(&bytes[..take])?;
+            self.written += take as u64;
+            bytes = &bytes[take..];
+        }
+        Ok(())
+    }
+}
+
+/// Drains both pipes until the child exits. Write errors are ignored so a full disk or locked file never
+/// blocks the child on a full pipe.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn pump_output(child: &mut Child, log: &Arc<Mutex<RotatingLog>>) {
+    fn pump(mut stream: impl Read + Send + 'static, log: Arc<Mutex<RotatingLog>>) {
+        thread::spawn(move || {
+            let mut buffer = vec![0u8; 64 * 1024];
+            while let Ok(read @ 1..) = stream.read(&mut buffer) {
+                if let Ok(mut log) = log.lock() {
+                    let _ = log.write(&buffer[..read]);
+                }
+            }
+        });
+    }
+    if let Some(stdout) = child.stdout.take() {
+        pump(stdout, log.clone());
+    }
+    if let Some(stderr) = child.stderr.take() {
+        pump(stderr, log.clone());
     }
 }
 
