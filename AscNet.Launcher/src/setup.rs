@@ -881,8 +881,9 @@ fn first_sha256(text: &str) -> Option<String> {
     None
 }
 
+/// The unique part goes first so the name keeps its extension: ShellExecute needs `.exe` to start the VS bootstrapper.
 fn scratch_file(root: &Path, name: &str) -> PathBuf {
-    root.join("tmp").join(format!("{name}-{}-{}", std::process::id(), uuid::Uuid::new_v4()))
+    root.join("tmp").join(format!("{}-{}-{name}", std::process::id(), uuid::Uuid::new_v4()))
 }
 
 #[derive(Debug)]
@@ -2417,8 +2418,9 @@ fn build_version_shim(compiler: &Compiler, checkout: &Path, stage: &Path, launch
         command
             .arg(checkout.join("AscNet.Patch").join("VersionShim").join("src").join("VersionShim.vcxproj"))
             .args(["/m:1", "/p:Configuration=Release", "/p:Platform=x64"])
-            .arg(format!("/p:OutDir=\"{out_dir}/\""))
-            .arg(format!("/p:IntDir=\"{int_dir}/\""));
+            // No inner quotes: Rust's Windows quoting escapes them to \" and MSBuild then sees them as path characters.
+            .arg(format!("/p:OutDir={out_dir}/"))
+            .arg(format!("/p:IntDir={int_dir}/"));
         run_logged(&mut command, "Building version loader", deadline, progress, log)?;
         fs::copy(loader.join("VersionShim.dll"), patch.join("version.dll")).context("copy version.dll")?;
     } else {
