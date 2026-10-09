@@ -32,7 +32,10 @@ internal partial class Program
     private static void ValidateVersion47CharacterCompatibility()
     {
         PacketFactory.LoadPacketHandlers();
-        AssertEqual(28, Character.CharacterSkillMaxLevel(101201), "character skill client-safe cap");
+        AssertEqual(29, Character.CharacterSkillMaxLevel(101201), "skill 101201 level under the client cap");
+        AssertEqual(29, Character.CharacterSkillMaxLevel(
+            TableReaderV2.Parse<CharacterSkillLevelEffectTable>().First(row => row.Level >= 29).SkillId),
+            "character skill client cap");
 
         ValidateVersion47HeadEquipValidation();
         ValidateVersion47HeadTimeoutReconciliation();
@@ -680,6 +683,7 @@ internal partial class Program
 
     private static void ValidateVersion47CharacterHeadSelectionCompatibility()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         const long playerId = 48_105;
         CharacterTable luciaRow = TableReaderV2.Parse<CharacterTable>()
             .Single(row => row.Id == 1021001);

@@ -1,0 +1,7 @@
+Id	InsideShopGroup[1]	InsideShopGroup[2]	InsideShopGroup[3]	InsideShopGroup[4]	InsideShopGroup[5]	InsideShopGroup[6]	InsideShopGroup[7]	OutsideShopGroup[1]	OutsideShopGroup[2]	OutsideShopGroup[3]	OutsideShopGroup[4]	InitShop[1]	InitShop[2]	InitShopPos[1]	InitShopPos[2]	LockInsidePos[1]	LockInsidePos[2]	LockInsidePos[3]	LockOutsidePos[1]	LockOutsidePos[2]	LockOutsidePos[3]	LockOutsidePos[4]
+1	1008	1010	1009					2003	2001	2004	2002					2	3	4	1	2	3	4
+2	1001	1003	1005	1004	1006	1007		2003	2001	2004	2002								1	2	3	4
+3	1001	1003	1002	1005	1004	1006	1007	2003	2001	2004	2002								1	3		
+4	1001	1003	1002	1005	1004	1006	1007	2003	2001	2004	2002											
+5	1001	1003	1002	1005	1004	1006	1007	2003	2001	2004	2002											
+6	1001	1003	1002	1005	1004	1006	1007	2003	2001	2004	2002											

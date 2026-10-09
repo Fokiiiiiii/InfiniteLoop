@@ -1,6 +1,6 @@
 # InfiniteLoop
 
-InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. The server core tracks the Global/EN PC client; the Steam bridge also routes the closely related JP PC client through its official regional config.
+InfiniteLoop is a working branch of [AscNet](https://github.com/rafi1212122/AscNet), a private-server emulator for **Punishing: Gray Raven**. It tracks the global PC/Steam client, documents implemented behavior separately from unresolved compatibility gaps, and routes the JP PC client through its official regional config.
 
 This is research/dev infrastructure, not an official service. It expects a local client, a local AscNet process, and a local MongoDB database.
 
@@ -12,24 +12,19 @@ The current server data/config target is **4.8**, not a claim of complete 4.8 ga
 | --- | --- |
 | Client package | `com.kurogame.pc.punishing.grayraven.en` |
 | Application version | `4.8.0` |
-| Document version | `4.8.10` |
-| Launch module version | `4.8.10` |
+| Document version | `4.8.12` |
+| Launch module version | `4.8.12` |
 | Steam/PC channel | `205` |
 | Game server TCP port | `2335` by default |
 | SDK/HTTP URL used by the runner | `http://127.0.0.1:8080` by default |
 
-`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.10` version/hash tuple and retains older tuples.
+`Resources/Configs/version_config.json` includes the authoritative `4.8.0 -> 4.8.12` version/hash tuple and retains older tuples. The native launcher's binary allowlist targets client 4.8.0, EN, TW, KR, JP and CN (launcher 1.0.14, patch 0.4.0; CN: see `Docs/cn-sdk-support.md`).
 
-The JP PC bridge targets `com.kurogame.punishing.grayraven.jp`, application
-`4.8.0`, channel `5`, CDN key `BYf6VZR7DluwhM64`, and the observed `prod-jpcdn`
-origins. It fetches config from the official JP CDN and rewrites only login
-destinations. JP document and launch module versions are taken from that live
-config because their patch numbering can differ from Global/EN.
+One instance serves every region: the package in the config request picks the `Packages` entry (document/launch version, hashes and its `Region` block of CDNs, channel, server-list label and config rows) in `version_config.json`, and each TCP session reports its own document version from the handshake. Tables, notices and gameplay stay the shared EN-derived set for all regions. KR and JP config tuples come from their live config.tab; KR/JP native hooks are statically checked only (see `AscNet.Launcher/docs/client-download.md`) until a KR/JP client run.
 
-For JP, start `run_steam.py --region jp --proxy-local`. The runner starts the
-local services and process-scoped mitmproxy, then waits; launch the game from
-Steam yourself. This path does not install DLLs, patch game files, or edit
-KRSDK cache files.
+The JP PC bridge targets `com.kurogame.punishing.grayraven.jp`, application `4.8.0`, channel `5`, CDN key `BYf6VZR7DluwhM64`, and the observed `prod-jpcdn` origins. It fetches config from the official JP CDN and rewrites only login destinations. JP document and launch module versions are taken from that live config because their patch numbering can differ from Global/EN.
+
+For JP, start `run_steam.py --region jp --proxy-local`. The runner starts the local services and process-scoped mitmproxy, then waits; launch the game from Steam yourself. This path does not install DLLs, patch game files, or edit KRSDK cache files.
 
 ## What changed in this branch
 
@@ -98,6 +93,43 @@ The table decoder verified 16,113 typed tables; 4,461 ancillary raw assets remai
 
 Focused verification on 2026-09-24: the `--non-fate-policy-only` compatibility harness passed against a private MongoDB. Ten PacketCodec scenarios completed 154 transactions without collector failures; eight bounded replays through the installed 4.8 client's original Lua passed 1,178 checks. The separate banner/equipment regression scenario completed 15 transactions and 50 client-consumer checks. Fixtures used synthetic accounts only, and dated scenarios injected the handler/scenario clock rather than rewriting production calendars. This is not a full-mode native playthrough: engine adapters, declared out-of-scope login pushes and synthetic skill-merge inputs remain explicit proof boundaries; native combat, rendered UI and movie playback are unverified. Throwaway collectors and private database files were removed after verification; the permanent compatibility harness remains in `AscNet.Test`.
 
+### 4.8 data and feature changes
+
+Installed, SHA-verified client tables and Lua are the source for this update. `Resources/table/manifest.json` records per-table provenance and preserves earlier local-policy projections. This update adds no capture-backed runtime data.
+
+- Kurumi Tokisaki and Adelyde: Anabasis acquisition, normal progression, exhibition rewards, and training-item handling; training maximizes authored level/grade/eligible normal skills, not evolution or Leap.
+- Zafkiel and Kelpie CUB data, five weapons, Pesanteur memories, new coatings/portraits, and authored Harmony II upgrades. Memory resonance discounts now follow the two configured suits rather than the previous single-suit assumption.
+- Observer effects use `CharacterObsTransform` career/element rules, including Overlinker. Stage general-skill bans follow the authored stage flag.
+- Standard 4.8 draw catalogs, Crucible milestone claims, Date A Live acquired-copy task progression, and selected-lottery state. Unsupported collab currencies are not guessed.
+- Free-ticket rewards persist as serial ticket stock, not inventory items. Every paid or free draw freezes its rolled outcome, pity/history and debit plan in one durable write, then grants once through per-document reward receipts; login resumes frozen draws, and a retry cannot charge, grant or advance progress twice. Non-Fate collab banners spend the paid ticket family and combine earned tickets in the same cost plan; the Fate banner remains closed (below).
+- Updated notices, event calendars, multi-round sign-ins, the Farwatch File Passport season, and 487 Study stages, including new frame trials and Celica practice.
+- Chapter 43 (Anchored in Faith), its LifeTree/exhibition dependencies, Wrathful Monsoon boss trials, and Kurumi/Adelyde teaching trials, guides, affection tasks, trust gifts, and dorm interactions.
+- Festival and coating-trial progress is rebuilt from persisted stage clears rather than fixed login payloads. Teaching treasure claims recover partially persisted rewards at login, including after the event closes.
+- Coating self-choice gachas `50–53` use authored rewards, costs, limits, milestones, and calendar `51001`. Selection changes preserve each pool's progress; frozen draw/exchange intents recover without charging or granting twice. Scene rewards persist ownership and notify the client.
+- Music playlist reordering uses the original client's reversed wire/display order and persists across login.
+- Envelope invitation/open/bind/story mutations, task notifications, first-day grant, accumulated per-business-day catch-up and earned-but-unclaimed task reissue; server-local Team Recommendation boards with persisted, server-evaluated target progress.
+- FangKuai v2 Start/Sync/Settle state, scoring operands, rewards, and tasks; chapter calendars `50802–50804` inherit the authored parent window. The client owns board generation; snapshot checks do not prove native move history.
+- Equipment mutations push every affected slot in one `NotifyEquipDataList` before the response. Taking a weapon off, or moving one to another character that does not hand back the weapon it displaces, is rejected; login normalization gives a weaponless owned character its authored default weapon and frees incompatible wearables.
+
+Distributed sources do not carry every retail rule. These surfaces state their local policy explicitly:
+
+| Surface | AscNet policy (not retail parity) / remaining gap |
+| --- | --- |
+| Collab draws `5612`, `381`, `7068` | AscNet policy (not retail): open at the 4.8 maintenance end, 2026-09-24 05:00 UTC (`1790226000`), instead of retail 2026-09-29 10:00 UTC (`1790676000`); end unchanged. Groups 37/38 carry Tag `5` from client `DrawTabs` Id 5 (Collab / Kurumi Tokisaki Pool). Login pushes `NotifyDateALiveDraw` with `DateALiveActivity` draws that are currently open (`{1:[5612]}` in window, empty otherwise). Paid ticket family `50017–50019` and earned family `50021–50023` fund a single combined cost plan, and the banner presents the paid family's primary item. |
+| Collab Fate `5613` | Pity is published only as an inclusive `80–100` range and the threshold weights are not distributed, so this banner fails closed: not advertised, no draw infos served, requests rejected. The threshold law is still missing and no substitute distribution is invented. |
+| Circuit Calculus / Punishaar | All 19 requests implemented over the authored activity tables: shop blocks map onto remedy/shop groups, stock and level rules, empty starting deck, per-save persisted RNG, and earned-gold accounting (sale refunds excluded). The client Lua simulates the battle; finish-fight results are consistency-checked, not battle proof. |
+| Overclock Simulation / Transfinite Tower | Its six requests are implemented: chapter/floor progression, energy accounting with rollback refunds, MVP, and a server-local rank board whose rank rewards (including ChatBoard unlocks) are delivered through durable receipts resumed at login. |
+| Wreck-It Huhu / FangKuai | Chapter calendars `50802–50804` inherit the authored parent window (permanent when the parent has none); authored `PreStageId` progression still gates entry. |
+| Team Recommendation | "Global" standings are this server's persisted accounts, not a retail leaderboard: eligible authored base formations (all three members owned inside the quality-star window, each with one table-valid weapon, six awareness sites and at most one partner) rank by quality-star, then level, then lowest UID. Snapshots expose template IDs only. |
+| Envelope Enter | Every authored business day from the schedule start through today accrues one daily ticket grant under its own receipt; the first-ever entry day pays the authored first-day reward instead, and earned-but-unclaimed daily tasks are reissued under their period claim key. |
+| Cosmic Wonders `50302` / self-choice lottery `49501` | The 4.8 client contains Cosmic Wonders data, but no authoritative 4.8 event window: `50302` is not scheduled and its calendar remains closed. The separate 3.7 self-choice lottery `49501` retains its user-approved unbounded window because its client UI requires a positive end time. |
+| Simulated Battlefield `50402` / `50403` | Availability follows the 4.8 activity start after the 2026-09-24 05:00 UTC update through the explicitly dated shop expiry on 2026-11-05 05:00 UTC. Applying those same bounds to task calendar `50403` is an AscNet scheduling policy, supported by the paired-ID precedent in 4.7, not a claim of an independently recovered retail task end date. |
+| Theatre6 / Nirvatia | Default buff 10 authors starting-skill family 22, whose composition is not shipped. AscNet policy (not retail parity) resolves it through authored Theatre6BuildTag 31 "Dreamlure": the lowest-id level-1, in-pool Nirvatia skill carrying that tag. Characters without such skills still reject. Character-specific mission counters and the authored skill-level-up trigger are implemented. |
+
+The table decoder verified 16,113 typed tables; 4,461 ancillary raw assets remain undecoded, outside the imported gameplay dependencies.
+
+Focused verification on 2026-09-24: the `--non-fate-policy-only` compatibility harness passed against a private MongoDB. Ten PacketCodec scenarios completed 154 transactions without collector failures; eight bounded replays through the installed 4.8 client's original Lua passed 1,178 checks. The separate banner/equipment regression scenario completed 15 transactions and 50 client-consumer checks. Fixtures used synthetic accounts only, and dated scenarios injected the handler/scenario clock rather than rewriting production calendars. This is not a full-mode native playthrough: engine adapters, declared out-of-scope login pushes and synthetic skill-merge inputs remain explicit proof boundaries; native combat, rendered UI and movie playback are unverified. Throwaway collectors and private database files were removed after verification; the permanent compatibility harness remains in `AscNet.Test`.
+
 ### Game protocol and data compatibility
 
 This branch adds or fixes current-client server behavior for:
@@ -117,6 +149,7 @@ This branch adds or fixes current-client server behavior for:
 - Story course rewards.
 - Lucia: Lotus's hidden interlude uses table-derived replay flags and persisted objective events, with an immediate hidden-stage notification and relog recovery. Old clear records do not prove objective completion; replay episode 6 after updating. Clearing the episode without its hidden objective does not unlock episode 7.
 - Boss single login payload shape.
+- Pain Cage consumes one Attempt per normal stage's first weekly clear, manual or Auto Clear; replays consume none. Current-week clears do not unlock Auto Clear until weekly rollover archives their records; prior archived eligibility remains unchanged until then. Weekly rollover resets completion flags, and ambiguous legacy clears are also reset. Codex clears update scores and first-clear task progress without marking weekly stages complete. Type 25001 achievements track each table-defined section's cumulative normal `Score` or its isolated Trial/Bestiary score total; earned progress is retained across lower replays and Reset Challenge.
 - Guide table compatibility for current guide TSVs.
 - Player cost-time upload.
 - Player point upload.
@@ -300,6 +333,20 @@ Run the focused server compatibility harness:
 dotnet run --project AscNet.Test/AscNet.Test.csproj -- --same-color-game-compat-only
 ```
 
+### Babylonia (BigWorld) world core
+
+`AscNet.GameServer/Handlers/BigWorld/BigWorldModule*.cs` owns world enter/leave, instance levels, the engine save channel (`DlcWorldSaveData`, `DlcWorldSceneObjectData`, `DlcSceneObjectStateSet`, `DlcWorldEnterSucceed`, `BigWorldCurNpcPosUpdate`), scene-object collection, box counts, teleporters, guide/fov/custom-param/red-point/map-pin state and the StatusSync XRpc channel. Nothing is replayed from captures; the retail oracles live in `AscNet.Test/Fixtures/BigWorld` for tests only.
+
+- **Scene objects:** `Resources/table/share/statussyncfight/level/sceneconfig/LevelSceneObject.tsv` is extracted from the installed client's level scene config (`Scripts/import_bigworld_scene_objects_4_7.py`): place ids (from 1; the lounge's interaction anchors 1-8 are below 1000), `CollectableComponent` (reward id, POI/course group) and `TeleporterComponent`. Collecting a collectable grants its `BigWorldReward` once, updates the level box count and the course explore POI. The same importer writes `LevelSpot.tsv` (`XTableLevelSpotNew` position/rotation per group).
+- **Dormitory (Commandant's Lounge, 4003):** `BigWorldDormitory.cs` is the server half of `XGameplayDormitory`. Enter snapshot and `SgDormSaveAndApplyLayoutRequest` (applied or re-saved preset) replicate the photo wall, photos, album photos, adorns, frame wall and frame goods of the player's applied layouts as `XSceneObject`s (children of the gameplay actor) at the `DormitoryConfig` spots; `Dormitory*.tsv` map `SgDormFurniture.SceneObjId` to scene object bases. Quest 2002's "View Photo Wall" target (scene object 1) is the `ConfigGroup_5001` anchor whose interaction completes 2002054 through `OnInteract`. Wall-plane placement, place id 0 and the parent uuid are AscNet policy (no retail lounge capture).
+- **Interactions:** `RpcPlayerInteractRequest` resolves the target (scene object or level NPC) and its `LevelInteractOption.tsv` row (same importer; `Config` holds the option's `CompleteActionList`). Order: collect push, `RpcNpcInteractStartNotify`, [`XRpcTeleportResetOnGroundRequest` when the list teleports, then the list via `BigWorldLevelActions.Run`], `RpcNpcInteractFinishNotify` after the client finishes the list, then `BigWorldQuestRuntime.OnInteract`. Unknown actor/option/level or a launcher that is not the player's NPC returns code 4.
+- **Policies:** a world's levels are the `Level` rows sharing its default level's `SectorName` prefix; the entrance red point stays on until the world is entered; an offline engine reports a collected object as `Active = false`.
+- **Engine mode (temporary experiment switch):** `ASCNET_BIGWORLD_ENGINE=online-min` (default) sends `WorldData.Online = true` with a generated `RepFight` (installed-client 11-key layout, `InitialQuests` from persisted quests) and a minimal `RepLevel` (player controller, team-NPC replicates, server controller) and answers `LoadCompleteRequest` with a generated XRpc bootstrap. `ASCNET_BIGWORLD_ENGINE=offline` sends `Online = false` with no `FightData`/`LevelData` (client-hosted engine). Any other value fails the enter. Set `ASCNET_DUMP_BIGWORLD=1` to dump BigWorld requests/responses/pushes to `.runtime/bigworld-packet-dumps`.
+
+```bash
+dotnet run --project AscNet.Test/AscNet.Test.csproj -- --big-world-core-only
+```
+
 ### Gender setup fix
 
 The current client needs gender selection to update both persisted player state and the live in-session player cache.
@@ -350,6 +397,12 @@ Minimum local tooling:
 - Python 3.10 or newer for `run_steam.py`
 - mitmproxy/mitmdump for Steam/PC bridge mode
 - A local Punishing: Gray Raven PC/Steam installation for client testing
+
+The .NET server and `run_steam.py` run natively on Linux. The game client and `AscNet.Launcher` are Windows programs. Under Wine, the launcher installs Git, the .NET 10 SDK, Rust 1.92 (MSVC), and MongoDB from official archives. It does not use PowerShell or WinGet. It passes `diagnosticDataCollectionEnabled=false` to Windows `mongod`. Under Wine it also downloads the MSVC toolset and Windows SDK from the Visual Studio 2022 release channel into the local tools directory. It does not run the Visual Studio installer. An existing unpacked tree at `C:\msvc` or `ASCNET_MSVC` is used when `VC\Auxiliary\Build\vcvars64.bat` is already there. When the configured Git remote cannot be fetched, a clean checkout that is already on that branch is built at its current revision.
+
+Optional/macOS-specific:
+
+- CrossOver or another Wine launcher if you use `launch-pgr-ascnet.sh`
 
 ## Running AscNet directly
 
@@ -415,11 +468,17 @@ Common options:
 | `--ascnet-password test` | Password used when creating that local account. |
 | `--gate-fallback-username <name>` | Map unknown Steam/KRSDK gate logins to an existing local account. |
 | `--no-ensure-account` | Skip local account creation/checking and disable implicit unknown-user fallback. |
+| `--seed-krsdk-cache` | Opt in to writing local AscNet account data into KRSDK cache files. |
+| `--krsdk-cache-dir <path>` | Override the KRSDK login-cache directory (default: `KR_<ProjectId>/<ProductId>` read from the installed client's `KRSDK.bin`). |
+| `--client-dir <path>` | Installed game directory used to auto-detect the region (default `$ASCNET_CLIENT_DIR`/`$PGR_ASCNET_DIR`, else the Steam path in `launch-pgr-ascnet.sh`). |
+| `--client-region en\|tw\|kr\|jp` | Override region detection; unreadable clients fall back to EN. |
 | `--no-proxy` | Run only AscNet; skip mitmproxy. |
 | `--no-smoke` | Skip config smoke checks before starting the bridge. |
 | `--proxy-log <path>` | Write redacted request/response diagnostics. |
 | `--protocol-gap-log <path>` | Write protocol compatibility metadata as JSONL; JP defaults to `.runtime/protocol-gap-jp.jsonl`. |
-| `--launch-cmd ...` | Start a command after services are ready. JP mode reserves game launch for Steam and rejects this option. |
+| `--launch-cmd ...` | Start a command after AscNet/proxy are ready. JP mode reserves game launch for Steam and rejects this option. |
+
+On native Windows, pass the client's actual `%APPDATA%\KR_<ProjectId>\<ProductId>` directory with `--krsdk-cache-dir` when using KRSDK cache repair or `--seed-krsdk-cache`; the default path targets the macOS/CrossOver launch example.
 
 The runner sets:
 

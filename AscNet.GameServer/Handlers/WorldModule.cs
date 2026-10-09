@@ -133,6 +133,7 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("LeaveWorldRequest")]
         public static void LeaveWorldRequestHandler(Session session, Packet.Request packet)
         {
+            BigWorld.BigWorldModule.OnLeaveWorld(session);
             session.SendResponse(new LeaveWorldResponse(), packet.Id);
         }
 

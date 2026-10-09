@@ -1,0 +1,107 @@
+Id	SourceGroupId	Type	Priority	Title	Desc	Icon	PreTaskId	ActivateCondition[1]	ActivateCondition[2]	Condition[1]	Condition[2]	Result	DropId	RewardId	SkipId	StartTime	EndTime	Suffix	ShowAfterTaskId	AchvType	GroupId	ShowAfterGroup	GroupTheme	ShowType	ShowCondition	Tag
+999999	0	6	10000	Daily Login	Daily 1st Login	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			999999		1	0	990015	0			Login	0	0	0	0	0	0	0	0
+990000	0	10001	10000	Sandbox Mode_Jumping Challenge_Complete 1 Jumping Challenge Stage	Clear 1 Space Leap stage for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990000		1	0	7000092	0				0	0	0	0	0	0	0	0
+990001	0	10001	9900	Sandbox Mode_Jumping Challenge_Complete 2 Jumping Challenge Stages	Clear 2 Space Leap stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990001		2	0	7000093	0				0	0	0	0	0	0	0	0
+990002	0	10001	9800	Sandbox Mode_Jumping Challenge_Complete 3 Jumping Challenge Stages	Clear 3 Space Leap stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990002		3	0	7000094	0				0	0	0	0	0	0	0	0
+990003	0	10001	9700	Sandbox Mode_Jumping Challenge_Complete 4 Jumping Challenge Stages	Clear 4 Space Leap stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990003		4	0	7000095	0				0	0	0	0	0	0	0	0
+990004	0	10001	9600	Sandbox Mode_Jumping Challenge_Complete 5 Jumping Challenge Stages	Clear 5 Space Leap stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990004		5	0	7000096	0				0	0	0	0	0	0	0	0
+990005	0	10001	9500	Sandbox Mode_Jumping Challenge_Complete 6 Jumping Challenge Stages	Clear 6 Space Leap stages for the first time	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990005		6	0	7000097	0				0	0	0	0	0	0	0	0
+990006	0	10001	9400	Sandbox Mode_Jumping Challenge_Complete All Jumping Challenge Stages	Clear all Space Leap stages with 3 stars	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990006		6	0	7000098	0				0	0	0	0	0	0	0	0
+990007	0	10001	9300	Sandbox Mode_Chest_Open 5 Chests	Open 5 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990007		5	0	7000099	0				0	0	0	0	0	0	0	0
+990008	0	10001	9200	Sandbox Mode_Chest_Open 10 Chests	Open 10 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990008		10	0	7000100	0				0	0	0	0	0	0	0	0
+990009	0	10001	9100	Sandbox Mode_Chest_Open 15 Chests	Open 15 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990009		15	0	7000101	0				0	0	0	0	0	0	0	0
+990010	0	10001	9000	Sandbox Mode_Chest_Open All Chests	Open all Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990010		19	0	7000102	0				0	0	0	0	0	0	0	0
+990011	0	10001	8900	Cafe_Unlock	Advance Chronicles Mission "Caffeine Conundrum" to the corresponding node	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990011		1	0	7000103	0				0	0	0	0	0	0	0	0
+990012	0	10001	8800	Cafe_Story Stage 1	Complete Kuroro Coffee - Business Record 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990012		1	0	7000104	0				0	0	0	0	0	0	0	0
+990013	0	10001	8700	Cafe_Story Stage 2	Complete Kuroro Coffee - Business Record 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990013		1	0	7000105	0				0	0	0	0	0	0	0	0
+990014	0	10001	8600	Cafe_Story Stage 3	Complete Kuroro Coffee - Business Record 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990014		1	0	7000106	0				0	0	0	0	0	0	0	0
+990015	0	10001	8500	Cafe_Story Stage 4	Complete Kuroro Coffee - Business Record 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990015		1	0	7000107	0				0	0	0	0	0	0	0	0
+990016	0	10001	8400	Cafe_Story Stage 5	Complete Kuroro Coffee - Business Record 5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990016		1	0	7000108	0				0	0	0	0	0	0	0	0
+990017	0	10001	8300	Cafe_Story Stage 6	Complete Kuroro Coffee - Business Record 6	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990017		1	0	7000109	0				0	0	0	0	0	0	0	0
+990018	0	10001	8200	Cafe_Challenge Stage 1	Complete Kuroro Coffee - Signature Mix 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990018		1	0	7000110	0				0	0	0	0	0	0	0	0
+990019	0	10001	8100	Cafe_Challenge Stage 2	Complete Kuroro Coffee - Signature Mix 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990019		1	0	7000111	0				0	0	0	0	0	0	0	0
+990020	0	10001	8000	Cafe_Challenge Stage 3	Complete Kuroro Coffee - Signature Mix 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990020		1	0	7000112	0				0	0	0	0	0	0	0	0
+990021	0	10001	7900	Cafe_Challenge Stage 4	Complete Kuroro Coffee - Signature Mix 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990021		1	0	7000113	0				0	0	0	0	0	0	0	0
+990022	0	10001	7800	Cafe_Challenge Stage 5	Complete Kuroro Coffee - Signature Mix 5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990022		1	0	7000114	0				0	0	0	0	0	0	0	0
+990023	0	10001	7700	Cafe_Challenge Stage 6	Complete Kuroro Coffee - Signature Mix 6	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990023		1	0	7000115	0				0	0	0	0	0	0	0	0
+990024	0	10001	7600	Cafe_Challenge Stage 7	Complete Kuroro Coffee - Signature Mix 7	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990024		1	0	7000116	0				0	0	0	0	0	0	0	0
+990025	0	10001	7500	Cafe_Challenge Stage 8	Complete Kuroro Coffee - Signature Mix 8	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990025		1	0	7000117	0				0	0	0	0	0	0	0	0
+990026	0	10001	7400	Cafe_Challenge Stage 9	Complete Kuroro Coffee - Signature Mix 9	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990026		1	0	7000118	0				0	0	0	0	0	0	0	0
+990027	0	10001	7300	Cafe_Challenge Stage 10	Complete Kuroro Coffee - Signature Mix 10	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990027		1	0	7000119	0				0	0	0	0	0	0	0	0
+990028	0	10001	7200	Cafe_Complete All Stages	Clear all Kuroro Coffee stages with 3 stars	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990028		16	0	7000120	0				0	0	0	0	0	0	0	0
+990029	0	10001	7100	Commercial District_Unlock	Advance Chronicles Mission "Commercial Square Development Plan" to the corresponding node	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990029		1	0	7000121	0				0	0	0	0	0	0	0	0
+990030	0	10001	7000	Commercial District_Story Stage 1	Complete Business Development Plan - Round 1 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990030		1	0	7000122	0				0	0	0	0	0	0	0	0
+990031	0	10001	6900	Commercial District_Story Stage 2	Complete Business Development Plan - Round 2 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990031		1	0	7000123	0				0	0	0	0	0	0	0	0
+990032	0	10001	6800	Commercial District_Story Stage 3	Complete Business Development Plan - Round 3 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990032		1	0	7000124	0				0	0	0	0	0	0	0	0
+990033	0	10001	6700	Commercial District_Story Stage 4	Complete Business Development Plan - Round 4 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990033		1	0	7000125	0				0	0	0	0	0	0	0	0
+990034	0	10001	6600	Commercial District_Story Stage 5	Complete Business Development Plan - Round 5 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990034		1	0	7000126	0				0	0	0	0	0	0	0	0
+990035	0	10001	6500	Commercial District_Story Stage 6	Complete Business Development Plan - Round 6 Construction	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990035		1	0	7000127	0				0	0	0	0	0	0	0	0
+990036	0	10001	6400	Commercial District_Complete All Stages	Clear all Business Development Plan stages with 3 stars	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990036		6	0	7000128	0				0	0	0	0	0	0	0	0
+990037	0	10001	6300	Lucia Affection Story_Unlock Commandant Dormitory	Advance Pilotage mission [Leisure Time Invitation] to the corresponding node	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990037		1	0	7000129	0				0	0	0	0	0	0	0	0
+990038	0	10001	6200	Lucia Affection Story_Obtain Photo 1	Obtain Record Moment 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990038		1	0	7000130	0				0	0	0	0	0	0	0	0
+990039	0	10001	6100	Lucia Affection Story_Obtain Photo 2	Obtain Record Moment 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990039		1	0	7000131	0				0	0	0	0	0	0	0	0
+990040	0	10001	6000	Lucia Affection Story_Obtain Photo 3	Obtain Record Moment 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990040		1	0	7000132	0				0	0	0	0	0	0	0	0
+990041	0	10001	5900	Lucia Affection Story_Obtain Photo 4	Obtain Record Moment 4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990041		1	0	7000133	0				0	0	0	0	0	0	0	0
+990042	0	10001	5800	Lucia Affection Story_Obtain Photo 5	Obtain Record Moment 5	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990042		1	0	7000134	0				0	0	0	0	0	0	0	0
+990043	0	10001	5700	Lucia Affection Story_Obtain Decoration 1	Obtain Time for Decoration 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990043		1	0	7000135	0				0	0	0	0	0	0	0	0
+990044	0	10001	5600	Lucia Affection Story_Obtain Decoration 2	Obtain Time for Decoration 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990044		1	0	7000136	0				0	0	0	0	0	0	0	0
+990045	0	10001	5500	Lucia Affection Story_Obtain Armband	Obtain Commandant Armband	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990045		1	0	7000137	0				0	0	0	0	0	0	0	0
+990046	0	10001	5400	Lucia Affection Story_Complete All Stories	"Complete Whispers of Love mission "Beyond Time's Shore"	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990046		1	0	7000138	0				0	0	0	0	0	0	0	0
+990047	0	10001	5300	Commercial District_Complete Commercial District Side Story A	Complete Rumor Mission "A Tap on the Heart"	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990047		1	0	7000147	0				0	0	0	0	0	0	0	0
+990048	0	10001	5200	Commercial District_Complete Commercial District Side Story B	Complete Rumor Mission "Mechanoid Carnival"	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990048		1	0	7000148	0				0	0	0	0	0	0	0	0
+990049	0	10001	5100	Commercial District_Complete All Babylonia Missions	Complete all Commercial District Operation Guide missions	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990049		7	0	7000156	0				0	0	0	0	0	0	0	0
+990050	0	10001	10000	Unlock Drone	Advance Chronicles Mission [Wishes Adrift in the Starry Sea] to the corresponding node	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990050		1	0	7000171	0				0	0	0	0	0	0	0	0
+990051	0	10001	9900	Drone 1-1	Clear Space Voyage AR001-1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990051		1	0	7000172	0				0	0	0	0	0	0	0	0
+990052	0	10001	9800	Drone 1-2	Clear Space Voyage AR001-2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990052		1	0	7000173	0				0	0	0	0	0	0	0	0
+990053	0	10001	9700	Drone 1-3	Clear Space Voyage AR001-3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990053		1	0	7000174	0				0	0	0	0	0	0	0	0
+990054	0	10001	9600	Drone 1-4	Clear Space Voyage AR001-4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990054		1	0	7000175	0				0	0	0	0	0	0	0	0
+990055	0	10001	9500	Drone 2-1	Clear Space Voyage AR002-1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990055		1	0	7000176	0				0	0	0	0	0	0	0	0
+990056	0	10001	9400	Drone 2-2	Clear Space Voyage AR002-2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990056		1	0	7000177	0				0	0	0	0	0	0	0	0
+990057	0	10001	9300	Drone 2-3	Clear Space Voyage AR002-3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990057		1	0	7000178	0				0	0	0	0	0	0	0	0
+990058	0	10001	9200	Drone 2-4	Clear Space Voyage AR002-4	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990058		1	0	7000179	0				0	0	0	0	0	0	0	0
+990059	0	10001	9100	Drone 3-1	Clear Space Voyage AR003-1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990059		1	0	7000180	0				0	0	0	0	0	0	0	0
+990060	0	10001	9000	Drone 3-2	Clear Space Voyage AR003-2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990060		1	0	7000181	0				0	0	0	0	0	0	0	0
+990061	0	10001	8900	Drone 3-3	Clear Space Voyage AR003-3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990061		1	0	7000182	0				0	0	0	0	0	0	0	0
+990062	0	10001	8800	Drone 4-1	Clear Space Voyage AR004-1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990062		1	0	7000183	0				0	0	0	0	0	0	0	0
+990063	0	10001	8700	Drone 4-2	Clear Space Voyage AR004-2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990063		1	0	7000184	0				0	0	0	0	0	0	0	0
+990064	0	10001	8600	Drone 4-3	Clear Space Voyage AR004-3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990064		1	0	7000185	0				0	0	0	0	0	0	0	0
+990065	0	10001	8500	Complete All Drone Levels with 3 Stars	Clear all Space Voyage stages with 3 stars	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990065		14	0	7000186	0				0	0	0	0	0	0	0	0
+990066	0	10001	8400	Achieve 1 Ending	Achieve 1 ending of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990066		1	0	7000187	0				0	0	0	0	0	0	0	0
+990067	0	10001	8300	Achieve 2 Endings	Achieve 2 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990067		2	0	7000188	0				0	0	0	0	0	0	0	0
+990068	0	10001	8200	Achieve 3 Endings	Achieve 3 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990068		3	0	7000189	0				0	0	0	0	0	0	0	0
+990069	0	10001	8100	Achieve 4 Endings	Achieve 4 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990069		4	0	7000190	0				0	0	0	0	0	0	0	0
+990070	0	10001	8000	Unlock Journey System v1.5	Complete Pilotage mission [Toward Undiscovered Beauty]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990070		1	0	7000191	0				0	0	0	0	0	0	0	0
+990071	0	10001	7900	Complete Photography Story 1	Complete Chronicles Mission [Bewilderment of a Nascent Will] 1	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990071		1	0	7000192	0				0	0	0	0	0	0	0	0
+990072	0	10001	7800	Complete Photography Story 2	Complete Chronicles Mission [Bewilderment of a Nascent Will] 2	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990072		1	0	7000193	0				0	0	0	0	0	0	0	0
+990073	0	10001	7700	Complete Photography Story 3	Complete Chronicles Mission [Bewilderment of a Nascent Will] 3	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990073		1	0	7000194	0				0	0	0	0	0	0	0	0
+990074	0	10001	7600	4 Treasure Chests	Open 4 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990074		4	0	7000195	0				0	0	0	0	0	0	0	0
+990075	0	10001	7500	8 Treasure Chests	Open 8 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990075		8	0	7000196	0				0	0	0	0	0	0	0	0
+990076	0	10001	7400	All Treasure Chests	Open all Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990076		10	0	7000197	0				0	0	0	0	0	0	0	0
+990077	0	10001	7300	Trigger All Actions for Character 1	Complete one encounter with Lucia	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990077		1	0	7000198	0				0	0	0	0	0	0	0	0
+990078	0	10001	7200	Trigger All Actions for Character 2	Complete one encounter with Teddy	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990078		1	0	7000199	0				0	0	0	0	0	0	0	0
+990079	0	10001	7100	Trigger All Actions for Character 3	Complete one encounter with Vera	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990079		1	0	7000200	0				0	0	0	0	0	0	0	0
+990080	0	10001	7000	Trigger All Actions for Character 4	Complete one encounter with Bianca	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990080		1	0	7000201	0				0	0	0	0	0	0	0	0
+990081	0	10001	6900	Trigger All Actions for Character 5	Complete one encounter with Rosetta	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990081		1	0	7000202	0				0	0	0	0	0	0	0	0
+990082	0	10001	6800	Trigger All Actions for Character 6	Complete one encounter with Wanshi	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990082		1	0	7000203	0				0	0	0	0	0	0	0	0
+990083	0	10001	6700	Trigger All Actions for Character 7	Complete one encounter with Lee	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990083		1	0	7000204	0				0	0	0	0	0	0	0	0
+990084	0	10001	6600	Trigger All Actions for Character 8	Complete one encounter with Asimov	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990084		1	0	7000205	0				0	0	0	0	0	0	0	0
+990099	0	11	6600	【对玩家不可见】【空花内】完成Quest7003，领取指挥官涂装	【对玩家不可见】【空花内】完成Quest7003，领取指挥官涂装	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990099		1	0	7000235	0				0	0	0	0	0	0	0	0
+990101	0	10001	10000	Unlock Journey System v2.0	Advance Pilotage Mission [Homecoming and A New Journey] to the corresponding node	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990101		1	0	7000247	0				0	0	0	0	0	0	0	0
+990102	0	10001	9900	1 Treasure Chest	Open 1 Supply Crate	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990102		1	0	7000248	0				0	0	0	0	0	0	0	0
+990103	0	10001	9800	2 Treasure Chests	Open 2 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990103		2	0	7000249	0				0	0	0	0	0	0	0	0
+990104	0	10001	9700	4 Treasure Chests	Open 4 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990104		4	0	7000250	0				0	0	0	0	0	0	0	0
+990105	0	10001	9600	8 Treasure Chests	Open 8 Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990105		8	0	7000251	0				0	0	0	0	0	0	0	0
+990106	0	10001	9500	All Treasure Chests	Open all Supply Crates	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990106		10	0	7000252	0				0	0	0	0	0	0	0	0
+990107	0	10001	9400	Achieve 1 Ending	Achieve 1 ending of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990107		1	0	7000253	0				0	0	0	0	0	0	0	0
+990108	0	10001	9300	Achieve 2 Endings	Achieve 2 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990108		2	0	7000254	0				0	0	0	0	0	0	0	0
+990109	0	10001	9200	Achieve 4 Endings	Achieve 4 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990109		4	0	7000255	0				0	0	0	0	0	0	0	0
+990110	0	10001	9100	Achieve 6 Endings	Achieve 6 endings of Invitation Mission	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990110		6	0	7000256	0				0	0	0	0	0	0	0	0
+990111	0	10001	9000	Decipher Side Story	Complete Rumor Mission [Undeciphered Code]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990111		1	0	7000257	0				0	0	0	0	0	0	0	0
+990112	0	10001	8900	Practice Side Story	Complete Rumor Mission [Post-Grad Sparring]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990112		1	0	7000258	0				0	0	0	0	0	0	0	0
+990113	0	10001	8800	F.O.S. Interface Guide Side Story	Complete Rumor Mission [Spear of Safety]	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990113		1	0	7000259	0				0	0	0	0	0	0	0	0
+990114	0	10001	8700	Trigger All Actions for Character 1	Complete one encounter with Liv	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990114		1	0	7000260	0				0	0	0	0	0	0	0	0
+990115	0	10001	8600	Trigger All Actions for Character 2	Complete one encounter with Chrome	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990115		1	0	7000261	0				0	0	0	0	0	0	0	0
+990116	0	10001	8500	Trigger All Actions for Character 3	Complete one encounter with Kamui	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990116		1	0	7000262	0				0	0	0	0	0	0	0	0
+990117	0	10001	8400	Trigger All Actions for Character 4	Complete one encounter with Vanessa	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990117		1	0	7000263	0				0	0	0	0	0	0	0	0
+990118	0	10001	8300	Trigger All Actions for Character 5	Complete one encounter with Nirvatia	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990118		1	0	7000264	0				0	0	0	0	0	0	0	0
+990119	0	10001	8200	Trigger All Actions for Character 6	Complete one encounter with Alpha	Assets/Product/Texture/Image/IconTask/TaskIconCommon.png	0			990119		1	0	7000265	0				0	0	0	0	0	0	0	0

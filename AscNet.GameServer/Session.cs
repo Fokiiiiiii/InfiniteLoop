@@ -23,12 +23,20 @@ namespace AscNet.GameServer
         public Stage stage = default!;
         public Fight? fight;
         public int? OpenedGuideGroupId;
+        // Regional build identity from HandshakeRequest; null until the client handshakes.
+        public string? ClientDocumentVersion;
+        public string? ClientApplicationVersion;
         public BossSinglePendingScore? PendingBossSingleScore;
+        public HashSet<int> PendingBossSingleRolloverStageIds { get; } = [];
         public Inventory inventory = default!;
         public int? PendingEnterWorldChatRequestId;
         public int? PendingGetWorldChannelInfoRequestId;
+        // BigWorld: set by DlcWorldSaveData in online engine mode, drained by LoadCompleteRequest.
         public bool PendingBigWorldLoadCompleteXRpc;
         public bool PendingBigWorldStartFightNotify;
+        // BigWorld world the session is inside (0 = not in BigWorld) and when its fight snapshot was built.
+        public int BigWorldWorldId;
+        public DateTime BigWorldFightStartedAt;
         public readonly Dictionary<(uint EquipId, int Slot), ResonanceInfo> PendingEquipResonances = new();
         public int? AppliedTeamPrefabId;
         public readonly Dictionary<uint, (uint FashionId, int WeaponFashionId)> RandomFashionRolls = new();
@@ -123,7 +131,9 @@ namespace AscNet.GameServer
                         && tundraPending.ResponseName is not (nameof(Handlers.FinishTaskResponse) or nameof(Handlers.FinishMultiTaskResponse))
                         && !Handlers.Theatre4Module.CanDispatchPendingRequest(this, request))
                     || (currentPlayer.Theatre6.PendingMutation is not null
-                        && !Handlers.Theatre6Module.CanDispatchPendingRequest(this, request))))
+                        && !Handlers.Theatre6Module.CanDispatchPendingRequest(this, request))
+                    || (currentPlayer.PendingPartnerDecompose is not null
+                        && request.Name is not ("PartnerDecomposeRequest" or "ReconnectRequest"))))
             {
                 string responseName = request.Name.EndsWith("Request", StringComparison.Ordinal)
                     ? request.Name[..^7] + "Response" : request.Name + "Response";
@@ -321,11 +331,12 @@ namespace AscNet.GameServer
                                         }
                                         string requestName = request.Name ?? "<unknown>";
                                         lastProtocolPoint = $"request:{requestName}";
+                                        ProbeBigWorldPacket("in", requestName, request.Content ?? [], request.Id, 0);
                                         RequestPacketHandlerDelegate? requestPacketHandler = PacketFactory.GetRequestPacketHandler(requestName);
                                         if (requestPacketHandler is not null)
                                         {
                                             // TODO: with new logger this will be unnecessary
-                                            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+                                            if (ShouldLogPacket(requestName))
                                                 log.Info($"Request received: nameLength={request.Name?.Length ?? 0}, contentBytes={request.Content?.Length ?? 0}, id={request.Id}");
                                             try
                                             {
@@ -695,9 +706,12 @@ namespace AscNet.GameServer
         private static bool ShouldDumpBigWorldPacket(string name)
         {
             return name.Contains("BigWorld", StringComparison.Ordinal)
-                || name.StartsWith("DlcWorld", StringComparison.Ordinal)
+                || name.StartsWith("Dlc", StringComparison.Ordinal)
+                || name.StartsWith("NotifyDlc", StringComparison.Ordinal)
+                || name.StartsWith("NotifySg", StringComparison.Ordinal)
+                || name.StartsWith("LeaveInstLevel", StringComparison.Ordinal)
                 || name.StartsWith("XRpc", StringComparison.Ordinal)
-                || name is "NotifySgDormData"
+                || name is "NotifyTask"
                     or "StartFightNotify"
                     or "LoadCompleteRequest"
                     or "LoadCompleteResponse"
@@ -746,7 +760,7 @@ namespace AscNet.GameServer
                 Type = Packet.ContentType.Response,
                 Content = MessagePackSerializer.Serialize(packet)
             });
-            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+            if (ShouldLogPacket(packet.Name))
                 log.Info($"{packet.Name}{(Common.Common.config.VerboseLevel >= VerboseLevel.Debug ? (", " + JsonConvert.SerializeObject(response)) : "")}");
         }
 
@@ -766,9 +780,16 @@ namespace AscNet.GameServer
                 Type = Packet.ContentType.Response,
                 Content = MessagePackSerializer.Serialize(packet)
             });
-            if (Common.Common.config.VerboseLevel > VerboseLevel.Silent)
+            if (ShouldLogPacket(name))
                 log.Info($"{name}{(Common.Common.config.VerboseLevel >= VerboseLevel.Debug ? (", " + FormatMessagePackContent(responseContent)) : "")}");
         }
+
+        // Heartbeats (lobby, fight, guild dorm) arrive every few seconds for the whole session; they are only
+        // logged at SuperDebug so they don't bury the useful lines.
+        private static bool ShouldLogPacket(string? name) =>
+            Common.Common.config.VerboseLevel > VerboseLevel.Silent
+            && (Common.Common.config.VerboseLevel >= VerboseLevel.SuperDebug
+                || name is null || !name.Contains("Heartbeat", StringComparison.Ordinal));
 
         private void Send(Packet packet)
         {

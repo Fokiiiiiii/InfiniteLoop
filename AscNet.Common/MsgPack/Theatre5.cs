@@ -1028,7 +1028,7 @@ public sealed class Theatre5WorldNpcData
     public Dictionary<int, int> MagicId2Level { get; set; } = [];
     public Theatre5DlcChipData? SelfAssistChipData { get; set; }
     public Theatre5WorldNpcPartData? PartData { get; set; }
-    public byte[] AttribsData { get; set; } = [];
+    public byte[]? AttribsData { get; set; } = [];
 }
 
 // Native XDlcCharacterData.
@@ -1165,12 +1165,16 @@ public sealed class Theatre5NpcSaveData
     public Theatre5NpcDirectlyFollowModeSaveData? DirectlyFollowModeSaveData { get; set; }
     public Theatre5NpcGuideMoveSaveData? GuideMoveSaveData { get; set; }
     public Theatre5NpcNodeLockFollowModeSaveData? NodeLockFollowModeSaveData { get; set; }
+    public Theatre5NpcTetherFollowModeSaveData? TetherFollowModeSaveData { get; set; }
 }
 
 // Native XNpcRelativeFollowModeSaveData.
 [MessagePackObject(true)]
 public sealed class Theatre5NpcRelativeFollowModeSaveData
 {
+    // XNpcFollowSaveData base (dump.cs D:70735).
+    public bool? IsForceTeleportEnabled { get; set; }
+    public float ForceTeleportRange { get; set; }
     public bool? IsFollowPlayer { get; set; }
     public int FollowTargetNpcPlaceId { get; set; }
     public float TargetAngle { get; set; }
@@ -1222,6 +1226,23 @@ public sealed class Theatre5NpcNodeLockFollowModeSaveData
     public Theatre5DlcVector3? PosOffset { get; set; }
 }
 
+// Native XNpcTetherFollowModeSaveData (dump48 D:72807). FollowerNpcCharacterData/PartData are only set by the retail follower swap; not modelled.
+[MessagePackObject(true)]
+public sealed class Theatre5NpcTetherFollowModeSaveData
+{
+    public bool? IsForceTeleportEnabled { get; set; }
+    public float ForceTeleportRange { get; set; }
+    public bool? IsPlayerBecomeFollower { get; set; }
+    public bool? IsFollowPlayer { get; set; }
+    public int FollowTargetNpcPlaceId { get; set; }
+    public float LeadExpRotRadius { get; set; }
+    public float ExpReachTime { get; set; }
+    public Theatre5DlcVector3? TargetPosOffset { get; set; }
+    public float NpcAnimAlignRadius { get; set; }
+    public float ChaseRadius { get; set; }
+    public int HandType { get; set; }
+}
+
 // Native DlcQuestInfo.
 [MessagePackObject(true)]
 public sealed class Theatre5DlcQuestInfo
@@ -1259,6 +1280,11 @@ public sealed class Theatre5DlcQuestDynamicData
     public Theatre5DlcVarBlockData? VarBlockData { get; set; }
     [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
     public Dictionary<int, int> FuncEntryDisableDict { get; set; } = [];
+    // Server-owned, BSON only: ESystemFunctionType entries this quest's SetSystemFuncEntryEnableBatch last enabled. The client
+    // never reads these quest dicts back (its XSystemFuncManager counters are per fight); the server replays FuncEntryDisableDict
+    // with RpcRecoverSystemFuncEntryEnableBatchRequest and these enables with RpcSetSystemFuncEntryEnableBatchRequest, only in
+    // the quest's level.
+    [IgnoreMember] public List<int> FuncEntryEnabled { get; set; } = [];
     public List<Theatre5DlcSystemFunctionControlSave> SystemFuncControlSaveData { get; set; } = [];
 }
 
@@ -1289,6 +1315,11 @@ public sealed class Theatre5DlcQuestStepObjective
     public List<int> NarrativeCompletedRecords { get; set; } = [];
     public List<int> SceneObjectCollectedRecords { get; set; } = [];
     public int SceneObjectCollectedCountRecord { get; set; }
+    // Server-owned run state, persisted in BSON only (never on the wire): level play timer of OnLevelTimeOut (10)
+    // and the level NPC place ids KillEnemy (16) counted dead.
+    [IgnoreMember] public bool TimerStarted { get; set; }
+    [IgnoreMember] public int TimerElapsedMs { get; set; }
+    [IgnoreMember] public List<int> KilledEnemies { get; set; } = [];
 }
 
 // Native DlcLevelActionListData.

@@ -13,6 +13,7 @@ internal static partial class Program
 {
     internal static void RunAudioPlayerUpgradeCompatibility()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         MethodInfo buildNotify = RequiredMethod(
             RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
             "BuildNotifyLogin", BindingFlags.NonPublic | BindingFlags.Static, [typeof(Session)]);

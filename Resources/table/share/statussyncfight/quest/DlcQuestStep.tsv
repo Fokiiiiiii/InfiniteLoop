@@ -1,0 +1,200 @@
+Id	QuestId	LevelId	PreStep[1]	PreStep[2]	PreLevelConditionGroup	IsEndStep	StepTextId	LocationTextId	ExecMode	IsFixedSaveBegin	IsFixedSaveEnd	NeedCompleteCount	OccupiableObjectIds[1]	OccupiableObjectIds[2]	StatisticModule	Config
+30201	3020	6001				0	4	5	1	0	0	0				
+30202	3020	6001	30201			0	8	9	1	0	0	0				
+30203	3020	6002	30202			0	12	13	1	0	0	0				
+30204	3020	6001	30203			1	16	17	1	0	0	1				
+100101	1001	4003				0	4	5	1	0	0	0				
+100102	1001	4001	100101			0	24	25	2	0	0	1				
+100103	1001	4001	100102			0	32	33	1	0	0	0				
+100104	1001	4001	100103			0	86	87	2	0	0	1				
+100105	1001	4003	100104			0	94	95	1	0	0	0				
+100106	1001	4003	100105			0	110	111	2	0	0	3				
+100107	1001	4003	100106			0	118	119	1	0	0	0				
+100108	1001	4001	100107			0	122	123	2	0	0	1				
+100109	1001	4001	100108			0	130	131	1	0	0	0				
+100110	1001	4001	100109			0	158	159	2	0	0	1				
+100111	1001	4001	100110			0	166	167	1	0	0	0				
+100112	1001	4003	100111			0	208	209	2	0	0	1				
+100113	1001	4001	100112			0	216	217	1	0	0	0				
+100114	1001	4003	100113			0	262	263	2	0	0	3				
+100115	1001	4003	100114			1	270	271	1	0	0	0				
+100201	1002	4001				0	4	5	1	0	0	0				
+100202	1002	4001	100201			0	10	11	1	0	0	0				
+100203	1002	4001	100202			0	14	15	1	0	0	0				
+100204	1002	4001	100203			0	18	19	1	0	0	0				
+100205	1002	4001	100204			1	22	23	1	0	0	0				
+200101	2001	4001				1	4	5	1	0	0	0				
+200201	2002	0				0	4	5	1	0	0	0				
+200202	2002	0	200201			1	60	61	1	0	0	0				
+200301	2003	0				1	4	5	1	0	0	0				
+200401	2004	4001				1	4	5	1	0	0	0				
+200501	2005	4001				1	4	5	1	0	0	0				
+200600	2006	6001				1	4	5	1	0	0	0				
+200701	2007	5001				0	4	5	1	0	0	0	103			
+200702	2007	5001	200701			1	10	11	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"2007","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":1}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":1}],"LogicOp":0}}
+200703	2007	5001	200701			1	14	15	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"2007","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":2}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+200901	2009	5001				0	4	5	1	0	0	0				
+200902	2009	5001				1	10	11	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"2009","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":5}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+200903	2009	5001				1	14	15	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"2009","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":6}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+201100	2011	5001				0	4	5	2	0	0	1				
+201101	2011	5001	201100			0	10	11	1	0	0	0				
+201102	2011	5001	201101			0	24	25	2	0	0	3				
+201103	2011	5001	201102			1	34	35	1	0	0	0				
+201200	2012	5001				0	4	5	2	0	0	1				
+201201	2012	5001	201200			1	10	11	1	0	0	1				{"StatisticModule":{"Items":[]}}
+201301	2013	5001				0	4	5	1	0	0	0				
+201302	2013	5001	201301			0	29	30	2	0	0	3				
+201303	2013	5001	201302			0	39	40	1	0	0	0				
+201304	2013	5001	201303			0	51	52	2	0	0	3				
+201305	2013	5001	201304			1	61	62	1	0	0	0				
+201401	2014	5001				0	4	5	1	0	0	0	110			
+201402	2014	5001	201401			0	14	15	2	0	0	1	110			
+201403	2014	5001	201402			0	20	21	2	0	0	1	110			{"StatisticModule":{"Items":[]}}
+201405	2014	5001	201403			1	26	27	1	0	0	0	110			
+201501	2015	6001				1	4	5	1	0	0	0				
+201601	2016	6001				1	4	5	1	0	0	0				
+201801	2018	6002				1	4	5	1	0	0	0				
+300401	3004	0				1	4	5	1	0	0	0				
+300501	3005	0				1	4	5	1	0	0	0				
+300601	3006	5001				1	4	5	2	0	0	3				
+300611	30061	5001				1	4	5	2	0	0	1				
+300701	3007	5001				1	4	5	2	0	0	3				
+300711	30071	5001				1	4	5	2	0	0	1				
+300801	3008	5001				1	4	5	2	0	0	3				
+300811	30081	5001				1	4	5	2	0	0	1				
+300901	3009	5001				1	4	5	2	0	0	3				
+300911	30091	5001				1	4	5	2	0	0	1				
+301001	3010	5001				1	4	5	2	0	0	3				
+301011	30101	5001				1	4	5	2	0	0	1				
+301101	3011	5001				1	4	5	2	0	0	3				
+301111	30111	5001				1	4	5	2	0	0	1				
+301201	3012	5001				1	4	5	2	0	0	3				
+301211	30121	5001				1	4	5	2	0	0	1				
+301301	3013	5001				1	4	5	2	0	0	3				
+301311	30131	5001				1	4	5	2	0	0	1				
+301401	3014	6001				1	4	5	2	0	0	4				
+301501	3015	6001				1	4	5	2	0	0	5				
+301601	3016	6001				1	4	5	2	0	0	6				
+301701	3017	6001				1	4	5	2	0	0	4				
+301801	3018	6001				1	4	5	2	0	0	4				
+301901	3019	6001				1	4	5	2	0	0	1				
+302501	3025	6001				0	4	5	1	0	0	0				
+302502	3025	6001	302501			0	8	9	2	0	0	1				
+302503	3025	6001	302502			0	12	13	1	0	0	0				
+302504	3025	6001	302503			0	20	21	2	0	0	1				
+302505	3025	6001	302504			0	28	29	1	0	0	0				
+302506	3025	6001	302505			0	32	33	2	0	0	1				
+302507	3025	6001	302506			0	40	41	1	0	0	0				
+302508	3025	6001	302507			0	52	53	1	0	0	1				
+302511	3025	6001	302508			1	56	57	1	0	0	0				
+302701	3027	6001				0	4	5	1	0	0	0				
+302702	3027	6001	302701			0	16	17	2	0	0	1				
+302703	3027	6001	302702			1	22	23	1	0	0	0				
+401201	4012	4012				0	4	5	1	0	0	1				
+401202	4012	4012	401201			0	28	29	2	0	0	3				
+401203	4012	4012	401205			0	40	41	2	0	0	3				
+401204	4012	4012	401203			0	48	49	1	0	0	0				
+401205	4012	4012	401202			0	36	37	1	0	0	0				
+401301	4013	0				1	4	5	1	0	0	1				
+402100	4021	4021				0	4	5	1	1	1	0				
+402101	4021	4021	402100			1	16	17	1	0	0	0				{"StatisticModule":{"Items":[]}}
+402200	4022	4022				0	4	5	1	0	0	0				
+402201	4022	4022	402200			1	16	17	1	0	0	0				
+402301	4023	4023				1	4	5	1	0	0	1				
+402401	4024	4024				1	4	5	1	0	0	1				
+402601	4026	4026				0	4	5	1	0	0	0				
+402602	4026	4026	402601			0	12	13	2	0	0	3				
+402603	4026	4026	402602			1	20	21	1	0	0	0				
+402701	4027	4027				0	4	5	1	0	0	0				
+402702	4027	4027	402701			0	8	9	2	0	0	3				
+402703	4027	4027	402702			1	16	17	1	0	0	0				
+402801	4028	4028				1	4	5	1	0	0	1				
+402901	4029	4029				1	4	5	1	0	0	0				
+403001	4030	4030				1	4	5	1	0	0	0				
+403101	4031	4031				0	4	5	1	0	0	0				
+403102	4031	4031	403101			0	10	11	2	0	0	3				
+403103	4031	4031	403102			1	18	19	1	0	0	0				
+403201	4032	4032				0	4	5	1	0	0	0				
+403202	4032	4032	403201			0	10	11	2	0	0	1				
+403203	4032	4032	403204			1	26	27	1	0	0	0				
+403204	4032	4032	403202			0	20	21	2	0	0	1				
+403301	4033	4033				0	4	5	1	0	0	0				
+403302	4033	4033	403301			0	8	9	2	0	0	1				
+403303	4033	4033	403302			0	12	13	2	0	0	1				
+403304	4033	4033	403303			0	16	17	2	0	0	1				
+403305	4033	4033	403304			1	20	21	1	0	0	0				
+403401	4034	4034				0	4	5	1	0	0	0				
+403501	4035	4035				0	4	5	1	0	0	0				
+403601	4036	1				0	4	5	1	0	0	0				
+403701	4037	4037				1	4	5	1	0	0	0				
+403801	4038	4038				0	4	5	1	0	0	0				
+403806	4038	4038	403801			0	12	13	2	0	0	1				
+403807	4038	4038				1	18	19	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"4038","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":5}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+403808	4038	4038				1	22	23	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"4038","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":6}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+403901	4039	4039				0	4	5	1	0	0	0				
+403902	4039	4039				1	10	11	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":1}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+403903	4039	4039				1	14	15	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":2}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+404001	4040	4040				0	4	5	1	0	0	0				
+404002	4040	4040				0	14	15	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0,"QuestId":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":1},"QuestId":0},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+404003	4040	4040				0	22	23	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0,"QuestId":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":2},"QuestId":0},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+404004	4040	4040				0	30	31	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision2","IntKey":0,"QuestId":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":1},"QuestId":0},"CompareType":0},"InvertResult":false,"TipDescId":null},{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision2","IntKey":0,"QuestId":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":2},"QuestId":0},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":1}],"LogicOp":0}}
+404005	4040	4040	404004			0	46	47	1	0	0	1				
+404006	4040	4040	404005			1	50	51	1	0	0	1				
+404101	4041	4041				1	4	5	1	0	0	0				
+404201	4042	4042				1	4	5	1	0	0	0				
+404301	4043	4043				0	4	5	1	0	0	0				
+404302	4043	4043	404301			0	8	9	2	0	0	1				
+404303	4043	4043	404302			0	18	19	1	0	0	0				
+404304	4043	4043	404303			0	26	27	2	0	0	1				
+404305	4043	4043	404304			0	34	35	1	0	0	0				
+404306	4043	4043	404305			1	54	55	2	0	0	2				
+404401	4044	4044				1	4	5	1	0	0	0				
+500101	5001	4008				0	4	5	1	0	0	0				
+500102	5001	4008	500101			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50010201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50010202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50010203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":300026,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}}]}}
+500103	5001	4008	500101			0	16	17	2	0	0	1				
+500104	5001	4008	500103			1	24	25	2	0	0	1				
+500201	5002	4009				0	4	5	1	0	0	0				
+500202	5002	4009	500201			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50020201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50020202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50020203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":400004,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}}]}}
+500203	5002	4009	500201			0	16	17	2	0	0	1				
+500204	5002	4009	500203			1	26	27	2	0	0	1				
+500301	5003	4010				0	4	5	1	0	0	0				
+500302	5003	4010	500301			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50030201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50030202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50030203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":500090,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":500053,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"TriggerJudge","IntKey":0}}]}}
+500303	5003	4010	500301			0	16	17	2	0	0	1				
+500304	5003	4010	500303			1	28	29	2	0	0	1				
+500401	5004	4018				0	4	5	1	0	0	0				
+500402	5004	4018	500401			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50040201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50040202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50040203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":600112,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}}]}}
+500403	5004	4018	500401			0	16	17	2	0	0	1				
+500404	5004	4018	500403			1	26	27	2	0	0	1				{"StatisticModule":{"Items":[]}}
+500501	5005	4019				0	4	5	1	0	0	0				
+500502	5005	4019	500501			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50050201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50050202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50050203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":700106,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}}]}}
+500503	5005	4019	500501			0	16	17	2	0	0	1				
+500504	5005	4019	500503			1	26	27	2	0	0	1				{"StatisticModule":{"Items":[]}}
+500601	5006	4020				0	4	5	1	0	0	0				
+500602	5006	4020	500601			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50060201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50060202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50060203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2001,"AddValue":{"Value":100},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2002,"AddValue":{"Value":-40},"PreventNegativeResult":true,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemPlayerEnterTrigger","TriggerHostActorPlaceId":800107,"TriggerId":1,"AddValue":{"Value":1},"StatisticType":4,"VarRef":{"VarType":1,"StrKey":"DeathCount","IntKey":0}}]}}
+500603	5006	4020	500601			0	16	17	2	0	0	1				
+500604	5006	4020	500603			1	26	27	2	0	0	1				
+500701	5007	4025				0	4	5	1	0	0	0				
+500702	5007	4025	500701			0	8	9	2	0	0	3				{"StatisticModule":{"Items":[{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":20},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"Score","IntKey":0}},{"$type":"XConfigQuestStatisticItemLevelPlayCurTime","StatisticType":2,"VarRef":{"VarType":2,"StrKey":"Time","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50070201,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50070202,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemQuestObjectiveComplete","QuestObjectiveId":50070203,"AddValue":{"Value":1},"StatisticType":3,"VarRef":{"VarType":1,"StrKey":"Star","IntKey":0}},{"$type":"XConfigQuestStatisticItemSceneObjectBeCollected","CollectableType":2000,"AddValue":{"Value":1},"PreventNegativeResult":false,"StatisticType":1,"VarRef":{"VarType":1,"StrKey":"GoldCount","IntKey":0}}]}}
+500703	5007	4025	500701			0	16	17	2	0	0	1				
+500704	5007	4025	500703			1	26	27	2	0	0	1				
+600101	6001	4001				1	4	5	1	0	0	0				
+600201	6002	6001				0	4	5	1	0	0	0				
+600202	6002	6001	600201			1	10	11	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":1}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+600203	6002	6001	600201			1	14	15	1	0	0	0				{"PreLevelConditionGroup":{"ConditionLists":[{"Conditions":[{"CondType":1,"Params":{"$type":"XConfigLevelConditionParamsCompareVar","LeftVarToken":{"$type":"XConfigQuestVarRefToken","VarType":1,"StrKey":"decision1","IntKey":0},"RightVarToken":{"$type":"XConfigQuestVarLiteralToken","Literal":{"$type":"XQuestVarValueInt","Value":2}},"CompareType":0},"InvertResult":false,"TipDescId":null}],"LogicOp":0}],"LogicOp":0}}
+600301	6003	6001				1	4	5	1	0	0	0				
+600401	6004	6001				1	4	5	1	0	0	0				
+600501	6005	6001				1	4	5	1	0	0	0				
+700101	7001	4003				0	4	5	1	0	0	0				
+700102	7001	4001	700101			0	14	15	1	0	0	0				
+700103	7001	5001	700102			1	22	23	1	0	0	0				
+700300	7003	4001				0	4	5	2	0	0	1				
+700301	7003	4001	700300			0	10	11	1	0	0	0				
+700302	7003	4001	700301			0	18	19	1	0	0	0				
+700303	7003	4001	700302			1	22	23	1	0	0	0				
+3014101	30141	6001				1	4	5	2	0	0	1				
+3015101	30151	6001				1	4	5	2	0	0	1				
+3016101	30161	6001				1	4	5	2	0	0	1				
+3017101	30171	6001				1	4	5	2	0	0	1				
+3018101	30181	6001				1	4	5	2	0	0	1				
+3019101	30191	6001				1	4	5	2	0	0	1				
+3020101	30201	6003				1	4	5	1	0	0	0				

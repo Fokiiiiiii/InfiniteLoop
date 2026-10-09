@@ -46,8 +46,11 @@ namespace AscNet.Common.Database
         #endregion
 
         public static IMongoCollection<Inventory> collection = Common.db.GetCollection<Inventory>("inventory");
+        // BigWorldItem rows are delivered through the main item channel (XBigWorldServiceAgency:OnInitItemData/IsDlcItem).
         private static readonly Lazy<HashSet<int>> ClientItemIds = new(() =>
-            TableReaderV2.Parse<ItemTable>().Select(item => item.Id).ToHashSet());
+            TableReaderV2.Parse<ItemTable>().Select(item => item.Id)
+                .Concat(TableReaderV2.Parse<AscNet.Table.V2.share.bigworld.common.item.BigWorldItemTable>().Select(item => item.Id))
+                .ToHashSet());
 
         public static bool IsValidClientItemId(int itemId)
         {
@@ -157,7 +160,7 @@ namespace AscNet.Common.Database
             ItemTable? itemTable = TableReaderV2.Parse<ItemTable>().Find(x => x.Id == itemId);
             long maxCount = GetMaxCount(itemTable);
 
-            if (item is not null && itemTable is not null)
+            if (item is not null)
             {
                 if (item.Count + amount <= maxCount && item.Count + amount >= 0)
                 {

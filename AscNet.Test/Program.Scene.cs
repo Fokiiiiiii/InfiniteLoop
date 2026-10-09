@@ -13,6 +13,7 @@ namespace AscNet.Test
     {
         private static void ValidateSceneCommandCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             List<int> catalogIds = TableReaderV2.Parse<AscNet.Table.V2.share.photomode.BackgroundTable>()
                 .Where(background => background.Id > 0 && background.SceneModelId > 0)
                 .Select(background => background.Id)

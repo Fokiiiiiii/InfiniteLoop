@@ -12,7 +12,6 @@ using AscNet.Table.V2.share.partner;
 using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.client.fuben.arena;
 using AscNet.Table.V2.share.fuben.arena;
-using AscNet.Table.V2.share.fuben.bosssingle;
 using AscNet.Table.V2.share.fuben.bossactivity;
 using AscNet.Table.V2.share.chat;
 using AscNet.Table.V2.share.fuben.mainline;
@@ -81,6 +80,63 @@ namespace AscNet.Test
             try
             {
                 UseResourceWorkingDirectory();
+                if (args.Contains("--cn-sdk-config-only"))
+                {
+                    ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
+                    ValidateCnSdkConfiguration().GetAwaiter().GetResult();
+                    ValidateRegionalConfigTab();
+                    return;
+                }
+                if (args.Contains("--cn-sdk-login-only"))
+                {
+                    ValidateCnSdkLogin().GetAwaiter().GetResult();
+                    return;
+                }
+                if (args.Contains("--big-world-skygarden-only"))
+                {
+                    RunBigWorldSkyGardenCompatibility();
+                    return;
+                }
+                if (args.Contains("--big-world-archive-only"))
+                {
+                    ValidateBigWorldArchive();
+                    return;
+                }
+                if (args.Contains("--big-world-quest-only"))
+                {
+                    ValidateBigWorldQuest();
+                    return;
+                }
+                if (args.Contains("--big-world-quest-coverage-only"))
+                {
+                    ValidateBigWorldQuestCoverage();
+                    return;
+                }
+                if (args.Contains("--big-world-quest-sweep-only"))
+                {
+                    ValidateBigWorldQuestSweep();
+                    return;
+                }
+                if (args.Contains("--big-world-interaction-only"))
+                {
+                    ValidateBigWorldInteraction();
+                    return;
+                }
+                if (args.Contains("--big-world-hotfix-only"))
+                {
+                    ValidateBigWorldHotfix();
+                    return;
+                }
+                if (args.Contains("--big-world-actions-only"))
+                {
+                    ValidateBigWorldActions();
+                    return;
+                }
+                if (args.Contains("--big-world-task-only"))
+                {
+                    ValidateBigWorldTask();
+                    return;
+                }
                 if (args.Contains("--draw-rules-only"))
                 {
                     ValidateDrawRules();
@@ -121,6 +177,11 @@ namespace AscNet.Test
                 if (args.Contains("--loading-option-compat-only"))
                 {
                     ValidateLoadingOptionCompatibility();
+                    return;
+                }
+                if (args.Contains("--store-purchases-only"))
+                {
+                    ValidateStorePurchases();
                     return;
                 }
                 if (args.Contains("--wheelchair-manual-compat-only"))
@@ -399,6 +460,20 @@ namespace AscNet.Test
                     ValidateBackgroundRewardGrants();
                     return;
                 }
+                if (args.Contains("--character-skill-cap-compat-only"))
+                {
+                    var lowerTableMax = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
+                        .GroupBy(row => row.SkillId)
+                        .Select(group => (SkillId: group.Key, MaxLevel: group.Max(row => row.Level)))
+                        .First(skill => skill.MaxLevel < 29);
+                    AssertEqual(lowerTableMax.MaxLevel,
+                        AscNet.Common.Database.Character.CharacterSkillMaxLevel(lowerTableMax.SkillId),
+                        "character skill table maximum below the client cap");
+                    int skillId = TableReaderV2.Parse<CharacterSkillLevelEffectTable>().First(row => row.Level >= 29).SkillId;
+                    AssertEqual(29, AscNet.Common.Database.Character.CharacterSkillMaxLevel(skillId), "character skill client cap");
+                    return;
+                }
+
                 if (args.Contains("--version-48-compat-only"))
                 {
                     ValidateVersion48Frames();
@@ -514,6 +589,11 @@ namespace AscNet.Test
                     ValidatePortraitCompatibility();
                     return;
                 }
+                if (args.Contains("--client-version-compat-only"))
+                {
+                    ValidateClientVersionRequestCompatibility();
+                    return;
+                }
                 if (args.Contains("--version-46-bootstrap-only"))
                 {
                     ValidateVersion46BootstrapCompatibility();
@@ -600,6 +680,18 @@ namespace AscNet.Test
                     ValidatePartnerComposeCompatibility();
                     return;
                 }
+                if (args.Contains("--partner-decompose-compat-only"))
+                {
+                    ValidatePartnerDecomposeCompatibilitySuite();
+                    return;
+                }
+                if (args.Contains("--partner-decompose-real-mongo-only"))
+                {
+                    ValidatePartnerDecomposeRealMongoDurability();
+                    return;
+                }
+
+
 
                 string? liveResonanceUid = args.FirstOrDefault(value =>
                     value.StartsWith("--verify-live-resonance-uid=", StringComparison.Ordinal));
@@ -646,6 +738,11 @@ namespace AscNet.Test
                     ValidateSignInDailyRewardCompatibility();
                     return;
                 }
+                if (args.Contains("--big-world-street-only"))
+                {
+                    ValidateBigWorldStreet();
+                    return;
+                }
                 if (args.Contains("--scene-command-only"))
                 {
                     ValidateSceneCommandCompatibility();
@@ -668,6 +765,12 @@ namespace AscNet.Test
                     return;
                 }
 
+
+                if (args.Contains("--big-world-character-only"))
+                {
+                    ValidateBigWorldCharacter();
+                    return;
+                }
 
                 if (args.Contains("--stage-bookmark-compat-only"))
                 {
@@ -716,6 +819,9 @@ namespace AscNet.Test
                 if (args.Contains("--boss-single-login-compat-only"))
                 {
                     ValidateBossSingleLoginCompatibilityShape();
+                    ValidateBossSingleLoginRollover();
+                    ValidateBossSingleSharedTimestampBoundary();
+                    ValidateBossSingleReconnectStageSnapshot();
                     return;
                 }
 
@@ -728,6 +834,7 @@ namespace AscNet.Test
                 if (args.Contains("--boss-single-compat-only"))
                 {
                     ValidateBossSingleCompatibility();
+                    ValidateBossSectionScoreProgress();
                     ValidateBossSingleIntensiveStageHydration();
                     ValidateBossSingleCycleStageScoreSync();
                     return;
@@ -846,6 +953,12 @@ namespace AscNet.Test
                     ValidateStudyProgressionCompatibility();
                     return;
                 }
+                if (args.Contains("--teaching-treasure-compat-only"))
+                {
+                    ValidateVersion48TeachingTreasureClaims();
+                    return;
+                }
+
 
                 if (args.Contains("--fight-settle-retreat-compat-only"))
                 {
@@ -1032,9 +1145,9 @@ namespace AscNet.Test
                     return;
                 }
 
-                if (args.Contains("--big-world-enter-compat-only"))
+                if (args.Contains("--big-world-core-only"))
                 {
-                    ValidateBigWorldEnterCompatibility();
+                    ValidateBigWorldCore();
                     return;
                 }
 
@@ -1100,8 +1213,12 @@ namespace AscNet.Test
                 ValidateStrongholdSweepCompatibility();
                 ValidateStrongholdRolloverCompatibility();
                 ValidateBossSingleLoginCompatibilityShape();
+                ValidateBossSingleLoginRollover();
+                ValidateBossSingleSharedTimestampBoundary();
+                ValidateBossSingleReconnectStageSnapshot();
                 ValidateBossActivityCompatibility();
                 ValidateBossSingleCompatibility();
+                ValidateBossSectionScoreProgress();
                 ValidateBossSingleIntensiveStageHydration();
                 ValidateBossSingleCycleStageScoreSync();
                 ValidateSimulatedBattlefieldCompatibility();
@@ -1119,6 +1236,8 @@ namespace AscNet.Test
                 ValidateRobotDeploymentFashionCompatibility();
                 ValidateSegmentCheckFightCompatibility();
                 ValidateFightRestartCompatibility();
+                ValidatePartnerDecomposeCompatibilitySuite();
+
                 ValidateCharacterProgressionPersistenceCompatibility();
                 ValidateCharacterSkillGroupTableBackedCompatibility();
                 ValidateCharacterEnhanceSkillTableBackedCompatibility();
@@ -1193,6 +1312,8 @@ namespace AscNet.Test
                 ValidateGuildWarPopupActionCompatibility();
                 ValidateVersion47ConcertStartCompatibility();
                 ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
+                ValidateCnSdkConfiguration().GetAwaiter().GetResult();
+                ValidateCnSdkLogin().GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -4139,8 +4260,13 @@ namespace AscNet.Test
                 "notify-login-time-limit-compat-test"))
             {
                 harness.Session.stage = CreateLoginAccountCompatibilityStage(notifyLoginPlayerId);
+                harness.Session.stage.Id = ObjectId.GenerateNewId();
+                AscNet.Common.Database.Stage.collection.InsertOne(harness.Session.stage);
                 productionLogin = buildNotifyLogin.Invoke(null, [harness.Session]) as NotifyLogin
                     ?? throw new InvalidDataException("AccountModule.BuildNotifyLogin returned nil or a non-NotifyLogin payload.");
+                AssertEqual(harness.Session.stage.BossSingleActivityNo,
+                    AscNet.Common.Database.Stage.Reload(harness.Session.stage.Id, notifyLoginPlayerId).BossSingleActivityNo,
+                    "BuildNotifyLogin persists its reconciled Stage ownership epoch");
             }
             if (productionLogin.TimeLimitCtrlConfigList.Count < 2
                 || productionLogin.FunctionOpenTimeConfigList.Any(mapping =>
@@ -4540,6 +4666,7 @@ namespace AscNet.Test
             ];
             character.Characters.AddRange(ownedCharacters);
             AscNet.Common.Database.Stage stage = CreateLoginAccountCompatibilityStage(playerId);
+            stage.Id = ObjectId.GenerateNewId();
             stage.AddStage(new StageDatum
             {
                 StageId = existingAccountStageId,
@@ -4557,6 +4684,7 @@ namespace AscNet.Test
                 BestCardIds = [1021001],
                 LastCardIds = [1021001]
             });
+            AscNet.Common.Database.Stage.collection.InsertOne(stage);
             HashSet<long> initialStageIds = stage.Stages.Keys.ToHashSet();
 
             NotifyLogin productionLogin;
@@ -5242,7 +5370,7 @@ namespace AscNet.Test
                 throw new InvalidDataException("AccountModule.DoLogin omitted NotifyClientVersion.");
             JObject versionPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(versionPush.Content));
             AssertEqual(currentDocumentVersion, versionPayload.Value<string>("Version"),
-                "NotifyClientVersion uses current document version");
+                "NotifyClientVersion uses the shared EN default for a session that never handshook (per-session regions are covered by ClientVersionRequest compatibility)");
             AssertEqual(false, versionPayload.Value<bool>("KickOut"), "NotifyClientVersion does not eject older clients");
 
             AssertPushSubsequence(
@@ -6070,33 +6198,79 @@ namespace AscNet.Test
 
         private static void ValidateClientVersionRequestCompatibility()
         {
-            const long playerId = 88_006;
-            using LoopbackSessionHarness harness = new(
-                CreateDrawCompatibilityCharacter(playerId),
-                CreateDrawCompatibilityPlayer(playerId),
-                CreateDrawCompatibilityInventory(playerId, []),
-                "login-account-client-version-compat-test");
-
-            const int clientVersionPacketId = 13_009;
-            InvokeRegisteredRequestHandler(
-                nameof(ClientVersionRequest),
-                harness.Session,
-                clientVersionPacketId,
-                new ClientVersionRequest { Version = "4.5.0" });
-            ClientVersionResponse response = ReadResponsePayload<ClientVersionResponse>(
-                harness,
-                clientVersionPacketId,
-                nameof(ClientVersionResponse),
-                "ClientVersionRequest response");
-
+            ValidateRegionalConfigTab();
             JObject versions = JsonSnapshot.LoadObject("Configs/version_config.json");
             JProperty current = versions.Properties().MaxBy(entry => Version.Parse(entry.Name))!;
-            string documentVersion = current.Value.Value<string>("DocumentVersion")!;
-            AssertEqual(0, response.Code, "ClientVersionResponse Code");
-            AssertEqual(documentVersion, response.Version, "ClientVersionResponse document version from current config");
-            if (response.Version == current.Name)
+            string enDocumentVersion = current.Value.Value<string>("DocumentVersion")!;
+            // The server echoes the client's own handshake version; all 4.8.0 regions share one today, so use any
+            // configured document version (current packages or older tuples) that differs from the EN default.
+            string krDocumentVersion = versions.Properties()
+                .SelectMany(entry => new[] { (JObject)entry.Value }
+                    .Concat(((JObject?)entry.Value["Packages"])?.Properties().Select(package => (JObject)package.Value) ?? []))
+                .Select(entry => entry.Value<string>("DocumentVersion")!)
+                .FirstOrDefault(version => version != enDocumentVersion)
+                ?? throw new InvalidDataException("Regional regression needs a document version that differs from EN.");
+
+            // Three sessions on one process: EN and KR clients that handshake, plus a legacy session that never does.
+            long nextPlayerId = 88_006;
+            LoopbackSessionHarness NewHarness(string name)
+            {
+                long playerId = nextPlayerId++;
+                return new(
+                    CreateDrawCompatibilityCharacter(playerId),
+                    CreateDrawCompatibilityPlayer(playerId),
+                    CreateDrawCompatibilityInventory(playerId, []),
+                    name);
+            }
+
+            using LoopbackSessionHarness en = NewHarness("login-account-client-version-en");
+            using LoopbackSessionHarness kr = NewHarness("login-account-client-version-kr");
+            using LoopbackSessionHarness legacy = NewHarness("login-account-client-version-legacy");
+
+            int packetId = 13_000;
+            void Handshake(LoopbackSessionHarness harness, string documentVersion)
+            {
+                int id = ++packetId;
+                InvokeRegisteredRequestHandler(nameof(HandshakeRequest), harness.Session, id,
+                    new HandshakeRequest { DocumentVersion = documentVersion, Sha1 = "", ApplicationVersion = "4.8.0" });
+                ReadResponsePayload<HandshakeResponse>(harness, id, nameof(HandshakeResponse), "HandshakeRequest response");
+            }
+
+            ClientVersionResponse RequestVersion(LoopbackSessionHarness harness)
+            {
+                int id = ++packetId;
+                InvokeRegisteredRequestHandler(nameof(ClientVersionRequest), harness.Session, id, new ClientVersionRequest { Version = "4.5.0" });
+                return ReadResponsePayload<ClientVersionResponse>(harness, id, nameof(ClientVersionResponse), "ClientVersionRequest response");
+            }
+
+            string NotifiedVersion(LoopbackSessionHarness harness)
+            {
+                RequiredMethod(RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"), "SendEmptyStartupPush",
+                    BindingFlags.Static | BindingFlags.NonPublic, [typeof(AscNet.GameServer.Session), typeof(string)])
+                    .Invoke(null, [harness.Session, "NotifyClientVersion"]);
+                Packet.Push push = TowerReadPush(harness, "NotifyClientVersion");
+                JObject payload = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
+                AssertEqual(false, payload.Value<bool>("KickOut"), "NotifyClientVersion does not eject older clients");
+                return payload.Value<string>("Version")!;
+            }
+
+            Handshake(en, enDocumentVersion);
+            Handshake(kr, krDocumentVersion);
+
+            // Interleave so a process-wide cached value would leak between regions.
+            ClientVersionResponse krResponse = RequestVersion(kr);
+            ClientVersionResponse enResponse = RequestVersion(en);
+            ClientVersionResponse legacyResponse = RequestVersion(legacy);
+            AssertEqual(0, krResponse.Code, "ClientVersionResponse Code");
+            AssertEqual(krDocumentVersion, krResponse.Version, "KR session ClientVersionResponse uses its handshake document version");
+            AssertEqual(enDocumentVersion, enResponse.Version, "EN session ClientVersionResponse uses its handshake document version");
+            AssertEqual(enDocumentVersion, legacyResponse.Version, "session without handshake falls back to the shared EN document version");
+            AssertEqual(krDocumentVersion, NotifiedVersion(kr), "KR session NotifyClientVersion document version");
+            AssertEqual(enDocumentVersion, NotifiedVersion(en), "EN session NotifyClientVersion document version");
+            AssertEqual(enDocumentVersion, NotifiedVersion(legacy), "legacy session NotifyClientVersion document version");
+            if (krResponse.Version == current.Name)
                 throw new InvalidDataException("ClientVersionResponse must return the document version, not the application version.");
-            AssertEqual(false, response.KickOut, "older-client request does not force restart");
+            AssertEqual(false, krResponse.KickOut, "older-client request does not force restart");
         }
 
         private static void ValidateLoginAccountNoticeFixtures()
@@ -6142,6 +6316,11 @@ namespace AscNet.Test
                 CreateDrawCompatibilityPlayer(playerId),
                 CreateDrawCompatibilityInventory(playerId, []),
                 "login-account-sync-read-game-notice-compat-test");
+            harness.Session.stage.Id = ObjectId.GenerateNewId();
+            AscNet.Common.Database.Stage.collection.InsertOne(harness.Session.stage);
+            if (AscNet.Common.Database.Stage.collection.CountDocuments(
+                    Builders<AscNet.Common.Database.Stage>.Filter.Eq(stage => stage.Id, harness.Session.stage.Id)) != 1)
+                throw new InvalidDataException("Game notice login fixture Stage was not inserted into its active collection.");
 
             const string noticeId = "6a1e0fd0f1b4a13fd8bf4900";
             const long modifyTime = 1_780_355_024;
@@ -6205,6 +6384,7 @@ namespace AscNet.Test
                 "BuildNotifyLogin",
                 BindingFlags.Static | BindingFlags.NonPublic,
                 [typeof(Session)]);
+            harness.Session.stage = AscNet.Common.Database.Stage.Reload(harness.Session.stage.Id, playerId);
             NotifyLogin notifyLogin = buildNotifyLogin.Invoke(null, [harness.Session]) as NotifyLogin
                 ?? throw new InvalidDataException("AccountModule.BuildNotifyLogin returned nil or a non-NotifyLogin payload.");
             NotifyLogin notifyLoginRoundTrip = MessagePackSerializer.Deserialize<NotifyLogin>(
@@ -6235,6 +6415,7 @@ namespace AscNet.Test
 
         private static void ValidateLifeTreeFinishProcessRequestCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride mongoOverride =
                 MongoCollectionOverride.InstallForMainLine2MessageStateCompatibility(
                     out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection);
@@ -10832,2475 +11013,9 @@ namespace AscNet.Test
             AssertEqual(1021005, player.AssistCharacterId, "ChangeAssistCharIdRequest persisted switched-back assist");
         }
 
-
-        private static void ValidateBigWorldEnterCompatibility()
-        {
-            const string enterRequestName = "BigWorldEnterWorldRequest";
-            const string enterResponseName = "BigWorldEnterWorldResponse";
-            const int requestWorldId = 0;
-            const int requestLevelId = 0;
-            const int expectedWorldId = 400;
-            const int expectedLevelId = 4001;
-            const long playerId = 99_401;
-            const int enterPacketId = 12_001;
-
-            Type enterRequestType = RequiredPayloadType(enterRequestName);
-            _ = RequiredPayloadType(enterResponseName);
-            object enterRequest = Activator.CreateInstance(enterRequestType)
-                ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-            SetRequiredIntegerMember(enterRequest, "WorldId", requestWorldId);
-            SetRequiredIntegerMember(enterRequest, "LevelId", requestLevelId);
-
-            AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(playerId);
-            player.PlayerData.Gender = 2;
-            (long fixturePlayerId, string fixturePlayerName, long fixturePlayerGender, IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts) = ReadBigWorldEnterFixtureExpectations();
-            using (LoopbackSessionHarness harness = new(
-                CreateDrawCompatibilityCharacter(playerId),
-                player,
-                CreateDrawCompatibilityInventory(playerId, []),
-                "big-world-enter-compat-test"))
-            {
-                InvokeRegisteredRequestHandler(enterRequestName, harness.Session, enterPacketId, enterRequest);
-                JObject enterResponse = ReadBigWorldEnterWorldResponseWithPushes(
-                    harness,
-                    enterPacketId,
-                    enterResponseName);
-
-                AssertEqual(0L, RequiredValue<long>(enterResponse, "Code", JTokenType.Integer, enterResponseName), $"{enterResponseName} Code");
-                JObject responsePlayerData = RequiredObject(enterResponse, "PlayerData", enterResponseName);
-                AssertEqual(fixturePlayerGender, RequiredValue<long>(responsePlayerData, "Gender", JTokenType.Integer, $"{enterResponseName}.PlayerData"), $"{enterResponseName} PlayerData.Gender fixture-compatible value despite session gender 2");
-                JObject enterResultData = RequiredObject(enterResponse, "EnterResultData", enterResponseName);
-                JObject worldData = RequiredObject(enterResultData, "WorldData", $"{enterResponseName}.EnterResultData");
-                AssertEqual((long)expectedWorldId, RequiredValue<long>(worldData, "WorldId", JTokenType.Integer, $"{enterResponseName}.EnterResultData.WorldData"), $"{enterResponseName} EnterResultData.WorldData.WorldId");
-                AssertEqual((long)expectedLevelId, RequiredValue<long>(worldData, "LevelId", JTokenType.Integer, $"{enterResponseName}.EnterResultData.WorldData"), $"{enterResponseName} EnterResultData.WorldData.LevelId");
-
-                JArray players = (JArray)RequiredToken(
-                    worldData,
-                    "Players",
-                    JTokenType.Array,
-                    $"{enterResponseName}.EnterResultData.WorldData");
-                if (players.Count == 0)
-                    throw new InvalidDataException($"{enterResponseName}.EnterResultData.WorldData.Players: expected at least one player entry.");
-                if (players[0] is not JObject firstPlayer)
-                    throw new InvalidDataException($"{enterResponseName}.EnterResultData.WorldData.Players[0]: expected JSON object, got {players[0]!.Type}.");
-
-                AssertEqual(player.PlayerData.Id, RequiredValue<long>(firstPlayer, "Id", JTokenType.Integer, $"{enterResponseName}.EnterResultData.WorldData.Players[0]"), $"{enterResponseName} EnterResultData.WorldData.Players[0].Id");
-                AssertEqual(player.PlayerData.Name, RequiredValue<string>(firstPlayer, "Name", JTokenType.String, $"{enterResponseName}.EnterResultData.WorldData.Players[0]"), $"{enterResponseName} EnterResultData.WorldData.Players[0].Name");
-                AssertTopLevelBigWorldSelfNpcCommanderPartData(
-                    firstPlayer,
-                    $"{enterResponseName}.EnterResultData.WorldData.Players[0]",
-                    expectedCommanderParts);
-
-                AssertNestedBigWorldNativePayloadIdentityAndCommanderPartData(
-                    enterResultData,
-                    "FightData",
-                    player.PlayerData.Id,
-                    player.PlayerData.Name,
-                    fixturePlayerId,
-                    fixturePlayerName,
-                    expectedCommanderParts,
-                    enterResponseName);
-                AssertNestedBigWorldNativePayloadIdentityAndCommanderPartData(
-                    enterResultData,
-                    "LevelData",
-                    player.PlayerData.Id,
-                    player.PlayerData.Name,
-                    fixturePlayerId,
-                    fixturePlayerName,
-                    expectedCommanderParts,
-                    enterResponseName);
-
-            }
-
-            string originalWorkingDirectory = Directory.GetCurrentDirectory();
-            string bigWorldResourceDirectory = Path.GetFullPath(Path.Combine(
-                Path.GetDirectoryName(ResourcePath("table", "share", "reward", "Reward.tsv"))!,
-                "..",
-                "..",
-                ".."));
-            try
-            {
-                Directory.SetCurrentDirectory(bigWorldResourceDirectory);
-                using LoopbackSessionHarness adjacentHarness = new(
-                    CreateDrawCompatibilityCharacter(playerId + 1),
-                    CreateDrawCompatibilityPlayer(playerId + 1),
-                    CreateDrawCompatibilityInventory(playerId + 1, []),
-                    "big-world-adjacent-compat-test");
-                AssertBigWorldAck(adjacentHarness, "BigWorldOnModuleLoadCompleteRequest", 12_002);
-                AssertBigWorldAck(adjacentHarness, "BigWorldSaveFovDataRequest", 12_003);
-                AssertBigWorldAck(adjacentHarness, "BigWorldTeamChangeRequest", 12_004);
-                AssertBigWorldAck(adjacentHarness, "BigWorldCheckIsShowMainRedPointRequest", 12_005);
-                AssertDlcWorldSaveData(adjacentHarness, 12_006, expectedWorldId, expectedLevelId);
-                AssertEnterInstLevelEmitsNewLevelNotify(adjacentHarness, 12_007, expectedWorldId, expectedLevelId);
-                byte[] capturedXRpcPayload = AssertLoadCompleteEmitsStartFightThenBigWorldBootstrap(adjacentHarness, 12_008, playerId + 1);
-                AssertXRpcAck(adjacentHarness, "XRpcCommon", "XRpcCommonResponse", 12_009, capturedXRpcPayload);
-                AssertXRpcAck(adjacentHarness, "XRpcComponentAction", "XRpcComponentActionResponse", 12_010, capturedXRpcPayload);
-                AssertXRpcPlayerInteractEmitsRetailStartFinishNotifies(adjacentHarness, 12_011, playerId + 1);
-                AssertXRpcSceneObjectInteractEmitsRewardSidecar(adjacentHarness, 12_012, playerId + 1);
-            }
-            finally
-            {
-                Directory.SetCurrentDirectory(originalWorkingDirectory);
-            }
-            AssertBigWorldLoginStartupPushes(playerId + 2);
-            ValidateBigWorldEnterLeaveReenter(playerId + 6, expectedWorldId, expectedLevelId);
-            ValidateBigWorldCourseCoreSetReadReentry(playerId + 8, expectedWorldId, expectedLevelId);
-
-            ValidateEnterInstLevelAdvanceTargetsRemainObservable(playerId + 5, expectedWorldId);
-            ValidateUnsupportedPersistedBigWorldLastLocation(
-                playerId + 3,
-                expectedWorldId,
-                expectedLevelId,
-                persistedWorldId: expectedWorldId,
-                persistedLevelId: 5001,
-                poisonedPosition: (12.25D, 34.5D, 56.75D));
-            ValidateSupportedPersistedBigWorldLastLocation(
-                playerId + 7,
-                expectedWorldId,
-                expectedLevelId,
-                persistedPosition: (716.25D, 84.5D, 902.75D));
-            ValidatePersistedBigWorldClaimedChest(
-                playerId + 4,
-                expectedWorldId,
-                expectedLevelId,
-                claimedPlaceId: 100016);
-
-            void ValidateBigWorldCourseCoreSetReadReentry(long coursePlayerId, int expectedWorldId, int expectedLevelId)
-            {
-                const string name = "BigWorld course core read/re-entry regression";
-                const int firstReadPacketId = 12_060;
-                const int secondReadPacketId = 12_061;
-                const int reenterPacketId = 12_062;
-
-                AscNet.Common.Database.Player coursePlayer = CreateDrawCompatibilityPlayer(coursePlayerId);
-                using LoopbackSessionHarness courseHarness = new(
-                    CreateDrawCompatibilityCharacter(coursePlayerId),
-                    coursePlayer,
-                    CreateDrawCompatibilityInventory(coursePlayerId, []),
-                    "big-world-course-core-read-compat-test");
-
-                AssertCourseCoreSetReadRequest(
-                    courseHarness,
-                    firstReadPacketId,
-                    versionId: 1,
-                    elementIds: [1001, 1002],
-                    expectedTaskProgressTotal: 2);
-                AssertCourseCoreSetReadRequest(
-                    courseHarness,
-                    secondReadPacketId,
-                    versionId: 1,
-                    elementIds: [2101],
-                    expectedTaskProgressTotal: null);
-
-                object enterRequest = Activator.CreateInstance(enterRequestType)
-                    ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-                SetRequiredIntegerMember(enterRequest, "WorldId", requestWorldId);
-                SetRequiredIntegerMember(enterRequest, "LevelId", requestLevelId);
-
-                InvokeRegisteredRequestHandler(enterRequestName, courseHarness.Session, reenterPacketId, enterRequest);
-                JObject enterResponse = ReadBigWorldEnterWorldResponseWithPushes(
-                    courseHarness,
-                    reenterPacketId,
-                    enterResponseName,
-                    expectedCourseTaskTotalProgress: 2,
-                    expectedCourseReadElementIds: [1001, 1002, 2101],
-                    expectedTeleporterPlaceIdsForLevel4001: [100122, 100121, 100030, 100027]);
-                AssertEqual(0L, RequiredValue<long>(enterResponse, "Code", JTokenType.Integer, $"{name} {enterResponseName}"), $"{name} {enterResponseName} Code");
-
-                JObject enterResultData = RequiredObject(enterResponse, "EnterResultData", $"{name} {enterResponseName}");
-                JObject worldData = RequiredObject(enterResultData, "WorldData", $"{name} {enterResponseName}.EnterResultData");
-                AssertEqual((long)expectedWorldId, RequiredValue<long>(worldData, "WorldId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.WorldId");
-                AssertEqual((long)expectedLevelId, RequiredValue<long>(worldData, "LevelId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.LevelId");
-            }
-
-            static void AssertCourseCoreSetReadRequest(
-                LoopbackSessionHarness harness,
-                int packetId,
-                int versionId,
-                IReadOnlyList<int> elementIds,
-                int? expectedTaskProgressTotal)
-            {
-                BigWorldCourseCoreSetReadRequest request = new()
-                {
-                    VersionId = versionId,
-                    ElementIds = elementIds.ToList()
-                };
-
-                InvokeRegisteredRequestHandler(nameof(BigWorldCourseCoreSetReadRequest), harness.Session, packetId, request);
-                BigWorldCourseCoreSetReadResponse response = ReadResponsePayload<BigWorldCourseCoreSetReadResponse>(
-                    harness,
-                    packetId,
-                    nameof(BigWorldCourseCoreSetReadResponse),
-                    $"{nameof(BigWorldCourseCoreSetReadRequest)} response");
-                AssertEqual(0, response.Code, $"{nameof(BigWorldCourseCoreSetReadResponse)} Code");
-                AssertIntegerList(
-                    elementIds.Select(elementId => (long)elementId).ToArray(),
-                    response.SuccessIds.Select(elementId => (long)elementId).ToArray(),
-                    $"{nameof(BigWorldCourseCoreSetReadResponse)} SuccessIds");
-
-                if (expectedTaskProgressTotal.HasValue)
-                {
-                    AssertBigWorldCourseTaskCntProgressPush(
-                        harness,
-                        versionId,
-                        expectedTaskProgressTotal.Value,
-                        $"{nameof(BigWorldCourseCoreSetReadRequest)} NotifyBigWorldCourseTaskCntProgress");
-                    return;
-                }
-
-                if (harness.TryReadAvailablePacket($"{nameof(BigWorldCourseCoreSetReadRequest)} unexpected task-progress push", out Packet unexpectedPacket))
-                    throw new InvalidDataException($"{nameof(BigWorldCourseCoreSetReadRequest)}: expected no second NotifyBigWorldCourseTaskCntProgress after progress was already complete, got {DescribePacket(unexpectedPacket)}.");
-            }
-
-            static void AssertBigWorldCourseTaskCntProgressPush(
-                LoopbackSessionHarness harness,
-                int expectedVersionId,
-                int expectedTotalProgress,
-                string name)
-            {
-                Packet packet = harness.ReadPacket($"{name} packet");
-                AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} packet type");
-                Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                AssertEqual("NotifyBigWorldCourseTaskCntProgress", push.Name, $"{name} packet name");
-                JObject payload = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
-                AssertEqual((long)expectedVersionId, RequiredValue<long>(payload, "VersionId", JTokenType.Integer, name), $"{name} VersionId");
-                AssertEqual((long)expectedTotalProgress, RequiredValue<long>(payload, "TotalProgress", JTokenType.Integer, name), $"{name} TotalProgress");
-            }
-
-            void ValidateBigWorldEnterLeaveReenter(long reentryPlayerId, int worldId, int levelId)
-            {
-                const string name = "BigWorld enter/leave/re-enter regression";
-                const int firstEnterPacketId = 12_050;
-                const int leavePacketId = 12_051;
-                const int secondEnterPacketId = 12_052;
-
-                using LoopbackSessionHarness reentryHarness = new(
-                    CreateDrawCompatibilityCharacter(reentryPlayerId),
-                    CreateDrawCompatibilityPlayer(reentryPlayerId),
-                    CreateDrawCompatibilityInventory(reentryPlayerId, []),
-                    "big-world-reentry-compat-test");
-
-                _ = AssertEnterRoundTrip(firstEnterPacketId, $"{name} first enter");
-
-                InvokeRegisteredRequestHandler(nameof(LeaveWorldRequest), reentryHarness.Session, leavePacketId, new LeaveWorldRequest());
-                LeaveWorldResponse leaveResponse = ReadResponsePayload<LeaveWorldResponse>(
-                    reentryHarness,
-                    leavePacketId,
-                    nameof(LeaveWorldResponse),
-                    $"{name} LeaveWorldRequest response");
-                AssertEqual(0, leaveResponse.Code, $"{name} LeaveWorldResponse Code");
-
-                _ = AssertEnterRoundTrip(secondEnterPacketId, $"{name} second enter");
-
-                JObject AssertEnterRoundTrip(int packetId, string stepName)
-                {
-                    object enterRequest = Activator.CreateInstance(enterRequestType)
-                        ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-                    SetRequiredIntegerMember(enterRequest, "WorldId", requestWorldId);
-                    SetRequiredIntegerMember(enterRequest, "LevelId", requestLevelId);
-
-                    InvokeRegisteredRequestHandler(enterRequestName, reentryHarness.Session, packetId, enterRequest);
-                    JObject enterResponse = ReadBigWorldEnterWorldResponseWithPushes(
-                        reentryHarness,
-                        packetId,
-                        enterResponseName);
-                    AssertEqual(0L, RequiredValue<long>(enterResponse, "Code", JTokenType.Integer, $"{stepName} {enterResponseName}"), $"{stepName} {enterResponseName} Code");
-
-                    JObject enterResultData = RequiredObject(enterResponse, "EnterResultData", $"{stepName} {enterResponseName}");
-                    JObject worldData = RequiredObject(enterResultData, "WorldData", $"{stepName} {enterResponseName}.EnterResultData");
-                    AssertEqual((long)worldId, RequiredValue<long>(worldData, "WorldId", JTokenType.Integer, $"{stepName} {enterResponseName}.EnterResultData.WorldData"), $"{stepName} EnterResultData.WorldData.WorldId");
-                    AssertEqual((long)levelId, RequiredValue<long>(worldData, "LevelId", JTokenType.Integer, $"{stepName} {enterResponseName}.EnterResultData.WorldData"), $"{stepName} EnterResultData.WorldData.LevelId");
-                    return enterResponse;
-                }
-            }
-
-            void ValidateUnsupportedPersistedBigWorldLastLocation(
-                long persistedPlayerId,
-                int expectedWorldId,
-                int expectedLevelId,
-                int persistedWorldId,
-                int persistedLevelId,
-                (double X, double Y, double Z) poisonedPosition)
-            {
-                const string name = "BigWorld unsupported persisted last-location regression";
-                AscNet.Common.Database.Player persistedPlayer = CreateDrawCompatibilityPlayer(persistedPlayerId);
-                SetPersistedBigWorldState(
-                    persistedPlayer,
-                    persistedWorldId,
-                    persistedLevelId,
-                    poisonedPosition);
-
-                using (LoopbackSessionHarness enterHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-unsupported-persisted-last-location-enter-test"))
-                {
-                    object enterRequest = Activator.CreateInstance(enterRequestType)
-                        ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-                    SetRequiredIntegerMember(enterRequest, "WorldId", 0);
-                    SetRequiredIntegerMember(enterRequest, "LevelId", 0);
-
-                    InvokeRegisteredRequestHandler(enterRequestName, enterHarness.Session, 12_020, enterRequest);
-                    JObject enterResponse = ReadBigWorldEnterWorldResponseWithPushes(
-                        enterHarness,
-                        12_020,
-                        enterResponseName);
-                    AssertEqual(0L, RequiredValue<long>(enterResponse, "Code", JTokenType.Integer, $"{name} {enterResponseName}"), $"{name} {enterResponseName} Code");
-                    JObject enterResultData = RequiredObject(enterResponse, "EnterResultData", $"{name} {enterResponseName}");
-                    JObject worldData = RequiredObject(enterResultData, "WorldData", $"{name} {enterResponseName}.EnterResultData");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(worldData, "WorldId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.WorldId ignores unsupported persisted player state");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(worldData, "LevelId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.LevelId ignores unsupported persisted player state");
-                    JObject bornData = RequiredFirstPlayerBornData(worldData, $"{name} {enterResponseName}.EnterResultData.WorldData");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(bornData, "LastWorldId", JTokenType.Integer, $"{name} BornData"), $"{name} BornData.LastWorldId ignores unsupported persisted player state");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(bornData, "LastLevelId", JTokenType.Integer, $"{name} BornData"), $"{name} BornData.LastLevelId ignores unsupported persisted player state");
-                    AssertPositionDoesNotEqual(poisonedPosition, RequiredObject(bornData, "Position", $"{name} BornData"), $"{name} BornData.Position ignores unsupported persisted player state");
-
-                    JObject responsePlayerData = RequiredObject(enterResponse, "PlayerData", $"{name} {enterResponseName}");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(responsePlayerData, "LastWorldId", JTokenType.Integer, $"{name} {enterResponseName}.PlayerData"), $"{name} PlayerData.LastWorldId ignores unsupported persisted player state");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(responsePlayerData, "LastLevelId", JTokenType.Integer, $"{name} {enterResponseName}.PlayerData"), $"{name} PlayerData.LastLevelId ignores unsupported persisted player state");
-                    AssertPlayerDataLastTransformIsNull(responsePlayerData, $"{name} {enterResponseName}.PlayerData");
-                }
-
-                using LoopbackSessionHarness saveHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-unsupported-persisted-last-location-save-test");
-                AssertDlcWorldSaveData(
-                    saveHarness,
-                    12_021,
-                    expectedWorldId,
-                    expectedLevelId,
-                    forbiddenReliablePos: poisonedPosition);
-            }
-
-            void ValidateSupportedPersistedBigWorldLastLocation(
-                long persistedPlayerId,
-                int expectedWorldId,
-                int expectedLevelId,
-                (double X, double Y, double Z) persistedPosition)
-            {
-                const string name = "BigWorld supported persisted last-location regression";
-                AscNet.Common.Database.Player persistedPlayer = CreateDrawCompatibilityPlayer(persistedPlayerId);
-                SetPersistedBigWorldState(
-                    persistedPlayer,
-                    expectedWorldId,
-                    expectedLevelId,
-                    persistedPosition);
-
-                using (LoopbackSessionHarness enterHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-supported-persisted-last-location-enter-test"))
-                {
-                    object enterRequest = Activator.CreateInstance(enterRequestType)
-                        ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-                    SetRequiredIntegerMember(enterRequest, "WorldId", 0);
-                    SetRequiredIntegerMember(enterRequest, "LevelId", 0);
-
-                    InvokeRegisteredRequestHandler(enterRequestName, enterHarness.Session, 12_022, enterRequest);
-                    JObject enterResponse = ReadBigWorldEnterWorldResponseWithPushes(
-                        enterHarness,
-                        12_022,
-                        enterResponseName);
-                    AssertEqual(0L, RequiredValue<long>(enterResponse, "Code", JTokenType.Integer, $"{name} {enterResponseName}"), $"{name} {enterResponseName} Code");
-                    JObject enterResultData = RequiredObject(enterResponse, "EnterResultData", $"{name} {enterResponseName}");
-                    JObject worldData = RequiredObject(enterResultData, "WorldData", $"{name} {enterResponseName}.EnterResultData");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(worldData, "WorldId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.WorldId remains on retail fixture");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(worldData, "LevelId", JTokenType.Integer, $"{name} {enterResponseName}.EnterResultData.WorldData"), $"{name} EnterResultData.WorldData.LevelId remains on retail fixture");
-                    JObject bornData = RequiredFirstPlayerBornData(worldData, $"{name} {enterResponseName}.EnterResultData.WorldData");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(bornData, "LastWorldId", JTokenType.Integer, $"{name} BornData"), $"{name} BornData.LastWorldId remains on retail fixture");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(bornData, "LastLevelId", JTokenType.Integer, $"{name} BornData"), $"{name} BornData.LastLevelId remains on retail fixture");
-                    AssertPositionEquals(persistedPosition, RequiredObject(bornData, "Position", $"{name} BornData"), $"{name} BornData.Position uses supported persisted player state");
-
-                    JObject responsePlayerData = RequiredObject(enterResponse, "PlayerData", $"{name} {enterResponseName}");
-                    AssertEqual((long)expectedWorldId, RequiredValue<long>(responsePlayerData, "LastWorldId", JTokenType.Integer, $"{name} {enterResponseName}.PlayerData"), $"{name} PlayerData.LastWorldId remains on retail fixture");
-                    AssertEqual((long)expectedLevelId, RequiredValue<long>(responsePlayerData, "LastLevelId", JTokenType.Integer, $"{name} {enterResponseName}.PlayerData"), $"{name} PlayerData.LastLevelId remains on retail fixture");
-                    AssertPlayerDataLastTransformIsNull(responsePlayerData, $"{name} {enterResponseName}.PlayerData");
-                }
-
-                using LoopbackSessionHarness saveHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-supported-persisted-last-location-save-test");
-                AssertDlcWorldSaveData(
-                    saveHarness,
-                    12_023,
-                    expectedWorldId,
-                    expectedLevelId,
-                    expectedReliablePos: persistedPosition);
-            }
-
-            void ValidatePersistedBigWorldClaimedChest(
-                long persistedPlayerId,
-                int worldId,
-                int levelId,
-                int claimedPlaceId)
-            {
-                const string name = "BigWorld persisted claimed chest regression";
-                AscNet.Common.Database.Player persistedPlayer = CreateDrawCompatibilityPlayer(persistedPlayerId);
-                SetPersistedBigWorldState(
-                    persistedPlayer,
-                    worldId,
-                    levelId,
-                    (615.273193359375D, 157.8118133544922D, 1280.5546875D),
-                    claimedSceneObjectLevelId: levelId,
-                    claimedSceneObjectPlaceId: claimedPlaceId);
-
-                using (LoopbackSessionHarness enterHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-persisted-claimed-chest-enter-test"))
-                {
-                    object enterRequest = Activator.CreateInstance(enterRequestType)
-                        ?? throw new InvalidDataException($"{enterRequestName}: expected a public parameterless constructor.");
-                    SetRequiredIntegerMember(enterRequest, "WorldId", worldId);
-                    SetRequiredIntegerMember(enterRequest, "LevelId", levelId);
-
-                    InvokeRegisteredRequestHandler(enterRequestName, enterHarness.Session, 12_030, enterRequest);
-                    _ = ReadBigWorldEnterWorldResponseWithPushes(
-                        enterHarness,
-                        12_030,
-                        enterResponseName,
-                        expectedBoxRewardedCountForLevel4001: 4);
-                }
-
-                using (LoopbackSessionHarness saveHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-persisted-claimed-chest-save-test"))
-                {
-                    _ = AssertDlcWorldSaveData(
-                        saveHarness,
-                        12_031,
-                        worldId,
-                        levelId,
-                        expectedBoxRewardedCountForLevel4001: 4,
-                        expectedClaimedPlaceId: claimedPlaceId);
-                }
-
-                using (LoopbackSessionHarness sceneObjectHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-persisted-claimed-chest-scene-object-test"))
-                {
-                    AssertDlcWorldSceneObjectDataContainsClaimedChest(
-                        sceneObjectHarness,
-                        12_032,
-                        worldId,
-                        levelId,
-                        claimedPlaceId,
-                        name);
-                }
-
-                using LoopbackSessionHarness interactHarness = new(
-                    CreateDrawCompatibilityCharacter(persistedPlayerId),
-                    persistedPlayer,
-                    CreateDrawCompatibilityInventory(persistedPlayerId, []),
-                    "big-world-persisted-claimed-chest-interact-test");
-                AssertClaimedXRpcSceneObjectInteractDoesNotEmitRewardSidecars(
-                    interactHarness,
-                    12_033,
-                    persistedPlayerId,
-                    levelId,
-                    claimedPlaceId);
-            }
-
-            static void ValidateEnterInstLevelAdvanceTargetsRemainObservable(long advancePlayerId, int worldId)
-            {
-                using LoopbackSessionHarness advanceHarness = new(
-                    CreateDrawCompatibilityCharacter(advancePlayerId),
-                    CreateDrawCompatibilityPlayer(advancePlayerId),
-                    CreateDrawCompatibilityInventory(advancePlayerId, []),
-                    "big-world-advance-level-observable-test");
-                AssertEnterInstLevelEmitsNewLevelNotify(advanceHarness, 12_040, worldId, 5001);
-                AssertEnterInstLevelEmitsNewLevelNotify(advanceHarness, 12_041, worldId, 6001);
-            }
-
-            static void SetPersistedBigWorldState(
-                AscNet.Common.Database.Player player,
-                int worldId,
-                int levelId,
-                (double X, double Y, double Z) position,
-                int? claimedSceneObjectLevelId = null,
-                int? claimedSceneObjectPlaceId = null)
-            {
-                MemberInfo stateMember = RequiredFirstDataMember(
-                    typeof(AscNet.Common.Database.Player),
-                    ["BigWorldState", "BigWorldData", "BigWorld"]);
-                object state = GetRequiredMemberValue(player, stateMember)
-                    ?? (Activator.CreateInstance(MemberValueType(stateMember))
-                        ?? throw new InvalidDataException($"{typeof(AscNet.Common.Database.Player).FullName}.{stateMember.Name}: expected a constructible per-player BigWorld state document."));
-
-                SetFirstAvailableIntegerMember(state, ["LastWorldId", "WorldId"], worldId, "Player.BigWorldState last world");
-                SetFirstAvailableIntegerMember(state, ["LastLevelId", "LevelId"], levelId, "Player.BigWorldState last level");
-                SetFirstAvailablePositionMember(state, ["LastPosition", "Position", "ReliablePos", "LastReliablePos"], position, "Player.BigWorldState last position");
-
-                if (claimedSceneObjectLevelId is int claimedLevelId && claimedSceneObjectPlaceId is int claimedPlaceId)
-                    AddClaimedSceneObjectKey(state, claimedLevelId, claimedPlaceId);
-
-                SetRequiredMemberValue(player, stateMember, state);
-            }
-
-            static MemberInfo RequiredFirstDataMember(Type type, IReadOnlyList<string> memberNames)
-            {
-                foreach (string memberName in memberNames)
-                {
-                    MemberInfo? member = OptionalDataMember(type, memberName);
-                    if (member is not null)
-                        return member;
-                }
-
-                throw new MissingMemberException(type.FullName, string.Join("|", memberNames));
-            }
-
-            static void SetFirstAvailableIntegerMember(object target, IReadOnlyList<string> memberNames, int value, string name)
-            {
-                MemberInfo member = RequiredFirstDataMember(target.GetType(), memberNames);
-                SetRequiredMemberValue(target, member, ConvertIntegerForType(MemberValueType(member), value));
-            }
-
-            static void SetFirstAvailablePositionMember(object target, IReadOnlyList<string> memberNames, (double X, double Y, double Z) position, string name)
-            {
-                MemberInfo member = RequiredFirstDataMember(target.GetType(), memberNames);
-                object value = CreateBigWorldPositionValue(MemberValueType(member), position, name);
-                SetRequiredMemberValue(target, member, value);
-            }
-
-            static object CreateBigWorldPositionValue(Type positionType, (double X, double Y, double Z) position, string name)
-            {
-                Type? nullableType = Nullable.GetUnderlyingType(positionType);
-                if (nullableType is not null)
-                    return CreateBigWorldPositionValue(nullableType, position, name);
-
-                if (positionType == typeof(object)
-                    || positionType.IsAssignableFrom(typeof(Dictionary<string, object?>)))
-                {
-                    return new Dictionary<string, object?>
-                    {
-                        ["X"] = position.X,
-                        ["Y"] = position.Y,
-                        ["Z"] = position.Z
-                    };
-                }
-
-                object positionValue = Activator.CreateInstance(positionType)
-                    ?? throw new InvalidDataException($"{name}: expected a constructible position type, got {positionType.FullName}.");
-                SetFirstAvailableFloatingMember(positionValue, ["X", "x", "PosX"], position.X, $"{name}.X");
-                SetFirstAvailableFloatingMember(positionValue, ["Y", "y", "PosY"], position.Y, $"{name}.Y");
-                SetFirstAvailableFloatingMember(positionValue, ["Z", "z", "PosZ"], position.Z, $"{name}.Z");
-                return positionValue;
-            }
-
-            static void SetFirstAvailableFloatingMember(object target, IReadOnlyList<string> memberNames, double value, string name)
-            {
-                MemberInfo member = RequiredFirstDataMember(target.GetType(), memberNames);
-                SetRequiredMemberValue(target, member, ConvertFloatingForType(MemberValueType(member), value, name));
-            }
-
-            static object ConvertFloatingForType(Type targetType, double value, string name)
-            {
-                Type? nullableType = Nullable.GetUnderlyingType(targetType);
-                if (nullableType is not null)
-                    return ConvertFloatingForType(nullableType, value, name);
-                if (targetType == typeof(double))
-                    return value;
-                if (targetType == typeof(float))
-                    return (float)value;
-                if (targetType == typeof(decimal))
-                    return (decimal)value;
-                if (targetType == typeof(int))
-                    return checked((int)value);
-                if (targetType == typeof(long))
-                    return checked((long)value);
-                throw new InvalidDataException($"{name}: expected a numeric position member, got {targetType.FullName}.");
-            }
-
-            static void AddClaimedSceneObjectKey(object state, int levelId, int placeId)
-            {
-                MemberInfo member = RequiredFirstDataMember(
-                    state.GetType(),
-                    ["ClaimedSceneObjectKeys", "ClaimedSceneObjectPlaces", "ClaimedChestKeys", "ClaimedChests", "ClaimedSceneObjects"]);
-                object collection = GetRequiredMemberValue(state, member)
-                    ?? CreateClaimedSceneObjectCollection(MemberValueType(member), $"{state.GetType().FullName}.{member.Name}");
-                AddClaimedSceneObjectKeyToCollection(collection, levelId, placeId, $"{state.GetType().FullName}.{member.Name}");
-                SetRequiredMemberValue(state, member, collection);
-            }
-
-            static object CreateClaimedSceneObjectCollection(Type collectionType, string name)
-            {
-                if (collectionType == typeof(object)
-                    || collectionType.IsAssignableFrom(typeof(HashSet<string>)))
-                    return new HashSet<string>(StringComparer.Ordinal);
-                if (collectionType.IsAssignableFrom(typeof(List<string>)))
-                    return new List<string>();
-
-                Type? elementType = TryGetSingleGenericEnumerableElementType(collectionType);
-                if (elementType is not null)
-                {
-                    Type concreteSetType = typeof(HashSet<>).MakeGenericType(elementType);
-                    if (collectionType.IsAssignableFrom(concreteSetType))
-                        return Activator.CreateInstance(concreteSetType)
-                            ?? throw new InvalidDataException($"{name}: expected to construct {concreteSetType.FullName}.");
-
-                    Type concreteListType = typeof(List<>).MakeGenericType(elementType);
-                    if (collectionType.IsAssignableFrom(concreteListType))
-                        return Activator.CreateInstance(concreteListType)
-                            ?? throw new InvalidDataException($"{name}: expected to construct {concreteListType.FullName}.");
-                }
-
-                if (!collectionType.IsInterface && Activator.CreateInstance(collectionType) is object collection)
-                    return collection;
-                throw new InvalidDataException($"{name}: expected a constructible claimed scene-object key collection, got {collectionType.FullName}.");
-            }
-
-            static Type? TryGetSingleGenericEnumerableElementType(Type collectionType)
-            {
-                if (collectionType.IsGenericType && collectionType.GetGenericArguments().Length == 1)
-                    return collectionType.GetGenericArguments()[0];
-
-                Type[] enumerableInterfaces = collectionType.GetInterfaces()
-                    .Where(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
-                    .ToArray();
-                return enumerableInterfaces.Length == 1 ? enumerableInterfaces[0].GetGenericArguments()[0] : null;
-            }
-
-            static void AddClaimedSceneObjectKeyToCollection(object collection, int levelId, int placeId, string name)
-            {
-                if (collection is System.Collections.IDictionary dictionary)
-                {
-                    dictionary[$"{levelId}:{placeId}"] = true;
-                    return;
-                }
-
-                if (collection is System.Collections.IList list)
-                {
-                    Type listElementType = RequiredListElementType(collection.GetType(), name);
-                    list.Add(CreateClaimedSceneObjectKeyValue(listElementType, levelId, placeId, name));
-                    return;
-                }
-
-                MethodInfo? addMethod = collection.GetType()
-                    .GetMethods(BindingFlags.Instance | BindingFlags.Public)
-                    .Where(method => method.Name == "Add" && method.GetParameters().Length == 1)
-                    .OrderBy(method => method.GetParameters()[0].ParameterType == typeof(string) ? 0 : 1)
-                    .FirstOrDefault();
-                if (addMethod is null)
-                    throw new InvalidDataException($"{name}: expected a claimed key collection with Add(value).");
-
-                Type elementType = addMethod.GetParameters()[0].ParameterType;
-                addMethod.Invoke(collection, [CreateClaimedSceneObjectKeyValue(elementType, levelId, placeId, name)]);
-            }
-
-            static object CreateClaimedSceneObjectKeyValue(Type keyType, int levelId, int placeId, string name)
-            {
-                if (keyType == typeof(string) || keyType == typeof(object))
-                    return $"{levelId}:{placeId}";
-                if (keyType.IsGenericType
-                    && keyType.GetGenericTypeDefinition() == typeof(ValueTuple<,>)
-                    && keyType.GetGenericArguments() is { Length: 2 } tupleTypes)
-                {
-                    return Activator.CreateInstance(
-                        keyType,
-                        ConvertIntegerForType(tupleTypes[0], levelId),
-                        ConvertIntegerForType(tupleTypes[1], placeId))
-                        ?? throw new InvalidDataException($"{name}: expected to construct claimed scene-object tuple key.");
-                }
-
-                object key = Activator.CreateInstance(keyType)
-                    ?? throw new InvalidDataException($"{name}: expected a constructible claimed scene-object key type, got {keyType.FullName}.");
-                SetFirstAvailableIntegerMember(key, ["LevelId", "InstLevelId"], levelId, $"{name} claimed key level");
-                SetFirstAvailableIntegerMember(key, ["PlaceId", "SceneObjectPlaceId", "ObjectPlaceId"], placeId, $"{name} claimed key place");
-                return key;
-            }
-
-            static JObject RequiredFirstPlayerBornData(JObject worldData, string path)
-            {
-                JArray players = (JArray)RequiredToken(worldData, "Players", JTokenType.Array, path);
-                if (players.Count == 0)
-                    throw new InvalidDataException($"{path}.Players: expected at least one player entry.");
-                if (players[0] is not JObject firstPlayer)
-                    throw new InvalidDataException($"{path}.Players[0]: expected JSON object, got {players[0]!.Type}.");
-                return RequiredObject(firstPlayer, "BornData", $"{path}.Players[0]");
-            }
-
-            static void AssertPositionEquals((double X, double Y, double Z) expected, JObject actual, string name)
-            {
-                AssertJsonNumberNear(expected.X, RequiredValue<double>(actual, "X", JTokenType.Float, name), $"{name}.X");
-                AssertJsonNumberNear(expected.Y, RequiredValue<double>(actual, "Y", JTokenType.Float, name), $"{name}.Y");
-                AssertJsonNumberNear(expected.Z, RequiredValue<double>(actual, "Z", JTokenType.Float, name), $"{name}.Z");
-            }
-
-            static void AssertPositionDoesNotEqual((double X, double Y, double Z) forbidden, JObject actual, string name)
-            {
-                double actualX = RequiredValue<double>(actual, "X", JTokenType.Float, name);
-                double actualY = RequiredValue<double>(actual, "Y", JTokenType.Float, name);
-                double actualZ = RequiredValue<double>(actual, "Z", JTokenType.Float, name);
-                if (Math.Abs(forbidden.X - actualX) <= 0.001D
-                    && Math.Abs(forbidden.Y - actualY) <= 0.001D
-                    && Math.Abs(forbidden.Z - actualZ) <= 0.001D)
-                    throw new InvalidDataException($"{name}: must not equal unsupported persisted position ({forbidden.X}, {forbidden.Y}, {forbidden.Z}).");
-            }
-
-            static void AssertPlayerDataLastTransformIsNull(JObject playerData, string name)
-            {
-                _ = RequiredToken(playerData, "LastPosition", JTokenType.Null, name);
-                _ = RequiredToken(playerData, "LastRotation", JTokenType.Null, name);
-            }
-
-            static void AssertJsonNumberNear(double expected, double actual, string name)
-            {
-                if (Math.Abs(expected - actual) > 0.001D)
-                    throw new InvalidDataException($"{name}: expected {expected}, got {actual}.");
-            }
-
-            static void AssertSaveDataSceneObjectAbsent(JObject levelData, int placeId, string path)
-            {
-                JObject actorSaveData = RequiredObject(levelData, "ActorSaveData", path);
-                JObject soSaveDatas = RequiredObject(actorSaveData, "SoSaveDatas", $"{path}.ActorSaveData");
-                string placeKey = placeId.ToString();
-                if (soSaveDatas.TryGetValue(placeKey, out JToken? claimedSaveData))
-                    throw new InvalidDataException($"{path}.ActorSaveData.SoSaveDatas[{placeId}]: expected claimed chest save-data entry to be removed, got {claimedSaveData.Type}.");
-            }
-
-            static void AssertSceneObjectNoLongerInteractable(JObject sceneObjectState, string name)
-            {
-                bool provesUnavailable = false;
-                if (sceneObjectState.TryGetValue("IsInteractable", out JToken? interactable)
-                    && interactable.Type == JTokenType.Boolean)
-                {
-                    if (interactable.Value<bool>())
-                        throw new InvalidDataException($"{name}: expected claimed chest not to be interactable.");
-                    provesUnavailable = true;
-                }
-
-                if (sceneObjectState.TryGetValue("Active", out JToken? active)
-                    && active.Type == JTokenType.Boolean)
-                {
-                    if (!active.Value<bool>())
-                        provesUnavailable = true;
-                    else if (!provesUnavailable)
-                        throw new InvalidDataException($"{name}: expected claimed chest not to be active or not to be interactable.");
-                }
-
-                if (!provesUnavailable)
-                    throw new InvalidDataException($"{name}: expected IsInteractable=false or Active=false for claimed chest state.");
-            }
-
-            static void AssertDlcWorldSceneObjectDataContainsClaimedChest(
-                LoopbackSessionHarness harness,
-                int packetId,
-                int worldId,
-                int levelId,
-                int claimedPlaceId,
-                string name)
-            {
-                const string requestName = "DlcWorldSceneObjectDataRequest";
-                const string responseName = "DlcWorldSceneObjectDataResponse";
-                byte[] requestContent = MessagePackSerializer.Serialize(new Dictionary<string, object?>
-                {
-                    ["WorldId"] = worldId,
-                    ["LevelId"] = levelId
-                });
-                InvokeRegisteredRequestHandlerWithContent(requestName, harness.Session, packetId, requestContent);
-
-                Packet responsePacket = harness.ReadPacket($"{name} {requestName} response packet");
-                AssertEqual(Packet.ContentType.Response, responsePacket.Type, $"{name} {requestName} response packet type");
-                Packet.Response packetResponse = MessagePackSerializer.Deserialize<Packet.Response>(responsePacket.Content);
-                AssertEqual(packetId, packetResponse.Id, $"{name} {responseName} packet id");
-                AssertEqual(responseName, packetResponse.Name, $"{name} {responseName} packet name");
-                JObject response = JObject.Parse(MessagePackSerializer.ConvertToJson(packetResponse.Content));
-                AssertEqual(0L, RequiredValue<long>(response, "Code", JTokenType.Integer, $"{name} {responseName}"), $"{name} {responseName} Code");
-                JObject sceneObjectStates = RequiredObject(response, "SceneObjectStates", $"{name} {responseName}");
-                JObject claimedState = RequiredObject(sceneObjectStates, claimedPlaceId.ToString(), $"{name} {responseName}.SceneObjectStates");
-                AssertSceneObjectNoLongerInteractable(claimedState, $"{name} {responseName}.SceneObjectStates[{claimedPlaceId}]");
-            }
-
-            static void AssertClaimedXRpcSceneObjectInteractDoesNotEmitRewardSidecars(
-                LoopbackSessionHarness harness,
-                int packetId,
-                long playerId,
-                int levelId,
-                int claimedPlaceId)
-            {
-                const string requestName = "XRpcCommon RpcPlayerInteractRequest persisted claimed chest";
-                byte[] requestPayload = BuildXRpcPlayerInteractRequestPayload(
-                    playerId,
-                    targetUuid: 95,
-                    targetPlaceId: claimedPlaceId,
-                    targetType: 2,
-                    optionId: 1);
-
-                InvokeRegisteredRequestHandlerWithContent("XRpcCommon", harness.Session, packetId, requestPayload);
-
-                Packet startPacket = harness.ReadPacket($"{requestName} start notify packet");
-                AssertXRpcCommonPushPacketArgs(
-                    startPacket,
-                    "RpcNpcInteractStartNotify",
-                    [95, claimedPlaceId, 2, 1],
-                    $"{requestName} start notify");
-                AssertXRpcCommonPushArgs(
-                    harness,
-                    "RpcNpcInteractFinishNotify",
-                    [],
-                    $"{requestName} finish notify");
-
-                Type responseType = RequiredPayloadType("XRpcCommonResponse");
-                object response = ReadResponsePayload(
-                    harness,
-                    packetId,
-                    "XRpcCommonResponse",
-                    $"{requestName} response",
-                    responseType,
-                    maxPacketsToRead: 1);
-                AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{requestName} response Code");
-                if (harness.TryReadAvailablePacket($"{requestName} unexpected packet after claimed interaction", out Packet extraPacket))
-                    throw new InvalidDataException($"{requestName}: claimed {levelId}/{claimedPlaceId} must not emit reward sidecars or inventory rewards; got extra {DescribePacket(extraPacket)}.");
-            }
-
-            static void AssertNestedBigWorldNativePayloadIdentityAndCommanderPartData(
-                JObject enterResultData,
-                string propertyName,
-                long expectedPlayerId,
-                string expectedPlayerName,
-                long fixturePlayerId,
-                string fixturePlayerName,
-                IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts,
-                string responseName)
-            {
-                string payloadPath = $"{responseName}.EnterResultData.{propertyName}";
-                if (!enterResultData.TryGetValue(propertyName, out JToken? encodedPayload))
-                    throw new InvalidDataException($"{responseName}.EnterResultData: missing JSON field '{propertyName}'.");
-
-                string encodedBytes = encodedPayload.Type switch
-                {
-                    JTokenType.Object => RequiredValue<string>((JObject)encodedPayload, "__base64_bytes__", JTokenType.String, payloadPath),
-                    JTokenType.String => encodedPayload.Value<string>()!,
-                    _ => throw new InvalidDataException($"{payloadPath}: expected JSON Object with __base64_bytes__ or base64 String, got {encodedPayload.Type}.")
-                };
-
-                byte[] payloadBytes;
-                try
-                {
-                    payloadBytes = Convert.FromBase64String(encodedBytes);
-                }
-                catch (FormatException ex)
-                {
-                    throw new InvalidDataException($"{payloadPath}.__base64_bytes__: expected base64-encoded MessagePack bytes.", ex);
-                }
-
-                JToken nestedPayload;
-                try
-                {
-                    nestedPayload = JToken.Parse(MessagePackSerializer.ConvertToJson(payloadBytes));
-                }
-                catch (Exception ex) when (ex is MessagePackSerializationException || ex is JsonException)
-                {
-                    throw new InvalidDataException($"{payloadPath}: expected __base64_bytes__ to decode to MessagePack JSON.", ex);
-                }
-
-                AssertJsonContainsInteger(nestedPayload, expectedPlayerId, $"{payloadPath} nested MessagePack JSON active session player Id");
-                AssertJsonContainsString(nestedPayload, expectedPlayerName, $"{payloadPath} nested MessagePack JSON active session player Name");
-                AssertJsonDoesNotContainInteger(nestedPayload, fixturePlayerId, $"{payloadPath} nested MessagePack JSON fixture player Id");
-                AssertJsonDoesNotContainString(nestedPayload, fixturePlayerName, $"{payloadPath} nested MessagePack JSON fixture player Name");
-                AssertNestedBigWorldCommanderPartData(nestedPayload, $"{payloadPath} nested MessagePack JSON", expectedCommanderParts);
-            }
-
-            static void AssertTopLevelBigWorldSelfNpcCommanderPartData(
-                JObject firstPlayer,
-                string firstPlayerPath,
-                IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts)
-            {
-                JArray npcList = (JArray)RequiredToken(firstPlayer, "NpcList", JTokenType.Array, firstPlayerPath);
-                if (npcList.Count == 0)
-                    throw new InvalidDataException($"{firstPlayerPath}.NpcList: expected at least one self NPC entry.");
-                if (npcList[0] is not JObject selfNpc)
-                    throw new InvalidDataException($"{firstPlayerPath}.NpcList[0]: expected JSON object, got {npcList[0]!.Type}.");
-
-                JObject partData = RequiredObject(selfNpc, "PartData", $"{firstPlayerPath}.NpcList[0]");
-                JArray partList = (JArray)RequiredToken(partData, "PartList", JTokenType.Array, $"{firstPlayerPath}.NpcList[0].PartData");
-                AssertCommanderPartListContainsFixtureCompatibleParts(partList, $"{firstPlayerPath}.NpcList[0].PartData.PartList", expectedCommanderParts);
-            }
-
-            static void AssertNestedBigWorldCommanderPartData(
-                JToken nestedPayload,
-                string payloadPath,
-                IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts)
-            {
-                List<(JArray PartList, string Path)> commanderPartLists = [];
-                List<string> observedPartDataPartLists = [];
-                CollectCommanderPartLists(nestedPayload, payloadPath, commanderPartLists, observedPartDataPartLists, expectedCommanderParts);
-                if (commanderPartLists.Count != 1)
-                {
-                    throw new InvalidDataException(
-                        $"{payloadPath} commander fixture-compatible PartData.PartList count: expected '1', got '{commanderPartLists.Count}'. " +
-                        $"Observed PartData.PartList part ids: {FormatObservedPartLists(observedPartDataPartLists)}.");
-                }
-
-                AssertCommanderPartListContainsFixtureCompatibleParts(commanderPartLists[0].PartList, commanderPartLists[0].Path, expectedCommanderParts);
-            }
-
-
-            static void CollectCommanderPartLists(
-                JToken token,
-                string path,
-                List<(JArray PartList, string Path)> commanderPartLists,
-                List<string> observedPartDataPartLists,
-                IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts)
-            {
-                if (token is JObject obj)
-                {
-                    if (TryDecodeNestedMessagePackBytes(obj, out JToken? decodedNestedPayload))
-                        CollectCommanderPartLists(decodedNestedPayload, $"{path}.__base64_bytes__", commanderPartLists, observedPartDataPartLists, expectedCommanderParts);
-
-                    bool foundPartDataPartList = TryGetPartDataPartList(obj, path, out JArray? partList, out string partListPath);
-                    if (foundPartDataPartList)
-                    {
-                        observedPartDataPartLists.Add($"{partListPath}=[{DescribePartListPartIds(partList)}]");
-                        if (PartListContainsFixtureCompatiblePartIds(partList, expectedCommanderParts))
-                            commanderPartLists.Add((partList, partListPath));
-                    }
-
-                    foreach (JProperty property in obj.Properties())
-                    {
-                        if (foundPartDataPartList && string.Equals(property.Name, "PartData", StringComparison.Ordinal))
-                            continue;
-                        CollectCommanderPartLists(property.Value, $"{path}.{property.Name}", commanderPartLists, observedPartDataPartLists, expectedCommanderParts);
-                    }
-                    return;
-                }
-
-                if (token.Type == JTokenType.String
-                    && TryDecodeNestedMessagePackString(token.Value<string>(), out JToken? decodedStringPayload))
-                {
-                    CollectCommanderPartLists(decodedStringPayload, $"{path}.__base64_string__", commanderPartLists, observedPartDataPartLists, expectedCommanderParts);
-                    return;
-                }
-
-                if (token is JArray array)
-                {
-                    for (int index = 0; index < array.Count; index++)
-                        CollectCommanderPartLists(array[index], $"{path}[{index}]", commanderPartLists, observedPartDataPartLists, expectedCommanderParts);
-                }
-            }
-
-            static bool TryGetPartDataPartList(JObject obj, string path, out JArray partList, out string partListPath)
-            {
-                if (obj.TryGetValue("PartData", out JToken? partDataToken)
-                    && partDataToken is JObject partData
-                    && partData.TryGetValue("PartList", out JToken? nestedPartListToken)
-                    && nestedPartListToken is JArray nestedPartList)
-                {
-                    partList = nestedPartList;
-                    partListPath = $"{path}.PartData.PartList";
-                    return true;
-                }
-
-                if (path.EndsWith(".PartData", StringComparison.Ordinal)
-                    && obj.TryGetValue("PartList", out JToken? partListToken)
-                    && partListToken is JArray directPartList)
-                {
-                    partList = directPartList;
-                    partListPath = $"{path}.PartList";
-                    return true;
-                }
-
-                partList = null!;
-                partListPath = string.Empty;
-                return false;
-            }
-
-            static bool TryDecodeNestedMessagePackBytes(JObject obj, out JToken decodedPayload)
-            {
-                decodedPayload = JValue.CreateNull();
-                if (!obj.TryGetValue("__base64_bytes__", out JToken? encodedPayload)
-                    || encodedPayload.Type != JTokenType.String)
-                {
-                    return false;
-                }
-
-                if (!TryDecodeNestedMessagePackString(encodedPayload.Value<string>(), out decodedPayload))
-                    throw new InvalidDataException("Expected __base64_bytes__ to contain a MessagePack payload.");
-
-                return true;
-            }
-
-            static bool TryDecodeNestedMessagePackString(string? encodedPayload, out JToken decodedPayload)
-            {
-                decodedPayload = JValue.CreateNull();
-                if (string.IsNullOrWhiteSpace(encodedPayload) || encodedPayload.Length % 4 != 0)
-                    return false;
-
-                try
-                {
-                    byte[] payloadBytes = Convert.FromBase64String(encodedPayload);
-                    decodedPayload = DecodeLeadingMessagePackJson(payloadBytes);
-                    return true;
-                }
-                catch (Exception exception) when (exception is FormatException or MessagePackSerializationException or JsonException or InvalidOperationException)
-                {
-                    decodedPayload = JValue.CreateNull();
-                    return false;
-                }
-            }
-
-            static JToken DecodeLeadingMessagePackJson(byte[] payloadBytes)
-            {
-                MessagePackReader reader = new(new System.Buffers.ReadOnlySequence<byte>(payloadBytes));
-                reader.Skip();
-                int consumed = checked((int)reader.Consumed);
-                if (consumed <= 0)
-                    throw new InvalidDataException("Expected a leading MessagePack value.");
-                return JToken.Parse(MessagePackSerializer.ConvertToJson(payloadBytes.AsMemory(0, consumed).ToArray()));
-            }
-
-            static string FormatObservedPartLists(List<string> observedPartDataPartLists)
-            {
-                if (observedPartDataPartLists.Count == 0)
-                    return "<none>";
-
-                int limit = Math.Min(5, observedPartDataPartLists.Count);
-                StringBuilder builder = new();
-                for (int index = 0; index < limit; index++)
-                {
-                    if (index > 0)
-                        builder.Append("; ");
-                    builder.Append(observedPartDataPartLists[index]);
-                }
-
-                if (observedPartDataPartLists.Count > limit)
-                    builder.Append($"; ... {observedPartDataPartLists.Count - limit} more");
-                return builder.ToString();
-            }
-
-            static string DescribePartListPartIds(JArray partList)
-            {
-                StringBuilder builder = new();
-                int observedPartIds = 0;
-                foreach (JToken part in partList)
-                {
-                    if (part is not JObject partObject
-                        || !partObject.TryGetValue("PartId", out JToken? partId)
-                        || partId.Type != JTokenType.Integer)
-                    {
-                        continue;
-                    }
-
-                    if (observedPartIds > 0)
-                        builder.Append(", ");
-                    if (observedPartIds == 8)
-                    {
-                        builder.Append("...");
-                        break;
-                    }
-
-                    builder.Append(partId.Value<long>());
-                    observedPartIds++;
-                }
-
-                return observedPartIds == 0 ? "<no integer PartId values>" : builder.ToString();
-            }
-
-            static bool PartListContainsFixtureCompatiblePartIds(JArray partList, IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts)
-            {
-                foreach ((long partId, _) in expectedCommanderParts)
-                {
-                    if (!PartListContainsPartId(partList, partId))
-                        return false;
-                }
-
-                return true;
-            }
-
-            static bool PartListContainsPartId(JArray partList, long expectedPartId)
-            {
-                foreach (JToken part in partList)
-                {
-                    if (part is JObject partObject
-                        && partObject.TryGetValue("PartId", out JToken? partId)
-                        && partId.Type == JTokenType.Integer
-                        && partId.Value<long>() == expectedPartId)
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            static void AssertCommanderPartListContainsFixtureCompatibleParts(
-                JArray partList,
-                string partListPath,
-                IReadOnlyList<(long PartId, long ColourId)> expectedCommanderParts)
-            {
-                foreach ((long expectedPartId, long expectedColourId) in expectedCommanderParts)
-                {
-                    JObject part = AssertPartListContainsPart(partList, partListPath, expectedPartId);
-                    AssertEqual(expectedColourId, RequiredValue<long>(part, "ColourId", JTokenType.Integer, $"{partListPath}[PartId={expectedPartId}]"), $"{partListPath} PartId {expectedPartId} ColourId");
-                }
-            }
-
-            static JObject AssertPartListContainsPart(JArray partList, string partListPath, long expectedPartId)
-            {
-                for (int index = 0; index < partList.Count; index++)
-                {
-                    if (partList[index] is not JObject part)
-                        throw new InvalidDataException($"{partListPath}[{index}]: expected JSON object, got {partList[index]!.Type}.");
-
-                    if (RequiredValue<long>(part, "PartId", JTokenType.Integer, $"{partListPath}[{index}]") == expectedPartId)
-                        return part;
-                }
-
-                throw new InvalidDataException($"{partListPath}: expected commander fixture-compatible PartId {expectedPartId}.");
-            }
-
-            static (long PlayerId, string PlayerName, long PlayerGender, IReadOnlyList<(long PartId, long ColourId)> CommanderParts) ReadBigWorldEnterFixtureExpectations()
-            {
-                byte[] fixturePayload;
-                try
-                {
-                    string encodedPayload = File.ReadAllText(ResourcePath("Configs", "big_world_enter_world_response.msgpack.b64")).Trim();
-                    fixturePayload = Convert.FromBase64String(encodedPayload);
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is FormatException)
-                {
-                    throw new InvalidDataException("BigWorld enter-world fixture expectations: expected readable base64 MessagePack fixture.", ex);
-                }
-
-                JObject fixtureResponse;
-                try
-                {
-                    fixtureResponse = JObject.Parse(MessagePackSerializer.ConvertToJson(fixturePayload));
-                }
-                catch (Exception ex) when (ex is MessagePackSerializationException || ex is JsonException)
-                {
-                    throw new InvalidDataException("BigWorld enter-world fixture expectations: expected fixture bytes to decode to MessagePack JSON.", ex);
-                }
-
-                JObject enterResultData = RequiredObject(fixtureResponse, "EnterResultData", "BigWorld enter-world fixture");
-                JObject worldData = RequiredObject(enterResultData, "WorldData", "BigWorld enter-world fixture.EnterResultData");
-                JArray players = (JArray)RequiredToken(worldData, "Players", JTokenType.Array, "BigWorld enter-world fixture.EnterResultData.WorldData");
-                if (players.Count == 0)
-                    throw new InvalidDataException("BigWorld enter-world fixture.EnterResultData.WorldData.Players: expected at least one fixture player.");
-                if (players[0] is not JObject firstFixturePlayer)
-                    throw new InvalidDataException($"BigWorld enter-world fixture.EnterResultData.WorldData.Players[0]: expected JSON object, got {players[0]!.Type}.");
-
-                JObject playerData = RequiredObject(fixtureResponse, "PlayerData", "BigWorld enter-world fixture");
-                long currentCommanderOutfitType = RequiredValue<long>(playerData, "CurCommanderOutfitType", JTokenType.Integer, "BigWorld enter-world fixture.PlayerData");
-                JObject commanderFashionOutfits = RequiredObject(playerData, "CommanderFashionOutfits", "BigWorld enter-world fixture.PlayerData");
-                string currentCommanderOutfitKey = currentCommanderOutfitType.ToString();
-                JObject currentCommanderOutfit = RequiredObject(commanderFashionOutfits, currentCommanderOutfitKey, "BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits");
-                JObject wearFashionDict = RequiredObject(currentCommanderOutfit, "WearFashionDict", $"BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits[{currentCommanderOutfitKey}]");
-                List<(long PartId, long ColourId)> commanderParts = [];
-                foreach (JProperty fashionEntry in wearFashionDict.Properties())
-                {
-                    if (fashionEntry.Value is not JObject fashionPart)
-                        throw new InvalidDataException($"BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits[{currentCommanderOutfitKey}].WearFashionDict[{fashionEntry.Name}]: expected JSON object, got {fashionEntry.Value.Type}.");
-
-                    commanderParts.Add((
-                        RequiredValue<long>(fashionPart, "PartId", JTokenType.Integer, $"BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits[{currentCommanderOutfitKey}].WearFashionDict[{fashionEntry.Name}]"),
-                        RequiredValue<long>(fashionPart, "ColourId", JTokenType.Integer, $"BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits[{currentCommanderOutfitKey}].WearFashionDict[{fashionEntry.Name}]")));
-                }
-
-                if (commanderParts.Count == 0)
-                    throw new InvalidDataException($"BigWorld enter-world fixture.PlayerData.CommanderFashionOutfits[{currentCommanderOutfitKey}].WearFashionDict: expected at least one commander fashion part.");
-
-                return (
-                    RequiredValue<long>(firstFixturePlayer, "Id", JTokenType.Integer, "BigWorld enter-world fixture.EnterResultData.WorldData.Players[0]"),
-                    RequiredValue<string>(firstFixturePlayer, "Name", JTokenType.String, "BigWorld enter-world fixture.EnterResultData.WorldData.Players[0]"),
-                    RequiredValue<long>(playerData, "Gender", JTokenType.Integer, "BigWorld enter-world fixture.PlayerData"),
-                    commanderParts);
-            }
-
-
-            static void AssertJsonContainsInteger(JToken payload, long expectedValue, string name)
-            {
-                if (!JsonContainsInteger(payload, expectedValue))
-                    throw new InvalidDataException($"{name}: expected an integer value equal to {expectedValue}.");
-            }
-
-            static void AssertJsonContainsString(JToken payload, string expectedValue, string name)
-            {
-                if (!JsonContainsString(payload, expectedValue))
-                    throw new InvalidDataException($"{name}: expected a string value equal to '{expectedValue}'.");
-            }
-
-            static void AssertJsonDoesNotContainInteger(JToken payload, long forbiddenValue, string name)
-            {
-                if (JsonContainsInteger(payload, forbiddenValue))
-                    throw new InvalidDataException($"{name}: must not contain integer value {forbiddenValue}.");
-            }
-
-            static void AssertJsonDoesNotContainString(JToken payload, string forbiddenValue, string name)
-            {
-                if (JsonContainsString(payload, forbiddenValue))
-                    throw new InvalidDataException($"{name}: must not contain string value '{forbiddenValue}'.");
-            }
-
-            static bool JsonContainsInteger(JToken token, long expectedValue)
-            {
-                if (token.Type == JTokenType.Integer && token.Value<long>() == expectedValue)
-                    return true;
-
-                foreach (JToken child in token.Children())
-                {
-                    if (JsonContainsInteger(child, expectedValue))
-                        return true;
-                }
-
-                return false;
-            }
-
-            static bool JsonContainsString(JToken token, string expectedValue)
-            {
-                if (token.Type == JTokenType.String && string.Equals(token.Value<string>(), expectedValue, StringComparison.Ordinal))
-                    return true;
-
-                foreach (JToken child in token.Children())
-                {
-                    if (JsonContainsString(child, expectedValue))
-                        return true;
-                }
-
-                return false;
-            }
-
-            static JObject ReadBigWorldEnterWorldResponseWithPushes(
-                LoopbackSessionHarness harness,
-                int expectedPacketId,
-                string expectedResponseName,
-                int expectedBoxRewardedCountForLevel4001 = 3,
-                int? expectedCourseTaskTotalProgress = null,
-                IReadOnlyList<long>? expectedCourseReadElementIds = null,
-                IReadOnlyList<long>? expectedTeleporterPlaceIdsForLevel4001 = null)
-            {
-                bool expectCourseDataPush = expectedCourseTaskTotalProgress.GetValueOrDefault() > 0
-                    || expectedCourseReadElementIds is { Count: > 0 };
-                int expectedPushCount = expectCourseDataPush ? 4 : 3;
-                JObject? responsePayload = null;
-                List<string> packetNames = [];
-                List<string> pushNames = [];
-                Dictionary<string, byte[]> pushContentsByName = new(StringComparer.Ordinal);
-
-                for (int packetIndex = 0; packetIndex < expectedPushCount + 1; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{expectedResponseName} response/push packet {packetIndex + 1}");
-                    switch (packet.Type)
-                    {
-                        case Packet.ContentType.Response:
-                            if (responsePayload is not null)
-                                throw new InvalidDataException($"{expectedResponseName}: expected one response packet, got a second response.");
-                            Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
-                            AssertEqual(expectedPacketId, response.Id, $"{expectedResponseName} packet id");
-                            AssertEqual(expectedResponseName, response.Name, $"{expectedResponseName} packet name");
-                            responsePayload = JObject.Parse(MessagePackSerializer.ConvertToJson(response.Content));
-                            packetNames.Add(response.Name);
-                            break;
-                        case Packet.ContentType.Push:
-                            Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                            packetNames.Add(push.Name);
-                            pushNames.Add(push.Name);
-                            pushContentsByName.TryAdd(push.Name, push.Content);
-                            break;
-                        default:
-                            throw new InvalidDataException($"{expectedResponseName}: expected only response/push packets, got {packet.Type}.");
-                    }
-                }
-
-                if (responsePayload is null)
-                    throw new InvalidDataException($"{expectedResponseName}: expected a response packet around BigWorld startup pushes.");
-
-                string[] expectedPushNames = expectCourseDataPush
-                    ? [
-                        "NotifyBigWorldAlbumUpdate",
-                        "NotifyBigWorldMapData",
-                        "NotifySgDormData",
-                        "NotifyBigWorldCourseData"
-                    ]
-                    : [
-                        "NotifyBigWorldAlbumUpdate",
-                        "NotifyBigWorldMapData",
-                        "NotifySgDormData"
-                    ];
-                AssertEqual(expectedPushCount, pushNames.Count, $"{expectedResponseName} BigWorld enter push count");
-                AssertEqual(expectedResponseName, packetNames[0], $"{expectedResponseName} first packet");
-                for (int pushIndex = 0; pushIndex < expectedPushNames.Length; pushIndex++)
-                {
-                    AssertEqual(expectedPushNames[pushIndex], pushNames[pushIndex], $"{expectedResponseName} enter push order {pushIndex + 1}");
-                    AssertEqual(expectedPushNames[pushIndex], packetNames[pushIndex + 1], $"{expectedResponseName} response/push packet order {pushIndex + 2}");
-                }
-
-                if (!pushContentsByName.TryGetValue("NotifyBigWorldAlbumUpdate", out byte[]? albumUpdateContent))
-                    throw new InvalidDataException($"{expectedResponseName}: expected NotifyBigWorldAlbumUpdate content.");
-                AssertEqual(60, albumUpdateContent.Length, "NotifyBigWorldAlbumUpdate raw payload length");
-
-                if (!pushContentsByName.TryGetValue("NotifyBigWorldMapData", out byte[]? mapDataContent))
-                    throw new InvalidDataException($"{expectedResponseName}: expected NotifyBigWorldMapData content.");
-                if (expectedBoxRewardedCountForLevel4001 == 3)
-                    AssertEqual(25, mapDataContent.Length, "NotifyBigWorldMapData raw payload length");
-                JObject mapData = JObject.Parse(MessagePackSerializer.ConvertToJson(mapDataContent));
-                JObject boxRewardedCntData = RequiredObject(mapData, "BoxRewardedCntData", "NotifyBigWorldMapData");
-                AssertEqual((long)expectedBoxRewardedCountForLevel4001, RequiredValue<long>(boxRewardedCntData, "4001", JTokenType.Integer, "NotifyBigWorldMapData.BoxRewardedCntData"), $"NotifyBigWorldMapData BoxRewardedCntData[4001] rewarded chest count");
-
-                if (!pushContentsByName.TryGetValue("NotifySgDormData", out byte[]? dormDataContent))
-                    throw new InvalidDataException($"{expectedResponseName}: expected NotifySgDormData content.");
-                AssertEqual(388, dormDataContent.Length, "NotifySgDormData raw payload length");
-
-                if (expectCourseDataPush)
-                {
-                    if (!pushContentsByName.TryGetValue("NotifyBigWorldCourseData", out byte[]? courseDataContent))
-                        throw new InvalidDataException($"{expectedResponseName}: expected NotifyBigWorldCourseData content for progressed BigWorld state.");
-                    JObject courseData = JObject.Parse(MessagePackSerializer.ConvertToJson(courseDataContent));
-                    AssertBigWorldCourseData(
-                        courseData,
-                        expectedBoxRewardedCountForLevel4001,
-                        expectedCourseTaskTotalProgress,
-                        expectedCourseReadElementIds,
-                        "NotifyBigWorldCourseData");
-                }
-
-                AssertBigWorldTeleporterData(
-                    responsePayload,
-                    expectedTeleporterPlaceIdsForLevel4001 ?? [100122, 100121],
-                    expectedResponseName);
-
-                if (harness.TryReadAvailablePacket($"{expectedResponseName} unexpected packet after BigWorld enter pushes", out Packet extraPacket))
-                {
-                    string extraPacketDetail = extraPacket.Type.ToString();
-                    if (extraPacket.Type == Packet.ContentType.Push)
-                    {
-                        Packet.Push extraPush = MessagePackSerializer.Deserialize<Packet.Push>(extraPacket.Content);
-                        extraPacketDetail = $"{extraPacket.Type} {extraPush.Name}";
-                    }
-                    else if (extraPacket.Type == Packet.ContentType.Response)
-                    {
-                        Packet.Response extraResponse = MessagePackSerializer.Deserialize<Packet.Response>(extraPacket.Content);
-                        extraPacketDetail = $"{extraPacket.Type} {extraResponse.Name}";
-                    }
-
-                    throw new InvalidDataException($"{expectedResponseName}: unexpected packet after expected BigWorld enter pushes: {extraPacketDetail}.");
-                }
-
-                return responsePayload;
-            }
-
-            static void AssertBigWorldTeleporterData(
-                JObject enterResponse,
-                IReadOnlyList<long> expectedPlaceIds,
-                string name)
-            {
-                JObject playerData = RequiredObject(enterResponse, "PlayerData", name);
-                JObject teleporterData = RequiredObject(playerData, "TeleporterData", $"{name}.PlayerData");
-                AssertIntegerList(
-                    expectedPlaceIds,
-                    RequiredJsonIntegerArray(teleporterData, "4001", $"{name}.PlayerData.TeleporterData"),
-                    $"{name}.PlayerData.TeleporterData[4001]");
-            }
-
-            static void AssertBigWorldCourseData(
-                JObject courseData,
-                int expectedBoxRewardedCountForLevel4001,
-                int? expectedCourseTaskTotalProgress,
-                IReadOnlyList<long>? expectedCourseReadElementIds,
-                string name)
-            {
-                JObject data = RequiredObject(courseData, "Data", name);
-                JObject datas = RequiredObject(data, "Datas", $"{name}.Data");
-                JObject versionData = RequiredObject(datas, "1", $"{name}.Data.Datas");
-                AssertEqual(1L, RequiredValue<long>(versionData, "VersionId", JTokenType.Integer, $"{name}.Data.Datas[1]"), $"{name}.Data.Datas[1].VersionId");
-
-                JObject taskCntData = RequiredObject(versionData, "TaskCntData", $"{name}.Data.Datas[1]");
-                if (expectedCourseTaskTotalProgress.HasValue)
-                    AssertEqual((long)expectedCourseTaskTotalProgress.Value, RequiredValue<long>(taskCntData, "TotalProgress", JTokenType.Integer, $"{name}.Data.Datas[1].TaskCntData"), $"{name}.Data.Datas[1].TaskCntData.TotalProgress");
-
-                JObject coreCntData = RequiredObject(versionData, "CoreCntData", $"{name}.Data.Datas[1]");
-                if (expectedCourseReadElementIds is not null)
-                {
-                    AssertIntegerList(
-                        expectedCourseReadElementIds,
-                        RequiredJsonIntegerArray(coreCntData, "ReadElementIds", $"{name}.Data.Datas[1].CoreCntData"),
-                        $"{name}.Data.Datas[1].CoreCntData.ReadElementIds");
-                }
-
-                JObject exploreCntData = RequiredObject(versionData, "ExploreCntData", $"{name}.Data.Datas[1]");
-                JObject exploreDatas = RequiredObject(exploreCntData, "ExploreDatas", $"{name}.Data.Datas[1].ExploreCntData");
-                JObject exploreData = RequiredObject(exploreDatas, "1", $"{name}.Data.Datas[1].ExploreCntData.ExploreDatas");
-                JObject poiCounts = RequiredObject(exploreData, "PoiCounts", $"{name}.Data.Datas[1].ExploreCntData.ExploreDatas[1]");
-                AssertEqual((long)expectedBoxRewardedCountForLevel4001, RequiredValue<long>(poiCounts, "101", JTokenType.Integer, $"{name}.Data.Datas[1].ExploreCntData.ExploreDatas[1].PoiCounts"), $"{name} rewarded chest PoiCounts[101]");
-
-                AssertBigWorldCourseVersionContentIds(datas, 2, 201, 202, 203, name);
-                AssertBigWorldCourseVersionContentIds(datas, 3, 301, 302, 303, name);
-            }
-
-            static void AssertBigWorldCourseVersionContentIds(
-                JObject datas,
-                int versionId,
-                long expectedTaskContentId,
-                long expectedExploreContentId,
-                long expectedCoreContentId,
-                string name)
-            {
-                string versionKey = versionId.ToString();
-                JObject versionData = RequiredObject(datas, versionKey, $"{name}.Data.Datas");
-                AssertEqual((long)versionId, RequiredValue<long>(versionData, "VersionId", JTokenType.Integer, $"{name}.Data.Datas[{versionKey}]"), $"{name}.Data.Datas[{versionKey}].VersionId");
-                JObject taskCntData = RequiredObject(versionData, "TaskCntData", $"{name}.Data.Datas[{versionKey}]");
-                AssertEqual(expectedTaskContentId, RequiredValue<long>(taskCntData, "ContentId", JTokenType.Integer, $"{name}.Data.Datas[{versionKey}].TaskCntData"), $"{name}.Data.Datas[{versionKey}].TaskCntData.ContentId");
-                JObject exploreCntData = RequiredObject(versionData, "ExploreCntData", $"{name}.Data.Datas[{versionKey}]");
-                AssertEqual(expectedExploreContentId, RequiredValue<long>(exploreCntData, "ContentId", JTokenType.Integer, $"{name}.Data.Datas[{versionKey}].ExploreCntData"), $"{name}.Data.Datas[{versionKey}].ExploreCntData.ContentId");
-                JObject coreCntData = RequiredObject(versionData, "CoreCntData", $"{name}.Data.Datas[{versionKey}]");
-                AssertEqual(expectedCoreContentId, RequiredValue<long>(coreCntData, "ContentId", JTokenType.Integer, $"{name}.Data.Datas[{versionKey}].CoreCntData"), $"{name}.Data.Datas[{versionKey}].CoreCntData.ContentId");
-            }
-
-
-            static void AssertStartFightNotifyPacket(Packet packet, string name)
-            {
-                AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} packet type");
-                Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                AssertEqual("StartFightNotify", push.Name, $"{name} packet name");
-                JObject payload = JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
-                AssertEqual(0L, RequiredValue<long>(payload, "Code", JTokenType.Integer, "StartFightNotify"), $"{name} Code");
-            }
-
-
-            static JObject AssertDlcWorldSaveData(
-                LoopbackSessionHarness harness,
-                int packetId,
-                int expectedWorldId,
-                int expectedLevelId,
-                int expectedBoxRewardedCountForLevel4001 = 3,
-                (double X, double Y, double Z)? expectedReliablePos = null,
-                (double X, double Y, double Z)? forbiddenReliablePos = null,
-                int? expectedClaimedPlaceId = null)
-            {
-                const string requestName = "DlcWorldSaveDataRequest";
-                const string responseName = "DlcWorldSaveDataResponse";
-                Type requestType = RequiredPayloadType(requestName);
-                Type responseType = RequiredPayloadType(responseName);
-                object request = Activator.CreateInstance(requestType)
-                    ?? throw new InvalidDataException($"{requestName}: expected a public parameterless constructor.");
-                SetRequiredIntegerMember(request, "WorldId", expectedWorldId);
-
-                InvokeRegisteredRequestHandler(requestName, harness.Session, packetId, request);
-
-                Packet responsePacket = harness.ReadPacket($"{requestName} response packet");
-                AssertEqual(Packet.ContentType.Response, responsePacket.Type, $"{requestName} response packet type");
-                Packet.Response packetResponse = MessagePackSerializer.Deserialize<Packet.Response>(responsePacket.Content);
-                AssertEqual(packetId, packetResponse.Id, $"{responseName} packet id");
-                AssertEqual(responseName, packetResponse.Name, $"{responseName} packet name");
-                byte[] rawResponseContent = packetResponse.Content;
-                _ = MessagePackDeserialize(responseType, rawResponseContent)
-                    ?? throw new InvalidDataException($"{responseName}: response content deserialized as nil.");
-                if (expectedWorldId == 400
-                    && expectedLevelId == 4001
-                    && expectedBoxRewardedCountForLevel4001 == 3
-                    && expectedReliablePos is null
-                    && forbiddenReliablePos is null
-                    && expectedClaimedPlaceId is null)
-                {
-                    AssertEqual(9_730, rawResponseContent.Length, $"{responseName} raw payload length");
-                }
-                JObject response = JObject.Parse(MessagePackSerializer.ConvertToJson(rawResponseContent));
-
-                AssertEqual(0L, RequiredValue<long>(response, "Code", JTokenType.Integer, $"{responseName}"), $"{responseName} Code");
-                JObject worldSaveData = RequiredObject(response, "WorldSaveData", responseName);
-                JObject levelDataDict = RequiredObject(worldSaveData, "LevelDataDict", $"{responseName}.WorldSaveData");
-                JObject levelData = RequiredObject(levelDataDict, expectedLevelId.ToString(), $"{responseName}.WorldSaveData.LevelDataDict");
-                AssertEqual((long)expectedWorldId, RequiredValue<long>(levelData, "WorldId", JTokenType.Integer, $"{responseName}.WorldSaveData.LevelDataDict[{expectedLevelId}]"), $"{responseName} LevelDataDict[{expectedLevelId}].WorldId");
-                AssertEqual((long)expectedLevelId, RequiredValue<long>(levelData, "LevelId", JTokenType.Integer, $"{responseName}.WorldSaveData.LevelDataDict[{expectedLevelId}]"), $"{responseName} LevelDataDict[{expectedLevelId}].LevelId");
-                if (expectedReliablePos.HasValue)
-                {
-                    AssertPositionEquals(expectedReliablePos.Value, RequiredObject(levelData, "ReliablePos", $"{responseName}.WorldSaveData.LevelDataDict[{expectedLevelId}]"), $"{responseName} persisted ReliablePos");
-                    AssertReliablePosComponentsUseFloat32(rawResponseContent, expectedLevelId, $"{responseName} persisted ReliablePos");
-                }
-                if (forbiddenReliablePos.HasValue)
-                    AssertPositionDoesNotEqual(forbiddenReliablePos.Value, RequiredObject(levelData, "ReliablePos", $"{responseName}.WorldSaveData.LevelDataDict[{expectedLevelId}]"), $"{responseName} ReliablePos ignores unsupported persisted player state");
-                if (expectedClaimedPlaceId is int claimedPlaceId)
-                    AssertSaveDataSceneObjectAbsent(levelData, claimedPlaceId, $"{responseName}.WorldSaveData.LevelDataDict[{expectedLevelId}]");
-                if (harness.TryReadAvailablePacket($"{requestName} unexpected packet after {responseName}", out Packet extraPacket))
-                    throw new InvalidDataException($"{requestName}: expected exactly {responseName} before the next request, got extra {DescribePacket(extraPacket)}.");
-
-                return response;
-            }
-
-            static void AssertReliablePosComponentsUseFloat32(byte[] payload, int expectedLevelId, string name)
-            {
-                MessagePackReader reader = new(new System.Buffers.ReadOnlySequence<byte>(payload));
-                try
-                {
-                    ReadRequiredMessagePackMapMember(ref reader, "WorldSaveData", name);
-                    ReadRequiredMessagePackMapMember(ref reader, "LevelDataDict", $"{name}.WorldSaveData");
-                    ReadRequiredMessagePackMapKey(ref reader, expectedLevelId, $"{name}.WorldSaveData.LevelDataDict");
-                    ReadRequiredMessagePackMapMember(ref reader, "ReliablePos", $"{name}.WorldSaveData.LevelDataDict[{expectedLevelId}]");
-                    AssertMessagePackFloat32MapFields(ref reader, payload, ["X", "Y", "Z"], $"{name}.WorldSaveData.LevelDataDict[{expectedLevelId}].ReliablePos");
-                }
-                catch (Exception exception) when (exception is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected raw MessagePack map containing WorldSaveData.LevelDataDict[{expectedLevelId}].ReliablePos.", exception);
-                }
-            }
-
-            static void ReadRequiredMessagePackMapMember(ref MessagePackReader reader, string memberName, string name)
-            {
-                int fieldCount = reader.ReadMapHeader();
-                for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++)
-                {
-                    if (reader.NextMessagePackType != MessagePackType.String)
-                    {
-                        reader.Skip();
-                        reader.Skip();
-                        continue;
-                    }
-
-                    string? key = reader.ReadString();
-                    if (string.Equals(key, memberName, StringComparison.Ordinal))
-                        return;
-
-                    reader.Skip();
-                }
-
-                throw new InvalidDataException($"{name}: expected MessagePack map member {memberName}.");
-            }
-
-            static void ReadRequiredMessagePackMapKey(ref MessagePackReader reader, int expectedKey, string name)
-            {
-                int fieldCount = reader.ReadMapHeader();
-                string expectedStringKey = expectedKey.ToString();
-                for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++)
-                {
-                    if (TryReadMessagePackMapKey(ref reader, expectedKey, expectedStringKey))
-                        return;
-
-                    reader.Skip();
-                }
-
-                throw new InvalidDataException($"{name}: expected MessagePack map key {expectedKey}.");
-            }
-
-            static bool TryReadMessagePackMapKey(ref MessagePackReader reader, int expectedIntegerKey, string expectedStringKey)
-            {
-                if (reader.NextMessagePackType == MessagePackType.Integer)
-                {
-                    long key = reader.ReadInt64();
-                    return key == expectedIntegerKey;
-                }
-
-                if (reader.NextMessagePackType == MessagePackType.String)
-                {
-                    string? key = reader.ReadString();
-                    return string.Equals(key, expectedStringKey, StringComparison.Ordinal);
-                }
-
-                reader.Skip();
-                return false;
-            }
-
-            static void AssertMessagePackFloat32MapFields(ref MessagePackReader reader, byte[] payload, IReadOnlyCollection<string> expectedFields, string name)
-            {
-                HashSet<string> remainingFields = new(expectedFields, StringComparer.Ordinal);
-                int fieldCount = reader.ReadMapHeader();
-                for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++)
-                {
-                    if (reader.NextMessagePackType != MessagePackType.String)
-                        throw new InvalidDataException($"{name}: expected string key at map field {fieldIndex} while checking float markers.");
-
-                    string? key = reader.ReadString();
-                    if (key is not null && remainingFields.Remove(key))
-                    {
-                        int markerOffset = checked((int)reader.Consumed);
-                        if ((uint)markerOffset >= (uint)payload.Length)
-                            throw new InvalidDataException($"{name}.{key}: missing MessagePack value marker.");
-
-                        byte marker = payload[markerOffset];
-                        if (marker == 0xCB)
-                            throw new InvalidDataException($"{name}.{key}: expected MessagePack float32 marker 0xCA, got float64 marker 0xCB.");
-                        if (marker != 0xCA)
-                            throw new InvalidDataException($"{name}.{key}: expected MessagePack float32 marker 0xCA, got marker 0x{marker:X2}.");
-                    }
-
-                    reader.Skip();
-                }
-
-                if (remainingFields.Count > 0)
-                    throw new InvalidDataException($"{name}: expected MessagePack float fields {string.Join(", ", remainingFields)}.");
-            }
-
-            static void AssertEnterInstLevelEmitsNewLevelNotify(
-                LoopbackSessionHarness harness,
-                int packetId,
-                int expectedWorldId,
-                int expectedInstLevelId)
-            {
-                const string requestName = "EnterInstLevelRequest";
-                const string responseName = "EnterInstLevelResponse";
-                const string notifyName = "NotifyNewEnteredBigWorldLevelId";
-                Type requestType = RequiredPayloadType(requestName);
-                Type responseType = RequiredPayloadType(responseName);
-                object request = Activator.CreateInstance(requestType)
-                    ?? throw new InvalidDataException($"{requestName}: expected a public parameterless constructor.");
-                SetRequiredIntegerMember(request, "WorldId", expectedWorldId);
-                SetRequiredIntegerMember(request, "InstLevelId", expectedInstLevelId);
-
-                InvokeRegisteredRequestHandler(requestName, harness.Session, packetId, request);
-
-                bool sawResponse = false;
-                bool sawNotify = false;
-                for (int packetIndex = 0; packetIndex < 2; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{requestName} response/push packet {packetIndex + 1}");
-                    if (packet.Type == Packet.ContentType.Response)
-                    {
-                        if (sawResponse)
-                            throw new InvalidDataException($"{requestName}: expected one {responseName}, got a second response.");
-                        Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
-                        AssertEqual(packetId, response.Id, $"{responseName} packet id");
-                        AssertEqual(responseName, response.Name, $"{responseName} packet name");
-                        object responsePayload = MessagePackDeserialize(responseType, response.Content)
-                            ?? throw new InvalidDataException($"{responseName}: response deserialized as nil.");
-                        AssertEqual(0, GetRequiredIntegerMember(responsePayload, "Code"), $"{responseName} Code");
-                        sawResponse = true;
-                        continue;
-                    }
-
-                    AssertEqual(Packet.ContentType.Push, packet.Type, $"{requestName} notify packet type");
-                    if (sawNotify)
-                        throw new InvalidDataException($"{requestName}: expected one {notifyName}, got a second push.");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    AssertEqual(notifyName, push.Name, $"{requestName} notify packet name");
-                    JToken notifyPayload = JToken.Parse(MessagePackSerializer.ConvertToJson(push.Content));
-                    AssertJsonContainsInteger(notifyPayload, expectedInstLevelId, $"{notifyName} payload requested InstLevelId");
-                    sawNotify = true;
-                }
-
-                if (!sawResponse)
-                    throw new InvalidDataException($"{requestName}: expected {responseName}.");
-                if (!sawNotify)
-                    throw new InvalidDataException($"{requestName}: expected {notifyName} for InstLevelId {expectedInstLevelId}.");
-            }
-
-            static byte[] AssertLoadCompleteEmitsStartFightThenBigWorldBootstrap(
-                LoopbackSessionHarness harness,
-                int packetId,
-                long expectedPlayerId)
-            {
-                const string requestName = "LoadCompleteRequest";
-                const string responseName = "LoadCompleteResponse";
-                Type requestType = RequiredPayloadType(requestName);
-                Type responseType = RequiredPayloadType(responseName);
-                object request = Activator.CreateInstance(requestType)
-                    ?? throw new InvalidDataException($"{requestName}: expected a public parameterless constructor.");
-
-                InvokeRegisteredRequestHandler(requestName, harness.Session, packetId, request);
-
-                Packet startFightPacket = harness.ReadPacket($"{requestName} StartFightNotify");
-                AssertStartFightNotifyPacket(startFightPacket, $"{requestName} StartFightNotify");
-
-                Packet responsePacket = harness.ReadPacket($"{requestName} response");
-                AssertEqual(Packet.ContentType.Response, responsePacket.Type, $"{requestName} response packet type");
-                Packet.Response packetResponse = MessagePackSerializer.Deserialize<Packet.Response>(responsePacket.Content);
-                AssertEqual(packetId, packetResponse.Id, $"{responseName} packet id");
-                AssertEqual(responseName, packetResponse.Name, $"{responseName} packet name");
-                object response = MessagePackDeserialize(responseType, packetResponse.Content)
-                    ?? throw new InvalidDataException($"{responseName}: expected a response payload.");
-                AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{responseName} Code");
-
-                string[] expectedMethods =
-                [
-                    "RpcEcologyConstructClearStateUpdateNotify",
-                    "RpcBeginCheckRLObjectCompleted",
-                    "RpcAddQuestNavPointForLevelSceneObject",
-                    "RpcSetCombatState",
-                    "RpcBeginUpdateLevel"
-                ];
-                List<string> observedMethods = [];
-                byte[]? firstXRpcPayload = null;
-
-                for (int pushIndex = 0; pushIndex < expectedMethods.Length; pushIndex++)
-                {
-                    Packet pushPacket = harness.ReadPacket($"{requestName} XRpcCommon push {pushIndex + 1}");
-                    AssertEqual(Packet.ContentType.Push, pushPacket.Type, $"{requestName} XRpcCommon push {pushIndex + 1} packet type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(pushPacket.Content);
-                    AssertEqual("XRpcCommon", push.Name, $"{requestName} XRpcCommon push {pushIndex + 1} packet name");
-                    firstXRpcPayload ??= push.Content;
-
-                    object?[] rpc = DeserializeXRpcList(push.Content, $"{requestName} XRpcCommon push {pushIndex + 1}");
-                    string methodName = RequiredXRpcMethodName(rpc, $"{requestName} XRpcCommon push {pushIndex + 1}");
-                    observedMethods.Add(methodName);
-                    AssertEqual(expectedMethods[pushIndex], methodName, $"{requestName} XRpcCommon method order {pushIndex + 1}");
-
-                    if (methodName == "RpcSetCombatState")
-                    {
-                        byte[] argsPayload = RequiredXRpcArgsPayload(rpc, $"{requestName} RpcSetCombatState");
-                        Dictionary<string, object?> args = DeserializeXRpcArgs(argsPayload, $"{requestName} RpcSetCombatState args");
-                        AssertEqual(expectedPlayerId, RequiredXRpcInteger(args, "PlayerId", $"{requestName} RpcSetCombatState args"), $"{requestName} RpcSetCombatState PlayerId");
-                        AssertXRpcMapIntegerValueDoesNotUseInt64Marker(argsPayload, "PlayerId", $"{requestName} RpcSetCombatState args");
-                        AssertEqual(false, RequiredXRpcBoolean(args, "IsInCombat", $"{requestName} RpcSetCombatState args"), $"{requestName} RpcSetCombatState IsInCombat");
-                    }
-                }
-
-                if (!observedMethods.SequenceEqual(expectedMethods))
-                    throw new InvalidDataException($"{requestName} XRpcCommon method list: expected {string.Join(" -> ", expectedMethods)}, got {string.Join(" -> ", observedMethods)}.");
-                if (harness.TryReadAvailablePacket($"{requestName} unexpected packet after XRpcCommon bootstrap", out Packet extraPacket))
-                {
-                    if (extraPacket.Type == Packet.ContentType.Push)
-                    {
-                        Packet.Push extraPush = MessagePackSerializer.Deserialize<Packet.Push>(extraPacket.Content);
-                        if (string.Equals(extraPush.Name, "StartFightNotify", StringComparison.Ordinal))
-                            throw new InvalidDataException($"{requestName}: expected no duplicate StartFightNotify after XRpcCommon bootstrap.");
-                    }
-
-                    throw new InvalidDataException($"{requestName}: expected exactly StartFightNotify, {responseName}, and five XRpcCommon pushes, got extra {DescribePacket(extraPacket)}.");
-                }
-
-                return firstXRpcPayload
-                    ?? throw new InvalidDataException($"{requestName}: expected at least one captured XRpc payload.");
-            }
-
-            static void AssertXRpcAck(
-                LoopbackSessionHarness harness,
-                string requestName,
-                string responseName,
-                int packetId,
-                byte[] capturedCompatibleListPayload)
-            {
-                Type responseType = RequiredPayloadType(responseName);
-                _ = DeserializeXRpcList(capturedCompatibleListPayload, $"{requestName} captured-compatible request payload");
-                InvokeRegisteredRequestHandlerWithContent(requestName, harness.Session, packetId, capturedCompatibleListPayload);
-                object response = ReadResponsePayload(
-                    harness,
-                    packetId,
-                    responseName,
-                    $"{requestName} response",
-                    responseType,
-                    maxPacketsToRead: 1);
-                AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{responseName} Code");
-            }
-
-            static void AssertXRpcPlayerInteractEmitsRetailStartFinishNotifies(
-                LoopbackSessionHarness harness,
-                int packetId,
-                long playerId)
-            {
-                const string requestName = "XRpcCommon RpcPlayerInteractRequest retail start/finish";
-                byte[] requestPayload = BuildXRpcPlayerInteractRequestPayload(
-                    playerId,
-                    targetUuid: 95,
-                    targetPlaceId: 100016,
-                    targetType: 2,
-                    optionId: 1);
-
-                InvokeRegisteredRequestHandlerWithContent("XRpcCommon", harness.Session, packetId, requestPayload);
-
-                Packet startPacket = ReadXRpcCommonAfterOptionalBigWorldRewardSidecars(
-                    harness,
-                    requestName,
-                    expectedRewardItemId: 3,
-                    expectedRewardCount: 100);
-
-                AssertXRpcCommonPushPacketArgs(
-                    startPacket,
-                    "RpcNpcInteractStartNotify",
-                    [95, 100016, 2, 1],
-                    $"{requestName} start notify",
-                    "95b95270634e7063496e74657261637453746172744e6f74696679c409945fce000186b00201010f00");
-                AssertXRpcCommonPushArgs(
-                    harness,
-                    "RpcNpcInteractFinishNotify",
-                    [],
-                    $"{requestName} finish notify",
-                    "95ba5270634e7063496e74657261637446696e6973684e6f74696679c40190010f00");
-
-                Type responseType = RequiredPayloadType("XRpcCommonResponse");
-                object response = ReadResponsePayload(
-                    harness,
-                    packetId,
-                    "XRpcCommonResponse",
-                    $"{requestName} response",
-                    responseType,
-                    maxPacketsToRead: 4);
-                AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{requestName} response Code");
-                if (harness.TryReadAvailablePacket($"{requestName} unexpected packet after response", out Packet extraPacket))
-                    throw new InvalidDataException($"{requestName}: expected retail start/finish notifies, optional reward pushes, and response; got extra {DescribePacket(extraPacket)}.");
-            }
-
-            static void AssertXRpcSceneObjectInteractEmitsRewardSidecar(
-                LoopbackSessionHarness harness,
-                int packetId,
-                long playerId)
-            {
-                const string requestName = "XRpcCommon RpcPlayerInteractRequest SceneObject table reward";
-                const int targetUuid = 117;
-                const int targetPlaceId = 100017;
-                const int targetType = 2;
-                const int optionId = 1;
-                const int expectedRewardItemId = 1;
-                const long expectedRewardCount = 7_500;
-                long initialRewardItemCount = harness.Session.inventory.Items.FirstOrDefault(item => item.Id == expectedRewardItemId)?.Count ?? 0;
-                long expectedInventoryRewardItemCount = initialRewardItemCount + expectedRewardCount;
-                byte[] requestPayload = BuildXRpcPlayerInteractRequestPayload(
-                    playerId,
-                    targetUuid,
-                    targetPlaceId,
-                    targetType,
-                    optionId);
-
-                InvokeRegisteredRequestHandlerWithContent("XRpcCommon", harness.Session, packetId, requestPayload);
-
-                ReadXRpcComponentActionCollectAfterBigWorldProgressSidecars(
-                    harness,
-                    requestName,
-                    expectedRewardItemId,
-                    expectedRewardCount);
-                AssertXRpcCommonPushArgs(
-                    harness,
-                    "RpcNpcInteractStartNotify",
-                    [targetUuid, targetPlaceId, targetType, optionId],
-                    $"{requestName} start notify");
-                AssertXRpcCommonPushArgs(
-                    harness,
-                    "RpcNpcInteractFinishNotify",
-                    [],
-                    $"{requestName} finish notify");
-                AssertRewardInventoryPushBeforeXRpcCommonResponse(
-                    harness,
-                    packetId,
-                    requestName,
-                    expectedRewardItemId,
-                    expectedInventoryRewardItemCount);
-
-                if (harness.TryReadAvailablePacket($"{requestName} unexpected packet after response", out Packet extraPacket))
-                    throw new InvalidDataException($"{requestName}: expected collect sidecar, start/finish notifies, reward inventory push, and response; got extra {DescribePacket(extraPacket)}.");
-            }
-
-            static byte[] BuildXRpcPlayerInteractRequestPayload(
-                long playerId,
-                int targetUuid,
-                int targetPlaceId,
-                int targetType,
-                int optionId)
-            {
-                byte[] argsPayload = MessagePackSerializer.Serialize(new object?[]
-                {
-                    checked((int)playerId),
-                    1,
-                    991,
-                    targetUuid,
-                    targetPlaceId,
-                    targetType,
-                    4001,
-                    optionId
-                });
-                return MessagePackSerializer.Serialize(new object?[]
-                {
-                    "RpcPlayerInteractRequest",
-                    argsPayload,
-                    1,
-                    15,
-                    4001
-                });
-            }
-
-            static Packet ReadXRpcCommonAfterOptionalBigWorldRewardSidecars(
-                LoopbackSessionHarness harness,
-                string requestName,
-                int expectedRewardItemId,
-                long expectedRewardCount)
-            {
-                for (int packetIndex = 0; packetIndex < 4; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{requestName} pre-start packet {packetIndex + 1}");
-                    AssertEqual(Packet.ContentType.Push, packet.Type, $"{requestName} pre-start packet {packetIndex + 1} type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    if (string.Equals(push.Name, "XRpcCommon", StringComparison.Ordinal))
-                        return packet;
-
-                    if (string.Equals(push.Name, "XRpcComponentAction", StringComparison.Ordinal))
-                    {
-                        AssertXRpcComponentActionCollectNotify(
-                            push.Content,
-                            $"{requestName} optional collect sidecar",
-                            expectedRewardItemId,
-                            expectedRewardCount);
-                        continue;
-                    }
-
-                    if (string.Equals(push.Name, "NotifyBigWorldBoxData", StringComparison.Ordinal)
-                        || string.Equals(push.Name, "NotifyBigWorldCourseExploreProgress", StringComparison.Ordinal))
-                        continue;
-
-                    throw new InvalidDataException($"{requestName}: expected optional BigWorld reward sidecar or XRpcCommon start notify, got push {push.Name}.");
-                }
-
-                throw new InvalidDataException($"{requestName}: expected XRpcCommon start notify after optional BigWorld reward sidecars.");
-            }
-
-            static void ReadXRpcComponentActionCollectAfterBigWorldProgressSidecars(
-                LoopbackSessionHarness harness,
-                string requestName,
-                int expectedRewardItemId,
-                long expectedRewardCount)
-            {
-                for (int packetIndex = 0; packetIndex < 4; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{requestName} collect/prelude packet {packetIndex + 1}");
-                    AssertEqual(Packet.ContentType.Push, packet.Type, $"{requestName} collect/prelude packet {packetIndex + 1} type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    if (string.Equals(push.Name, "XRpcComponentAction", StringComparison.Ordinal))
-                    {
-                        AssertXRpcComponentActionCollectNotify(
-                            push.Content,
-                            $"{requestName} collect sidecar",
-                            expectedRewardItemId,
-                            expectedRewardCount);
-                        return;
-                    }
-
-                    if (string.Equals(push.Name, "NotifyBigWorldBoxData", StringComparison.Ordinal)
-                        || string.Equals(push.Name, "NotifyBigWorldCourseExploreProgress", StringComparison.Ordinal))
-                        continue;
-
-                    throw new InvalidDataException($"{requestName}: expected BigWorld reward progress sidecar or XRpcComponentAction collect notify, got push {push.Name}.");
-                }
-
-                throw new InvalidDataException($"{requestName}: expected XRpcComponentAction collect notify before XRpcCommon start/finish.");
-            }
-
-            static void AssertXRpcComponentActionCollectNotify(
-                byte[] payload,
-                string name,
-                int expectedRewardItemId,
-                long expectedRewardCount)
-            {
-                object?[] rpc = DeserializeXRpcList(payload, name);
-                AssertEqual(6, rpc.Length, $"{name} XRpcComponentAction envelope field count");
-                AssertEqual("RpcSceneObjectCollectNotify", RequiredXRpcMethodName(rpc, name), $"{name} method name");
-                byte[] argsPayload = RequiredXRpcArgsPayload(rpc, $"{name} args payload");
-                if (argsPayload.Length == 0)
-                    throw new InvalidDataException($"{name}: expected non-empty RpcSceneObjectCollectNotify args payload.");
-
-                object?[] args = DeserializeXRpcArgsList(argsPayload, $"{name} args");
-                if (args.Length == 0)
-                    throw new InvalidDataException($"{name} args: expected reward goods list argument.");
-                if (args[0] is not object?[] rewardGoods || rewardGoods.Length == 0)
-                    throw new InvalidDataException($"{name} args[0]: expected non-empty reward goods list.");
-
-                Dictionary<string, object?>? matchingReward = null;
-                List<long> observedTemplateIds = [];
-                for (int rewardIndex = 0; rewardIndex < rewardGoods.Length; rewardIndex++)
-                {
-                    Dictionary<string, object?> reward = RequiredStringKeyMap(rewardGoods[rewardIndex], $"{name} args[0][{rewardIndex}]");
-                    long templateId = RequiredXRpcInteger(reward, "TemplateId", $"{name} args[0][{rewardIndex}]");
-                    observedTemplateIds.Add(templateId);
-                    if (templateId == expectedRewardItemId)
-                    {
-                        matchingReward = reward;
-                        break;
-                    }
-                }
-
-                if (matchingReward is null)
-                    throw new InvalidDataException($"{name}: expected reward goods TemplateId {expectedRewardItemId}, got [{string.Join(", ", observedTemplateIds)}].");
-                AssertEqual(expectedRewardCount, RequiredXRpcInteger(matchingReward, "Count", $"{name} reward goods TemplateId {expectedRewardItemId}"), $"{name} reward goods count");
-            }
-
-            static Dictionary<string, object?> RequiredStringKeyMap(object? value, string name)
-            {
-                if (value is not System.Collections.IDictionary dictionary)
-                    throw new InvalidDataException($"{name}: expected MessagePack map, got {value?.GetType().FullName ?? "null"}.");
-
-                Dictionary<string, object?> map = new(StringComparer.Ordinal);
-                foreach (System.Collections.DictionaryEntry entry in dictionary)
-                {
-                    if (entry.Key is not string key)
-                        throw new InvalidDataException($"{name}: expected string map key, got {entry.Key?.GetType().FullName ?? "null"}.");
-                    map[key] = entry.Value;
-                }
-
-                return map;
-            }
-
-            static void AssertRewardInventoryPushBeforeXRpcCommonResponse(
-                LoopbackSessionHarness harness,
-                int packetId,
-                string requestName,
-                int expectedRewardItemId,
-                long expectedRewardCount)
-            {
-                bool sawRewardInventoryPush = false;
-                Type responseType = RequiredPayloadType("XRpcCommonResponse");
-                for (int packetIndex = 0; packetIndex < 5; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{requestName} reward/response packet {packetIndex + 1}");
-                    if (packet.Type == Packet.ContentType.Response)
-                    {
-                        if (!sawRewardInventoryPush)
-                            throw new InvalidDataException($"{requestName}: expected NotifyItemDataList reward push before XRpcCommonResponse.");
-
-                        Packet.Response packetResponse = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
-                        AssertEqual(packetId, packetResponse.Id, $"{requestName} response packet id");
-                        AssertEqual("XRpcCommonResponse", packetResponse.Name, $"{requestName} response packet name");
-                        object response = MessagePackDeserialize(responseType, packetResponse.Content)
-                            ?? throw new InvalidDataException($"{requestName} response: XRpcCommonResponse deserialized as nil.");
-                        AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{requestName} response Code");
-                        return;
-                    }
-
-                    AssertEqual(Packet.ContentType.Push, packet.Type, $"{requestName} reward/response packet {packetIndex + 1} type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    if (string.Equals(push.Name, nameof(NotifyItemDataList), StringComparison.Ordinal))
-                    {
-                        AssertRewardInventoryPush(push.Content, requestName, expectedRewardItemId, expectedRewardCount);
-                        sawRewardInventoryPush = true;
-                        continue;
-                    }
-
-                    if (string.Equals(push.Name, "NotifyBigWorldBoxData", StringComparison.Ordinal)
-                        || string.Equals(push.Name, "NotifyBigWorldCourseExploreProgress", StringComparison.Ordinal)
-                        || string.Equals(push.Name, "NotifyEquipDataList", StringComparison.Ordinal))
-                        continue;
-                    throw new InvalidDataException($"{requestName}: expected NotifyItemDataList reward push before XRpcCommonResponse, got unexpected push {push.Name}.");
-                }
-
-                throw new InvalidDataException($"{requestName}: expected XRpcCommonResponse after reward inventory push.");
-            }
-
-            static void AssertRewardInventoryPush(
-                byte[] content,
-                string requestName,
-                int expectedRewardItemId,
-                long expectedRewardCount)
-            {
-                NotifyItemDataList rewardPush = MessagePackSerializer.Deserialize<NotifyItemDataList>(content);
-                if (rewardPush.ItemDataList.Count == 0)
-                    throw new InvalidDataException($"{requestName} NotifyItemDataList: expected at least one reward item.");
-
-                Item? rewardItem = rewardPush.ItemDataList.SingleOrDefault(item => item.Id == expectedRewardItemId);
-                if (rewardItem is null)
-                    throw new InvalidDataException($"{requestName} NotifyItemDataList: expected reward item {expectedRewardItemId}.");
-                AssertEqual(expectedRewardCount, rewardItem.Count, $"{requestName} NotifyItemDataList reward item count");
-            }
-
-            static void AssertXRpcCommonPushArgs(
-                LoopbackSessionHarness harness,
-                string expectedMethodName,
-                IReadOnlyList<long> expectedArgs,
-                string name,
-                string? expectedPayloadHex = null)
-            {
-                Packet packet = harness.ReadPacket($"{name} packet");
-                AssertXRpcCommonPushPacketArgs(packet, expectedMethodName, expectedArgs, name, expectedPayloadHex);
-            }
-
-            static void AssertXRpcCommonPushPacketArgs(
-                Packet packet,
-                string expectedMethodName,
-                IReadOnlyList<long> expectedArgs,
-                string name,
-                string? expectedPayloadHex = null)
-            {
-                AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} packet type");
-                Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                AssertEqual("XRpcCommon", push.Name, $"{name} packet name");
-                AssertXRpcCommonEnvelopeTailIsClientReadable(push.Content, name);
-                if (expectedPayloadHex is not null)
-                    AssertEqual(expectedPayloadHex, Convert.ToHexString(push.Content).ToLowerInvariant(), $"{name} retail payload hex");
-
-                object?[] rpc = DeserializeXRpcList(push.Content, name);
-                AssertEqual(expectedMethodName, RequiredXRpcMethodName(rpc, name), $"{name} method name");
-                byte[] argsPayload = RequiredXRpcArgsPayload(rpc, $"{name} args payload");
-                object?[] args = DeserializeXRpcArgsList(argsPayload, $"{name} args");
-                AssertEqual(expectedArgs.Count, args.Length, $"{name} args count");
-                for (int argIndex = 0; argIndex < expectedArgs.Count; argIndex++)
-                {
-                    AssertEqual(
-                        expectedArgs[argIndex],
-                        RequiredXRpcListInteger(args, argIndex, $"{name} args"),
-                        $"{name} args[{argIndex}]");
-                }
-            }
-
-            static void AssertXRpcCommonEnvelopeTailIsClientReadable(byte[] payload, string name)
-            {
-                MessagePackReader reader = new(new System.Buffers.ReadOnlySequence<byte>(payload));
-                try
-                {
-                    int fieldCount = reader.ReadArrayHeader();
-                    AssertEqual(5, fieldCount, $"{name} XRpcCommon envelope field count");
-                    _ = reader.ReadString();
-                    _ = reader.ReadBytes();
-                    byte controllerId = reader.ReadByte();
-                    byte opcode = reader.ReadByte();
-                    byte levelId = reader.ReadByte();
-                    AssertEqual(1, controllerId, $"{name} XRpcCommon controller id");
-                    AssertEqual(15, opcode, $"{name} XRpcCommon opcode");
-                    AssertEqual(0, levelId, $"{name} XRpcCommon level id");
-                    AssertEqual(payload.Length, checked((int)reader.Consumed), $"{name} XRpcCommon envelope consumed bytes");
-                }
-                catch (Exception exception) when (exception is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected XRpcCommon envelope tail to use client-readable byte fields.", exception);
-                }
-            }
-
-            static string DescribePacket(Packet packet)
-            {
-                if (packet.Type == Packet.ContentType.Push)
-                {
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    return $"{packet.Type} {push.Name}";
-                }
-
-                if (packet.Type == Packet.ContentType.Response)
-                {
-                    Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
-                    return $"{packet.Type} {response.Name}";
-                }
-
-                return packet.Type.ToString();
-            }
-
-            static void InvokeRegisteredRequestHandlerWithContent(
-                string requestName,
-                Session session,
-                int packetId,
-                byte[] content)
-            {
-                RequestPacketHandlerDelegate handler = GetRegisteredRequestHandler(requestName);
-                Packet.Request packet = new()
-                {
-                    Id = packetId,
-                    Name = requestName,
-                    Content = content
-                };
-
-                try
-                {
-                    handler.Invoke(session, packet);
-                }
-                catch (Exception exception)
-                {
-                    throw new InvalidDataException($"{requestName}: registered handler invocation failed.", exception);
-                }
-            }
-
-            static object?[] DeserializeXRpcList(byte[] payload, string name)
-            {
-                try
-                {
-                    object?[] rpc = MessagePackSerializer.Deserialize<object?[]>(payload);
-                    if (rpc.Length == 0)
-                        throw new InvalidDataException($"{name}: expected a non-empty MessagePack list payload.");
-                    return rpc;
-                }
-                catch (Exception exception) when (exception is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected a MessagePack list payload.", exception);
-                }
-            }
-
-            static string RequiredXRpcMethodName(object?[] rpc, string name)
-            {
-                if (rpc[0] is not string methodName || string.IsNullOrWhiteSpace(methodName))
-                    throw new InvalidDataException($"{name}: expected list[0] to be a non-empty XRpc method name.");
-                return methodName;
-            }
-
-            static byte[] RequiredXRpcArgsPayload(object?[] rpc, string name)
-            {
-                if (rpc.Length < 2)
-                    throw new InvalidDataException($"{name}: expected a list[1] MessagePack args payload.");
-                if (rpc[1] is not byte[] argsPayload)
-                    throw new InvalidDataException($"{name}: expected list[1] to be MessagePack bytes, got {rpc[1]?.GetType().FullName ?? "null"}.");
-                return argsPayload;
-            }
-
-            static void AssertXRpcMapIntegerValueDoesNotUseInt64Marker(byte[] payload, string memberName, string name)
-            {
-                MessagePackReader reader = new(new System.Buffers.ReadOnlySequence<byte>(payload));
-                int fieldCount;
-                try
-                {
-                    fieldCount = reader.ReadMapHeader();
-                }
-                catch (Exception exception) when (exception is MessagePackSerializationException or InvalidOperationException)
-                {
-                    throw new InvalidDataException($"{name}: expected MessagePack map args while checking {memberName} integer marker.", exception);
-                }
-
-                for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++)
-                {
-                    if (reader.NextMessagePackType != MessagePackType.String)
-                        throw new InvalidDataException($"{name}: expected string key at map field {fieldIndex} while checking {memberName} integer marker.");
-
-                    string? key = reader.ReadString();
-                    if (string.Equals(key, memberName, StringComparison.Ordinal))
-                    {
-                        int markerOffset = checked((int)reader.Consumed);
-                        if ((uint)markerOffset >= (uint)payload.Length)
-                            throw new InvalidDataException($"{name}.{memberName}: missing MessagePack value marker.");
-
-                        byte marker = payload[markerOffset];
-                        if (marker is 0xD3 or 0xCF)
-                            throw new InvalidDataException($"{name}.{memberName}: expected client-compatible int32 MessagePack encoding, got {(marker == 0xD3 ? "int64" : "uint64")} marker 0x{marker:X2}.");
-                        if (reader.NextMessagePackType != MessagePackType.Integer)
-                            throw new InvalidDataException($"{name}.{memberName}: expected integer value marker, got {reader.NextMessagePackType} marker 0x{marker:X2}.");
-
-                        reader.Skip();
-                        return;
-                    }
-
-                    reader.Skip();
-                }
-
-                throw new InvalidDataException($"{name}: expected {memberName} while checking integer marker.");
-            }
-
-            static Dictionary<string, object?> DeserializeXRpcArgs(byte[] payload, string name)
-            {
-                try
-                {
-                    return MessagePackSerializer.Deserialize<Dictionary<string, object?>>(payload);
-                }
-                catch (Exception exception) when (exception is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected MessagePack map args.", exception);
-                }
-            }
-
-            static object?[] DeserializeXRpcArgsList(byte[] payload, string name)
-            {
-                try
-                {
-                    return MessagePackSerializer.Deserialize<object?[]>(payload);
-                }
-                catch (Exception exception) when (exception is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected MessagePack array args.", exception);
-                }
-            }
-
-            static long RequiredXRpcListInteger(IReadOnlyList<object?> args, int index, string name)
-            {
-                if ((uint)index >= (uint)args.Count)
-                    throw new InvalidDataException($"{name}: expected args[{index}].");
-
-                return args[index] switch
-                {
-                    byte typed => typed,
-                    sbyte typed => typed,
-                    short typed => typed,
-                    ushort typed => typed,
-                    int typed => typed,
-                    uint typed => typed,
-                    long typed => typed,
-                    ulong typed when typed <= long.MaxValue => (long)typed,
-                    _ => throw new InvalidDataException($"{name}[{index}]: expected integer, got {args[index]?.GetType().FullName ?? "null"}.")
-                };
-            }
-
-            static long RequiredXRpcInteger(IReadOnlyDictionary<string, object?> args, string memberName, string name)
-            {
-                if (!args.TryGetValue(memberName, out object? value))
-                    throw new InvalidDataException($"{name}: expected {memberName}.");
-
-                return value switch
-                {
-                    byte typed => typed,
-                    sbyte typed => typed,
-                    short typed => typed,
-                    ushort typed => typed,
-                    int typed => typed,
-                    uint typed => typed,
-                    long typed => typed,
-                    ulong typed when typed <= long.MaxValue => (long)typed,
-                    _ => throw new InvalidDataException($"{name}.{memberName}: expected integer, got {value?.GetType().FullName ?? "null"}.")
-                };
-            }
-
-            static bool RequiredXRpcBoolean(IReadOnlyDictionary<string, object?> args, string memberName, string name)
-            {
-                if (!args.TryGetValue(memberName, out object? value))
-                    throw new InvalidDataException($"{name}: expected {memberName}.");
-                if (value is not bool typed)
-                    throw new InvalidDataException($"{name}.{memberName}: expected boolean, got {value?.GetType().FullName ?? "null"}.");
-                return typed;
-            }
-
-            static void AssertBigWorldLoginStartupPushes(long playerId)
-            {
-                using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForShopCompatibility();
-                Type accountModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule");
-                MethodInfo doLogin = RequiredMethod(
-                    accountModule,
-                    "DoLogin",
-                    BindingFlags.Static | BindingFlags.NonPublic,
-                    [typeof(Session)]);
-
-                AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(playerId);
-                player.PlayerData.Gender = 2;
-                AscNet.Common.Database.Character character = CreateDrawCompatibilityCharacter(playerId);
-                character.Characters.Add(CreateLoginAccountCompatibilityCharacter(1021001, fashionId: 3021001));
-                using LoopbackSessionHarness harness = new(
-                    character,
-                    player,
-                    CreateDrawCompatibilityInventory(playerId, []),
-                    "big-world-login-startup-compat-test");
-                harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
-
-                doLogin.Invoke(null, [harness.Session]);
-                Dictionary<string, Packet.Push> pushesByName = ReadStartupPushesByNameUntil(
-                    harness,
-                    ["NotifyBigWorldMainRedPoint", "NotifyExternalRequiredBigWorldPlayerData"],
-                    maxStartupPushes: 192,
-                    "AccountModule.DoLogin BigWorld startup pushes");
-
-                _ = DeserializePushMap(
-                    pushesByName,
-                    "NotifyBigWorldMainRedPoint",
-                    "AccountModule.DoLogin NotifyBigWorldMainRedPoint startup payload");
-                JObject externalData = DeserializePushMap(
-                    pushesByName,
-                    "NotifyExternalRequiredBigWorldPlayerData",
-                    "AccountModule.DoLogin NotifyExternalRequiredBigWorldPlayerData startup payload");
-                AssertIntegerList(
-                    [],
-                    RequiredJsonIntegerArray(externalData, "EnteredBigWorldIds", "AccountModule.DoLogin NotifyExternalRequiredBigWorldPlayerData startup payload"),
-                    "NotifyExternalRequiredBigWorldPlayerData EnteredBigWorldIds");
-
-                IReadOnlyList<long> commanderFashionBags = RequiredJsonIntegerArray(
-                    externalData,
-                    "CommanderFashionBags",
-                    "AccountModule.DoLogin NotifyExternalRequiredBigWorldPlayerData startup payload");
-                if (commanderFashionBags.Count == 0)
-                    throw new InvalidDataException("NotifyExternalRequiredBigWorldPlayerData CommanderFashionBags: expected retail commander fashion bags.");
-                if (commanderFashionBags.Any(bagId => bagId <= 0))
-                    throw new InvalidDataException("NotifyExternalRequiredBigWorldPlayerData CommanderFashionBags: expected positive fashion bag ids.");
-
-                long gender = RequiredValue<long>(
-                    externalData,
-                    "Gender",
-                    JTokenType.Integer,
-                    "AccountModule.DoLogin NotifyExternalRequiredBigWorldPlayerData startup payload");
-                AssertEqual(1L, gender, "NotifyExternalRequiredBigWorldPlayerData Gender fixture-compatible value despite session gender 2");
-            }
-
-            static Dictionary<string, Packet.Push> ReadStartupPushesByNameUntil(
-                LoopbackSessionHarness harness,
-                IReadOnlyList<string> requiredPushNames,
-                int maxStartupPushes,
-                string name)
-            {
-                HashSet<string> requiredPushes = requiredPushNames.ToHashSet(StringComparer.Ordinal);
-                HashSet<string> observedRequiredPushes = new(StringComparer.Ordinal);
-                List<string> pushNames = [];
-                Dictionary<string, Packet.Push> pushesByName = new(StringComparer.Ordinal);
-                for (int packetIndex = 0; packetIndex < maxStartupPushes && observedRequiredPushes.Count < requiredPushes.Count; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{name} {packetIndex + 1}");
-                    AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} {packetIndex + 1} packet type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    pushNames.Add(push.Name);
-                    pushesByName.TryAdd(push.Name, push);
-                    if (requiredPushes.Contains(push.Name))
-                        observedRequiredPushes.Add(push.Name);
-                }
-
-                foreach (string requiredPushName in requiredPushNames)
-                {
-                    if (!observedRequiredPushes.Contains(requiredPushName))
-                        throw new InvalidDataException($"{name}: expected {requiredPushName}; observed {(pushNames.Count == 0 ? "<none>" : string.Join(" -> ", pushNames))}.");
-                }
-
-                return pushesByName;
-            }
-
-            static JObject DeserializePushMap(
-                IReadOnlyDictionary<string, Packet.Push> pushesByName,
-                string pushName,
-                string name)
-            {
-                if (!pushesByName.TryGetValue(pushName, out Packet.Push? push))
-                    throw new InvalidDataException($"{name}: expected {pushName} during login startup.");
-
-                try
-                {
-                    return JObject.Parse(MessagePackSerializer.ConvertToJson(push.Content));
-                }
-                catch (Exception ex) when (ex is not InvalidDataException)
-                {
-                    throw new InvalidDataException($"{name}: expected a MessagePack map payload.", ex);
-                }
-            }
-
-
-            static IReadOnlyList<long> RequiredJsonIntegerArray(JObject payload, string memberName, string name)
-            {
-                JArray values = (JArray)RequiredToken(payload, memberName, JTokenType.Array, name);
-                long[] integers = new long[values.Count];
-                for (int index = 0; index < values.Count; index++)
-                {
-                    JToken value = values[index]!;
-                    if (value.Type != JTokenType.Integer)
-                        throw new InvalidDataException($"{name} {memberName}[{index}]: expected JSON Integer, got {value.Type}.");
-                    integers[index] = value.Value<long>();
-                }
-
-                return integers;
-            }
-
-            static void AssertBigWorldAck(LoopbackSessionHarness harness, string requestName, int packetId)
-            {
-                Type requestType = RequiredPayloadType(requestName);
-                string responseName = requestName[..^"Request".Length] + "Response";
-                Type responseType = RequiredPayloadType(responseName);
-                object request = Activator.CreateInstance(requestType)
-                    ?? throw new InvalidDataException($"{requestName}: expected a public parameterless constructor.");
-
-                InvokeRegisteredRequestHandler(requestName, harness.Session, packetId, request);
-                object response = ReadResponsePayload(
-                    harness,
-                    packetId,
-                    responseName,
-                    $"{requestName} response",
-                    responseType,
-                    maxPacketsToRead: 3);
-                AssertEqual(0, GetRequiredIntegerMember(response, "Code"), $"{responseName} Code");
-            }
-
-            static Type RequiredPayloadType(string typeName)
-            {
-                string[] candidateFullNames =
-                [
-                    $"AscNet.GameServer.Handlers.{typeName}",
-                    $"AscNet.Common.MsgPack.{typeName}"
-                ];
-                Assembly[] candidateAssemblies =
-                [
-                    typeof(PacketFactory).Assembly,
-                    typeof(NotifyLogin).Assembly
-                ];
-
-                foreach (string fullName in candidateFullNames)
-                {
-                    foreach (Assembly assembly in candidateAssemblies.Distinct())
-                    {
-                        Type? type = assembly.GetType(fullName, throwOnError: false);
-                        if (type is not null)
-                            return type;
-                    }
-                }
-
-                throw new TypeLoadException($"Expected BigWorld payload type {typeName} in AscNet.GameServer.Handlers or AscNet.Common.MsgPack.");
-            }
-        }
-
         private static void ValidateWeaponFashionUnlockCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             using MongoCollectionOverride mongoOverride =
                 MongoCollectionOverride.InstallForDailySignInCompatibility(
                     out _,
@@ -13549,6 +11264,7 @@ namespace AscNet.Test
 
         private static void ValidateWeaponFashionUseCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(WeaponFashionUseRequest);
             const string responseName = nameof(WeaponFashionUseResponse);
             const int capturedFashionId = 12_340_004;
@@ -14147,6 +11863,7 @@ namespace AscNet.Test
                 player,
                 CreateDrawCompatibilityInventory(playerId, []),
                 "team-prefab-compat");
+            harness.Session.stage = AscNet.Common.Database.Stage.FromUid(playerId);
 
             TeamPrefabData capturedEmpty = new()
             {
@@ -14736,6 +12453,11 @@ namespace AscNet.Test
                     CharacterId = secondCharacterId,
                     GroupId = chipGroup.GroupId
                 });
+            Packet chipGroupEquipPacket = harness.ReadPacket("memory preset equip push");
+            AssertEqual(Packet.ContentType.Push, chipGroupEquipPacket.Type, "memory preset equip push packet type");
+            Packet.Push chipGroupEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(chipGroupEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), chipGroupEquipPush.Name, "memory preset equip push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnChipGroupResponse>(
                 harness, 71_082, nameof(EquipPutOnChipGroupResponse), "memory preset equip").Code,
                 "memory preset equip Code");
@@ -14797,7 +12519,7 @@ namespace AscNet.Test
                 {
                     if (equipment is null)
                         continue;
-                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values)
+                    foreach (TeamPrefabEquipEntry preset in equipment.EquipDataDict.Values.Where(preset => preset.EquipId != 0))
                         AssertEqual(applied.TeamData[position],
                             equipPush.EquipDataList.Single(equip => equip.Id == preset.EquipId).CharacterId,
                             $"{name} client receives preset equipment ownership before acknowledgement");
@@ -15375,6 +13097,7 @@ namespace AscNet.Test
 
         private static void ValidateCharacterSwitchLiberateMagicCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(CharacterSwitchLiberateMagicIdRequest);
             const string responseName = nameof(CharacterSwitchLiberateMagicIdResponse);
             const int packetId = 19_520;
@@ -15684,6 +13407,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionRandomActiveCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(FashionRandomActiveRequest);
             const string responseName = nameof(FashionRandomActiveResponse);
             const int packetId = 19_451;
@@ -15973,6 +13697,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionSuitPoolSaveCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(FashionSuitPoolSaveRequest);
             const string responseName = nameof(FashionSuitPoolSaveResponse);
             const int packetId = 19_461;
@@ -16326,6 +14051,7 @@ namespace AscNet.Test
 
         private static void ValidateFashionColorCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             List<FashionColorTable> colorRows = TableReaderV2.Parse<FashionColorTable>();
             List<FashionTable> fashionRows = TableReaderV2.Parse<FashionTable>();
             List<FashionColorTable> normalizationRows = colorRows
@@ -17731,6 +15457,14 @@ namespace AscNet.Test
                     (RequiredCollectionField(typeof(AscNet.Common.Database.Character)), collection)
                 ]);
             }
+            public static MongoCollectionOverride InstallNoOpStageCollection()
+            {
+                return new MongoCollectionOverride(
+                [
+                    (RequiredCollectionField(typeof(AscNet.Common.Database.Stage)), CreateNoOpMongoCollection<AscNet.Common.Database.Stage>())
+                ]);
+            }
+
             public static MongoCollectionOverride InstallForMissingFeatureCompatibility()
             {
                 return new MongoCollectionOverride(
@@ -17986,7 +15720,7 @@ namespace AscNet.Test
             public bool ThrowAfterReplaceOne { get; set; }
             public Action<TDocument>? BeforeReplaceOne { get; set; }
             public long ReplaceOneMatchedCount { get; set; } = 1;
-            public byte[]? LastSuccessfulReplacementBson { get; private set; }
+            public byte[]? LastSuccessfulReplacementBson { get; set; }
             public Queue<long> CountDocumentsResults { get; } = new();
             public IReadOnlyList<TDocument>? FindResults { get; set; }
             public int? LastFindLimit { get; private set; }
@@ -19183,14 +16917,15 @@ namespace AscNet.Test
             AssertCallIsConditionallyGuarded(characterFromUid, characterSave, "Character.FromUid saves only changed normalized equips");
 
             Type accountModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule");
-            MethodInfo doLogin = RequiredMethod(
-                accountModule,
-                "DoLogin",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(Session)]);
             MethodInfo buildNotifyLogin = RequiredMethod(
                 accountModule,
                 "BuildNotifyLogin",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                [typeof(Session), typeof(long)]);
+
+            MethodInfo doLogin = RequiredMethod(
+                accountModule,
+                "DoLogin",
                 BindingFlags.Static | BindingFlags.NonPublic,
                 [typeof(Session)]);
             MethodInfo sendLoginState = RequiredMethod(
@@ -19244,14 +16979,6 @@ namespace AscNet.Test
                 typeof(AscNet.Common.Database.Character),
                 $"get_{nameof(AscNet.Common.Database.Character.Equips)}",
                 BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo playerDataGetter = RequiredMethod(
-                typeof(AscNet.Common.Database.Player),
-                $"get_{nameof(AscNet.Common.Database.Player.PlayerData)}",
-                BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo playerDataIdGetter = RequiredMethod(
-                typeof(PlayerData),
-                $"get_{nameof(PlayerData.Id)}",
-                BindingFlags.Instance | BindingFlags.Public);
             MethodInfo notifyLoginEquipListSetter = RequiredMethod(
                 typeof(NotifyLogin),
                 $"set_{nameof(NotifyLogin.EquipList)}",
@@ -19263,6 +16990,15 @@ namespace AscNet.Test
                 sessionCharacter,
                 characterEquipsGetter,
                 "AccountModule.BuildNotifyLogin NotifyLogin.EquipList source");
+
+            MethodInfo playerDataGetter = RequiredMethod(
+                typeof(AscNet.Common.Database.Player),
+                $"get_{nameof(AscNet.Common.Database.Player.PlayerData)}",
+                BindingFlags.Instance | BindingFlags.Public);
+            MethodInfo playerDataIdGetter = RequiredMethod(
+                typeof(PlayerData),
+                $"get_{nameof(PlayerData.Id)}",
+                BindingFlags.Instance | BindingFlags.Public);
             AssertEquipCommandSyncContract(
                 equipCommandType,
                 equipCommandExecute,
@@ -19589,6 +17325,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLine2LoginDataBsonCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const int passedMainLine2StageId = 10310102;
             const long derivedFirstPassTime = 1_744_211_568;
             const long fallbackLastPassTime = derivedFirstPassTime + 99;
@@ -19702,6 +17439,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLine2MessageStateUpdateCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = "MainLine2MessageStateUpdateRequest";
             const string responseName = "MainLine2MessageStateUpdateResponse";
             const int messageId = 1;
@@ -20021,6 +17759,7 @@ namespace AscNet.Test
 
         private static void ValidateMainLineLuosaitaEnterCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             MainLineLuosaitaEnterRequest request = new()
             {
                 SectionId = 1
@@ -21659,6 +19398,7 @@ namespace AscNet.Test
 
         private static void ValidateCharacterSendGiftCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string requestName = nameof(CharacterSendGiftRequest);
             const string responseName = nameof(CharacterSendGiftResponse);
             const long playerId = 99_570;
@@ -21920,6 +19660,7 @@ namespace AscNet.Test
         }
         private static void ValidateCharacterMenuAcknowledgementCompatibility()
         {
+            using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
             const string resetRequestName = nameof(CharacterResetNewFlagRequest);
             const string resetResponseName = nameof(CharacterResetNewFlagResponse);
             const string noticeRequestName = nameof(CharacterEnhanceSkillNoticeRequest);
@@ -27480,8 +25221,204 @@ namespace AscNet.Test
 
         }
 
+        private static void ValidateBossActivityLoginCompatibility()
+        {
+            using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForBossCompatibility(
+                out _, out _);
+            const long playerId = 99_701;
+            AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(playerId);
+            player.SimulatedBattlefield = new() { BossRankPlatform = 2 };
+            AscNet.Common.Database.Character character = CreateDrawCompatibilityCharacter(playerId);
+            AscNet.Common.Database.Inventory inventory = CreateDrawCompatibilityInventory(playerId, []);
+            using LoopbackSessionHarness harness = new(character, player, inventory, "boss-single-compat-test");
+            harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
+
+            Type bossModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.BossModule");
+            List<BossActivityTable> activityBossActivities = TableReaderV2.Parse<BossActivityTable>();
+            List<BossSectionTable> activityBossSections = TableReaderV2.Parse<BossSectionTable>();
+            Dictionary<int, BossChallengeTable> activityBossChallenges = TableReaderV2.Parse<BossChallengeTable>()
+                .ToDictionary(challenge => challenge.Id);
+            (BossActivityTable Activity, ActivityScheduleEntry Schedule) activeActivity = activityBossActivities
+                .Where(activity => activity.ActivityTimeId is > 0
+                    && ActivityScheduleService.TryGet(activity.ActivityTimeId.Value, out _))
+                .Select(activity =>
+                {
+                    ActivityScheduleService.TryGet(activity.ActivityTimeId!.Value, out ActivityScheduleEntry schedule);
+                    return (Activity: activity, Schedule: schedule);
+                })
+                .OrderByDescending(candidate => candidate.Activity.Id)
+                .First();
+            BossSectionTable activeSection = activityBossSections
+                .Where(section => section.ActivityId == activeActivity.Activity.Id
+                    && player.PlayerData.Level >= section.MinLevel
+                    && player.PlayerData.Level <= section.MaxLevel)
+                .OrderBy(section => section.OrderId)
+                .ThenBy(section => section.Id)
+                .First();
+            int[] activeChallengeIds = activeSection.ChallengeId.Where(id => id > 0).ToArray();
+            int[] activeStageIds = activeChallengeIds
+                .Select(challengeId => activityBossChallenges[challengeId].StageId)
+                .ToArray();
+            if (activeStageIds.Length == 0)
+                throw new InvalidDataException("Boss activity table-selected section has no challenge stages.");
+
+            MethodInfo buildActivityLoginData = RequiredMethod(
+                bossModule,
+                "BuildActivityLoginData",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                [typeof(Session), typeof(DateTimeOffset?)]);
+            NotifyBossActivityData? BuildActivityLogin(DateTimeOffset now) =>
+                buildActivityLoginData.Invoke(null, [harness.Session, now]) as NotifyBossActivityData;
+            DateTimeOffset activeNow = activeActivity.Schedule.StartTime > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(activeActivity.Schedule.StartTime)
+                : DateTimeOffset.UnixEpoch;
+            NotifyBossActivityData freshActivityLogin = BuildActivityLogin(activeNow)
+                ?? throw new InvalidDataException("BossModule.BuildActivityLoginData returned nil during its table-backed activity window.");
+            JObject freshActivityPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(
+                MessagePackSerializer.Serialize(freshActivityLogin)));
+            AssertEqual(
+                true,
+                freshActivityPayload.Properties().Select(property => property.Name).Order(StringComparer.Ordinal).SequenceEqual(
+                    ["ActivityId", "DifficultyScoreRecord", "PassStoryIds", "Schedule", "SectionId", "StageStarInfos", "StarRewardIds"]),
+                "NotifyBossActivityData exact top-level keys");
+            AssertEqual(activeActivity.Activity.Id,
+                RequiredValue<int>(freshActivityPayload, "ActivityId", JTokenType.Integer, "fresh NotifyBossActivityData"),
+                "fresh NotifyBossActivityData ActivityId");
+            AssertEqual(activeSection.Id,
+                RequiredValue<int>(freshActivityPayload, "SectionId", JTokenType.Integer, "fresh NotifyBossActivityData"),
+                "fresh NotifyBossActivityData SectionId");
+            AssertEqual(0,
+                RequiredValue<int>(freshActivityPayload, "Schedule", JTokenType.Integer, "fresh NotifyBossActivityData"),
+                "fresh NotifyBossActivityData Schedule");
+            JArray freshStageStars = RequiredValue<JArray>(
+                freshActivityPayload, "StageStarInfos", JTokenType.Array, "fresh NotifyBossActivityData");
+            AssertEqual(activeStageIds.Length, freshStageStars.Count, "fresh NotifyBossActivityData StageStarInfos count");
+            for (int stageIndex = 0; stageIndex < activeStageIds.Length; stageIndex++)
+            {
+                JObject stageStar = (JObject)freshStageStars[stageIndex]!;
+                AssertEqual(activeStageIds[stageIndex],
+                    RequiredValue<int>(stageStar, "StageId", JTokenType.Integer, $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}]"),
+                    $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}].StageId");
+                AssertEqual(0,
+                    RequiredValue<int>(stageStar, "StarsMark", JTokenType.Integer, $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}]"),
+                    $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}].StarsMark");
+            }
+            AssertEqual(0,
+                RequiredValue<JArray>(freshActivityPayload, "StarRewardIds", JTokenType.Array, "fresh NotifyBossActivityData").Count,
+                "fresh NotifyBossActivityData StarRewardIds count");
+            AssertEqual(0,
+                RequiredValue<JArray>(freshActivityPayload, "PassStoryIds", JTokenType.Array, "fresh NotifyBossActivityData").Count,
+                "fresh NotifyBossActivityData PassStoryIds count");
+            AssertEqual(0,
+                RequiredValue<JObject>(freshActivityPayload, "DifficultyScoreRecord", JTokenType.Object, "fresh NotifyBossActivityData").Count,
+                "fresh NotifyBossActivityData DifficultyScoreRecord count");
+
+            const int activityBossStarsMark = 5;
+            const int activityBossScore = 12_345;
+            harness.Session.stage.AddStage(new StageDatum
+            {
+                StageId = activeStageIds[0],
+                Passed = true,
+                StarsMark = activityBossStarsMark,
+                Score = activityBossScore
+            });
+            NotifyBossActivityData progressedActivityLogin = BuildActivityLogin(activeNow)
+                ?? throw new InvalidDataException("BossModule.BuildActivityLoginData returned nil for a progressed active activity.");
+            JObject progressedActivityPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(
+                MessagePackSerializer.Serialize(progressedActivityLogin)));
+            AssertEqual(1,
+                RequiredValue<int>(progressedActivityPayload, "Schedule", JTokenType.Integer, "progressed NotifyBossActivityData"),
+                "progressed NotifyBossActivityData consecutive Schedule");
+            JObject progressedFirstStage = (JObject)RequiredValue<JArray>(
+                progressedActivityPayload, "StageStarInfos", JTokenType.Array, "progressed NotifyBossActivityData")[0]!;
+            AssertEqual(activityBossStarsMark,
+                RequiredValue<int>(progressedFirstStage, "StarsMark", JTokenType.Integer, "progressed NotifyBossActivityData first stage"),
+                "progressed NotifyBossActivityData StarsMark");
+            JObject progressedScores = RequiredValue<JObject>(
+                progressedActivityPayload, "DifficultyScoreRecord", JTokenType.Object, "progressed NotifyBossActivityData");
+            AssertEqual(activityBossScore,
+                RequiredValue<int>(progressedScores, activeStageIds[0].ToString(CultureInfo.InvariantCulture), JTokenType.Integer,
+                    "progressed NotifyBossActivityData DifficultyScoreRecord"),
+                "progressed NotifyBossActivityData score");
+            DateTimeOffset inactiveNow = activeActivity.Schedule.EndTime > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(activeActivity.Schedule.EndTime)
+                : activeNow.AddYears(100);
+            AssertEqual(null, BuildActivityLogin(inactiveNow), "BossModule.BuildActivityLoginData inactive activity window");
+
+            if (ActivityScheduleService.IsOpen(activeActivity.Schedule.Id, DateTimeOffset.UtcNow))
+            {
+            MethodInfo doLogin = RequiredMethod(
+                RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
+                "DoLogin",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                [typeof(Session)]);
+
+            using (LoopbackSessionHarness activityLoginHarness = new(
+                CreateDrawCompatibilityCharacter(playerId + 1),
+                CreateDrawCompatibilityPlayer(playerId + 1),
+                CreateDrawCompatibilityInventory(playerId + 1, []),
+                "boss-activity-login-compat-test"))
+            {
+                activityLoginHarness.Session.stage = CreateLoginAccountCompatibilityStage(playerId + 1);
+                doLogin.Invoke(null, [activityLoginHarness.Session]);
+                bool sawBossActivityPush = false;
+                for (int packetIndex = 0; packetIndex < 192; packetIndex++)
+                {
+                    Packet packet = activityLoginHarness.ReadPacket($"Boss activity login startup packet {packetIndex + 1}");
+                    AssertEqual(Packet.ContentType.Push, packet.Type, "Boss activity login startup packet type");
+                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
+                    sawBossActivityPush |= push.Name == nameof(NotifyBossActivityData);
+                    if (push.Name == "NotifyWheelchairManualActivityUpdate")
+                        break;
+                }
+                AssertEqual(true, sawBossActivityPush,
+                    "AccountModule.DoLogin emits NotifyBossActivityData before startup completion");
+            }
+
+
+            const int activityBossRefreshPacketId = 82_001;
+            InvokeRegisteredRequestHandler(
+                nameof(GetActivityBossDataRequest),
+                harness.Session,
+                activityBossRefreshPacketId,
+                new GetActivityBossDataRequest());
+            Packet activityBossRefreshPushPacket = harness.ReadPacket("GetActivityBossDataRequest refresh push");
+            AssertEqual(Packet.ContentType.Push, activityBossRefreshPushPacket.Type, "GetActivityBossDataRequest first packet type");
+            Packet.Push activityBossRefreshPush = MessagePackSerializer.Deserialize<Packet.Push>(activityBossRefreshPushPacket.Content);
+            AssertEqual(nameof(NotifyBossActivityData), activityBossRefreshPush.Name, "GetActivityBossDataRequest refresh push name");
+            Packet activityBossRefreshResponsePacket = harness.ReadPacket("GetActivityBossDataRequest response");
+            AssertEqual(Packet.ContentType.Response, activityBossRefreshResponsePacket.Type, "GetActivityBossDataRequest response packet type");
+            Packet.Response activityBossRefreshResponse = MessagePackSerializer.Deserialize<Packet.Response>(activityBossRefreshResponsePacket.Content);
+            AssertEqual(activityBossRefreshPacketId, activityBossRefreshResponse.Id, "GetActivityBossDataRequest response id");
+            AssertEqual(nameof(GetActivityBossDataResponse), activityBossRefreshResponse.Name, "GetActivityBossDataRequest response name");
+            AssertEqual(0,
+                MessagePackSerializer.Deserialize<GetActivityBossDataResponse>(activityBossRefreshResponse.Content).Code,
+                "GetActivityBossDataRequest response code");
+            long originalPlayerLevel = player.PlayerData.Level;
+            player.PlayerData.Level = 0;
+            const int inactiveActivityBossRefreshPacketId = 82_002;
+            InvokeRegisteredRequestHandler(
+                nameof(GetActivityBossDataRequest),
+                harness.Session,
+                inactiveActivityBossRefreshPacketId,
+                new GetActivityBossDataRequest());
+            Packet inactiveActivityBossResponsePacket = harness.ReadPacket("inactive GetActivityBossDataRequest response");
+            AssertEqual(Packet.ContentType.Response, inactiveActivityBossResponsePacket.Type,
+                "inactive GetActivityBossDataRequest has no refresh push");
+            Packet.Response inactiveActivityBossResponse =
+                MessagePackSerializer.Deserialize<Packet.Response>(inactiveActivityBossResponsePacket.Content);
+            AssertEqual(inactiveActivityBossRefreshPacketId, inactiveActivityBossResponse.Id,
+                "inactive GetActivityBossDataRequest response id");
+            AssertEqual(1,
+                MessagePackSerializer.Deserialize<GetActivityBossDataResponse>(inactiveActivityBossResponse.Content).Code,
+                "inactive GetActivityBossDataRequest response code");
+            player.PlayerData.Level = originalPlayerLevel;
+            }
+        }
+
         private static void ValidateBossActivityCompatibility()
         {
+            ValidateBossActivityLoginCompatibility();
             using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForBossCompatibility(
                 out _,
                 out RecordingMongoCollectionProxy<AscNet.Common.Database.Stage> stageCollection);
@@ -27747,1700 +25684,6 @@ namespace AscNet.Test
             }
         }
 
-        private static void ValidateBossSingleCompatibility()
-        {
-            using MongoCollectionOverride mongoOverride = MongoCollectionOverride.InstallForBossCompatibility(
-                out RecordingMongoCollectionProxy<AscNet.Common.Database.Player> playerCollection,
-                out RecordingMongoCollectionProxy<AscNet.Common.Database.Stage> stageCollection);
-            const long playerId = 99_701;
-            const uint characterId = 1_021_001;
-            uint[] historyCharacterIds = [1_021_002, 1_021_003, 1_021_004];
-            AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(playerId);
-            player.SimulatedBattlefield = new() { BossRankPlatform = 2 };
-            AscNet.Common.Database.Character character = CreateDrawCompatibilityCharacter(playerId);
-            character.Characters.Add(CreateLoginAccountCompatibilityCharacter(characterId, 3_021_001));
-            foreach (uint historyCharacterId in historyCharacterIds)
-                character.Characters.Add(CreateLoginAccountCompatibilityCharacter(historyCharacterId, 3_021_001));
-            AscNet.Common.Database.Inventory inventory = CreateDrawCompatibilityInventory(playerId, []);
-            using LoopbackSessionHarness harness = new(character, player, inventory, "boss-single-compat-test");
-            harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
-
-            Type bossModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.BossModule");
-            MethodInfo buildLoginData = RequiredMethod(
-                bossModule,
-                "BuildLoginData",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(AscNet.Common.Database.Player), typeof(long?)]);
-            NotifyFubenBossSingleData BuildLogin(AscNet.Common.Database.Player target, long? now) =>
-                buildLoginData.Invoke(null, [target, now]) as NotifyFubenBossSingleData
-                ?? throw new InvalidDataException("BossModule.BuildLoginData returned nil.");
-            MethodInfo buildNotifyLogin = RequiredMethod(
-                RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
-                "BuildNotifyLogin",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(Session)]);
-            NotifyLogin BuildAccountLogin() =>
-                buildNotifyLogin.Invoke(null, [harness.Session]) as NotifyLogin
-                ?? throw new InvalidDataException("AccountModule.BuildNotifyLogin returned nil.");
-            List<BossActivityTable> activityBossActivities = TableReaderV2.Parse<BossActivityTable>();
-            List<BossSectionTable> activityBossSections = TableReaderV2.Parse<BossSectionTable>();
-            Dictionary<int, BossChallengeTable> activityBossChallenges = TableReaderV2.Parse<BossChallengeTable>()
-                .ToDictionary(challenge => challenge.Id);
-            (BossActivityTable Activity, ActivityScheduleEntry Schedule) activeActivity = activityBossActivities
-                .Where(activity => activity.ActivityTimeId is > 0
-                    && ActivityScheduleService.TryGet(activity.ActivityTimeId.Value, out _))
-                .Select(activity =>
-                {
-                    ActivityScheduleService.TryGet(activity.ActivityTimeId!.Value, out ActivityScheduleEntry schedule);
-                    return (Activity: activity, Schedule: schedule);
-                })
-                .OrderByDescending(candidate => candidate.Activity.Id)
-                .First();
-            BossSectionTable activeSection = activityBossSections
-                .Where(section => section.ActivityId == activeActivity.Activity.Id
-                    && player.PlayerData.Level >= section.MinLevel
-                    && player.PlayerData.Level <= section.MaxLevel)
-                .OrderBy(section => section.OrderId)
-                .ThenBy(section => section.Id)
-                .First();
-            int[] activeChallengeIds = activeSection.ChallengeId.Where(id => id > 0).ToArray();
-            int[] activeStageIds = activeChallengeIds
-                .Select(challengeId => activityBossChallenges[challengeId].StageId)
-                .ToArray();
-            if (activeStageIds.Length == 0)
-                throw new InvalidDataException("Boss activity table-selected section has no challenge stages.");
-
-            MethodInfo buildActivityLoginData = RequiredMethod(
-                bossModule,
-                "BuildActivityLoginData",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(Session), typeof(DateTimeOffset?)]);
-            NotifyBossActivityData? BuildActivityLogin(DateTimeOffset now) =>
-                buildActivityLoginData.Invoke(null, [harness.Session, now]) as NotifyBossActivityData;
-            DateTimeOffset activeNow = activeActivity.Schedule.StartTime > 0
-                ? DateTimeOffset.FromUnixTimeSeconds(activeActivity.Schedule.StartTime)
-                : DateTimeOffset.UnixEpoch;
-            NotifyBossActivityData freshActivityLogin = BuildActivityLogin(activeNow)
-                ?? throw new InvalidDataException("BossModule.BuildActivityLoginData returned nil during its table-backed activity window.");
-            JObject freshActivityPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(
-                MessagePackSerializer.Serialize(freshActivityLogin)));
-            AssertEqual(
-                true,
-                freshActivityPayload.Properties().Select(property => property.Name).Order(StringComparer.Ordinal).SequenceEqual(
-                    ["ActivityId", "DifficultyScoreRecord", "PassStoryIds", "Schedule", "SectionId", "StageStarInfos", "StarRewardIds"]),
-                "NotifyBossActivityData exact top-level keys");
-            AssertEqual(activeActivity.Activity.Id,
-                RequiredValue<int>(freshActivityPayload, "ActivityId", JTokenType.Integer, "fresh NotifyBossActivityData"),
-                "fresh NotifyBossActivityData ActivityId");
-            AssertEqual(activeSection.Id,
-                RequiredValue<int>(freshActivityPayload, "SectionId", JTokenType.Integer, "fresh NotifyBossActivityData"),
-                "fresh NotifyBossActivityData SectionId");
-            AssertEqual(0,
-                RequiredValue<int>(freshActivityPayload, "Schedule", JTokenType.Integer, "fresh NotifyBossActivityData"),
-                "fresh NotifyBossActivityData Schedule");
-            JArray freshStageStars = RequiredValue<JArray>(
-                freshActivityPayload, "StageStarInfos", JTokenType.Array, "fresh NotifyBossActivityData");
-            AssertEqual(activeStageIds.Length, freshStageStars.Count, "fresh NotifyBossActivityData StageStarInfos count");
-            for (int stageIndex = 0; stageIndex < activeStageIds.Length; stageIndex++)
-            {
-                JObject stageStar = (JObject)freshStageStars[stageIndex]!;
-                AssertEqual(activeStageIds[stageIndex],
-                    RequiredValue<int>(stageStar, "StageId", JTokenType.Integer, $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}]"),
-                    $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}].StageId");
-                AssertEqual(0,
-                    RequiredValue<int>(stageStar, "StarsMark", JTokenType.Integer, $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}]"),
-                    $"fresh NotifyBossActivityData StageStarInfos[{stageIndex}].StarsMark");
-            }
-            AssertEqual(0,
-                RequiredValue<JArray>(freshActivityPayload, "StarRewardIds", JTokenType.Array, "fresh NotifyBossActivityData").Count,
-                "fresh NotifyBossActivityData StarRewardIds count");
-            AssertEqual(0,
-                RequiredValue<JArray>(freshActivityPayload, "PassStoryIds", JTokenType.Array, "fresh NotifyBossActivityData").Count,
-                "fresh NotifyBossActivityData PassStoryIds count");
-            AssertEqual(0,
-                RequiredValue<JObject>(freshActivityPayload, "DifficultyScoreRecord", JTokenType.Object, "fresh NotifyBossActivityData").Count,
-                "fresh NotifyBossActivityData DifficultyScoreRecord count");
-
-            const int activityBossStarsMark = 5;
-            const int activityBossScore = 12_345;
-            harness.Session.stage.AddStage(new StageDatum
-            {
-                StageId = activeStageIds[0],
-                Passed = true,
-                StarsMark = activityBossStarsMark,
-                Score = activityBossScore
-            });
-            NotifyBossActivityData progressedActivityLogin = BuildActivityLogin(activeNow)
-                ?? throw new InvalidDataException("BossModule.BuildActivityLoginData returned nil for a progressed active activity.");
-            JObject progressedActivityPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(
-                MessagePackSerializer.Serialize(progressedActivityLogin)));
-            AssertEqual(1,
-                RequiredValue<int>(progressedActivityPayload, "Schedule", JTokenType.Integer, "progressed NotifyBossActivityData"),
-                "progressed NotifyBossActivityData consecutive Schedule");
-            JObject progressedFirstStage = (JObject)RequiredValue<JArray>(
-                progressedActivityPayload, "StageStarInfos", JTokenType.Array, "progressed NotifyBossActivityData")[0]!;
-            AssertEqual(activityBossStarsMark,
-                RequiredValue<int>(progressedFirstStage, "StarsMark", JTokenType.Integer, "progressed NotifyBossActivityData first stage"),
-                "progressed NotifyBossActivityData StarsMark");
-            JObject progressedScores = RequiredValue<JObject>(
-                progressedActivityPayload, "DifficultyScoreRecord", JTokenType.Object, "progressed NotifyBossActivityData");
-            AssertEqual(activityBossScore,
-                RequiredValue<int>(progressedScores, activeStageIds[0].ToString(CultureInfo.InvariantCulture), JTokenType.Integer,
-                    "progressed NotifyBossActivityData DifficultyScoreRecord"),
-                "progressed NotifyBossActivityData score");
-            DateTimeOffset inactiveNow = activeActivity.Schedule.EndTime > 0
-                ? DateTimeOffset.FromUnixTimeSeconds(activeActivity.Schedule.EndTime)
-                : activeNow.AddYears(100);
-            AssertEqual(null, BuildActivityLogin(inactiveNow), "BossModule.BuildActivityLoginData inactive activity window");
-
-            if (ActivityScheduleService.IsOpen(activeActivity.Schedule.Id, DateTimeOffset.UtcNow))
-            {
-            MethodInfo doLogin = RequiredMethod(
-                RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule"),
-                "DoLogin",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                [typeof(Session)]);
-
-            using (LoopbackSessionHarness activityLoginHarness = new(
-                CreateDrawCompatibilityCharacter(playerId + 1),
-                CreateDrawCompatibilityPlayer(playerId + 1),
-                CreateDrawCompatibilityInventory(playerId + 1, []),
-                "boss-activity-login-compat-test"))
-            {
-                activityLoginHarness.Session.stage = CreateLoginAccountCompatibilityStage(playerId + 1);
-                doLogin.Invoke(null, [activityLoginHarness.Session]);
-                bool sawBossActivityPush = false;
-                for (int packetIndex = 0; packetIndex < 192; packetIndex++)
-                {
-                    Packet packet = activityLoginHarness.ReadPacket($"Boss activity login startup packet {packetIndex + 1}");
-                    AssertEqual(Packet.ContentType.Push, packet.Type, "Boss activity login startup packet type");
-                    Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                    sawBossActivityPush |= push.Name == nameof(NotifyBossActivityData);
-                    if (push.Name == "NotifyWheelchairManualActivityUpdate")
-                        break;
-                }
-                AssertEqual(true, sawBossActivityPush,
-                    "AccountModule.DoLogin emits NotifyBossActivityData before startup completion");
-            }
-
-
-            const int activityBossRefreshPacketId = 82_001;
-            InvokeRegisteredRequestHandler(
-                nameof(GetActivityBossDataRequest),
-                harness.Session,
-                activityBossRefreshPacketId,
-                new GetActivityBossDataRequest());
-            Packet activityBossRefreshPushPacket = harness.ReadPacket("GetActivityBossDataRequest refresh push");
-            AssertEqual(Packet.ContentType.Push, activityBossRefreshPushPacket.Type, "GetActivityBossDataRequest first packet type");
-            Packet.Push activityBossRefreshPush = MessagePackSerializer.Deserialize<Packet.Push>(activityBossRefreshPushPacket.Content);
-            AssertEqual(nameof(NotifyBossActivityData), activityBossRefreshPush.Name, "GetActivityBossDataRequest refresh push name");
-            Packet activityBossRefreshResponsePacket = harness.ReadPacket("GetActivityBossDataRequest response");
-            AssertEqual(Packet.ContentType.Response, activityBossRefreshResponsePacket.Type, "GetActivityBossDataRequest response packet type");
-            Packet.Response activityBossRefreshResponse = MessagePackSerializer.Deserialize<Packet.Response>(activityBossRefreshResponsePacket.Content);
-            AssertEqual(activityBossRefreshPacketId, activityBossRefreshResponse.Id, "GetActivityBossDataRequest response id");
-            AssertEqual(nameof(GetActivityBossDataResponse), activityBossRefreshResponse.Name, "GetActivityBossDataRequest response name");
-            AssertEqual(0,
-                MessagePackSerializer.Deserialize<GetActivityBossDataResponse>(activityBossRefreshResponse.Content).Code,
-                "GetActivityBossDataRequest response code");
-            long originalPlayerLevel = player.PlayerData.Level;
-            player.PlayerData.Level = 0;
-            const int inactiveActivityBossRefreshPacketId = 82_002;
-            InvokeRegisteredRequestHandler(
-                nameof(GetActivityBossDataRequest),
-                harness.Session,
-                inactiveActivityBossRefreshPacketId,
-                new GetActivityBossDataRequest());
-            Packet inactiveActivityBossResponsePacket = harness.ReadPacket("inactive GetActivityBossDataRequest response");
-            AssertEqual(Packet.ContentType.Response, inactiveActivityBossResponsePacket.Type,
-                "inactive GetActivityBossDataRequest has no refresh push");
-            Packet.Response inactiveActivityBossResponse =
-                MessagePackSerializer.Deserialize<Packet.Response>(inactiveActivityBossResponsePacket.Content);
-            AssertEqual(inactiveActivityBossRefreshPacketId, inactiveActivityBossResponse.Id,
-                "inactive GetActivityBossDataRequest response id");
-            AssertEqual(1,
-                MessagePackSerializer.Deserialize<GetActivityBossDataResponse>(inactiveActivityBossResponse.Content).Code,
-                "inactive GetActivityBossDataRequest response code");
-            player.PlayerData.Level = originalPlayerLevel;
-            }
-
-
-
-            TResponse ReadAfterPushes<TResponse>(
-                int packetId,
-                string responseName,
-                string name,
-                out List<string> pushNames,
-                int maxPackets = 64)
-
-            {
-                pushNames = [];
-                for (int packetIndex = 0; packetIndex < maxPackets; packetIndex++)
-                {
-                    Packet packet = harness.ReadPacket($"{name} packet {packetIndex + 1}");
-                    if (packet.Type == Packet.ContentType.Push)
-                    {
-                        Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-                        pushNames.Add(push.Name);
-                        continue;
-                    }
-
-                    AssertEqual(Packet.ContentType.Response, packet.Type, $"{name} response packet type");
-                    Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
-                    AssertEqual(packetId, response.Id, $"{name} response packet id");
-                    AssertEqual(responseName, response.Name, $"{name} response packet name");
-                    return MessagePackSerializer.Deserialize<TResponse>(response.Content);
-                }
-                throw new InvalidDataException($"{name}: expected {responseName} within {maxPackets} packets.");
-            }
-
-            PreFightResponse StartFight(int packetId, int stageId, int stageType,
-                IReadOnlyList<uint>? cardIds = null, object? buffGroup = null)
-            {
-                InvokeRegisteredRequestHandler(
-                    nameof(PreFightRequest),
-                    harness.Session,
-                    packetId,
-                    new PreFightRequest
-                    {
-                        PreFightData = new PreFightRequest.PreFightRequestPreFightData
-                        {
-                            StageId = checked((uint)stageId),
-                            ChallengeCount = 1,
-                            CardIds = cardIds?.ToList() ?? [characterId],
-                            RobotIds = [],
-                            BossSingleStageType = stageType,
-                            BossSingleChallengeBuffGroup = buffGroup
-                        }
-                    });
-                PreFightResponse response = ReadResponsePayload<PreFightResponse>(
-                    harness,
-                    packetId,
-                    nameof(PreFightResponse),
-                    $"Pain Cage stage {stageId} PreFightResponse");
-                if (response.Code == 0)
-                {
-                    JArray groups = JArray.FromObject(response.FightData?.NpcGroupList
-                        ?? throw new InvalidDataException($"Pain Cage stage {stageId}: successful PreFight omitted NpcGroupList."));
-                    AssertEqual(true, groups.Count > 0,
-                        $"Pain Cage stage {stageId} successful PreFight has an NPC group");
-                    AssertEqual(true, groups.All(group => (group["NpcList"]?.Count() ?? 0) > 0),
-                        $"Pain Cage stage {stageId} successful PreFight groups are nonempty");
-                }
-                return response;
-            }
-
-            FightSettleResponse SettleFight(
-                int packetId,
-                PreFightResponse preFight,
-                BossSingleStageTable stage,
-                int characterHp,
-                int bossHp,
-                int fightSeconds = 20,
-                bool isWin = true,
-                bool isForceExit = false)
-            {
-                InvokeRegisteredRequestHandler(
-                    nameof(FightSettleRequest),
-                    harness.Session,
-                    packetId,
-                    new FightSettleRequest
-                    {
-                        Result = new FightSettleResult
-                        {
-                            IsWin = isWin,
-                            IsForceExit = isForceExit,
-                            StageId = checked((uint)stage.StageId),
-                            FightId = preFight.FightData.FightId,
-                            StartFrame = 1,
-                            SettleFrame = 1 + fightSeconds * 20,
-                            PauseFrame = 0,
-                            LeftTime = Math.Max(0, stage.PassTimeLimit - fightSeconds),
-                            NpcHpInfo = new()
-                            {
-                                [1] = new NpcHp
-                                {
-                                    CharacterId = checked((int)characterId),
-                                    Type = 1,
-                                    AttrTable = new()
-                                    {
-                                        [1] = new Dictionary<object, object>
-                                        {
-                                            ["Value"] = characterHp,
-                                            ["MaxValue"] = 100
-                                        }
-                                    },
-                                    BuffIds = []
-                                },
-                                [2] = new NpcHp
-                                {
-                                    Type = 2,
-                                    AttrTable = new()
-                                    {
-                                        [1] = new Dictionary<object, object>
-                                        {
-                                            ["Value"] = bossHp * 10_000,
-                                            ["MaxValue"] = 1_000_000
-                                        }
-                                    },
-                                    BuffIds = []
-                                }
-                            }
-                        }
-                    });
-                return ReadResponsePayload<FightSettleResponse>(
-                    harness,
-                    packetId,
-                    nameof(FightSettleResponse),
-                    $"Pain Cage stage {stage.StageId} FightSettleResponse");
-            }
-
-            BossSingleSaveScoreResponse SaveScore(
-                int packetId,
-                int stageId,
-                string name,
-                out List<string> pushNames)
-            {
-                InvokeRegisteredRequestHandler(
-                    nameof(BossSingleSaveScoreRequest),
-                    harness.Session,
-                    packetId,
-                    new BossSingleSaveScoreRequest { StageId = stageId });
-                return ReadAfterPushes<BossSingleSaveScoreResponse>(
-                    packetId,
-                    nameof(BossSingleSaveScoreResponse),
-                    name,
-                    out pushNames);
-            }
-
-            BossSingleFightResult RequiredBossResult(FightSettleResponse response, string name)
-            {
-                object? raw = response.Settle?.BossSingleFightResult;
-                if (raw is null)
-                    throw new InvalidDataException($"{name}: BossSingleFightResult is nil.");
-                if (raw is BossSingleFightResult typed)
-                    return typed;
-                return JObject.FromObject(raw).ToObject<BossSingleFightResult>()
-                    ?? throw new InvalidDataException($"{name}: BossSingleFightResult could not be decoded.");
-            }
-
-            List<BossSingleGradeTable> grades = TableReaderV2.Parse<BossSingleGradeTable>();
-            List<BossSingleGroupTable> groups = TableReaderV2.Parse<BossSingleGroupTable>();
-            List<BossSingleSectionTable> sections = TableReaderV2.Parse<BossSingleSectionTable>();
-            List<BossSingleStageTable> stages = TableReaderV2.Parse<BossSingleStageTable>();
-            List<BossSingleScoreRuleTable> scoreRules = TableReaderV2.Parse<BossSingleScoreRuleTable>();
-            List<BossSingleScoreRewardTable> scoreRewards = TableReaderV2.Parse<BossSingleScoreRewardTable>();
-            List<BossSingleRewardGoodsTable> rewardGoods = TableReaderV2.Parse<BossSingleRewardGoodsTable>();
-            List<BossSingleTrialGradeTable> trialGrades = TableReaderV2.Parse<BossSingleTrialGradeTable>();
-            List<BossSingleStageNpcTable> stageNpcs = TableReaderV2.Parse<BossSingleStageNpcTable>();
-            BossSingleConfigTable runtimeConfig = TableReaderV2.Parse<BossSingleConfigTable>().Single();
-            AssertEqual(6, runtimeConfig.AutoFightCount, "Pain Cage EN-config auto-fight limit");
-            AssertEqual(100, runtimeConfig.AutoFightRebate, "Pain Cage EN-config auto-fight rebate");
-            AssertEqual(301, stages.Count, "Pain Cage generated stage count");
-            AssertEqual(stages.Count, stageNpcs.Count, "Pain Cage every stage has an NPC mapping");
-            AssertEqual(true, stageNpcs.All(row => row.NpcId > 0), "Pain Cage NPC mappings are positive");
-            AssertEqual(8160, stageNpcs.Single(row => row.StageId == 30000303).NpcId,
-                "Pain Cage Roland stage resolves to the master NPC");
-            AssertEqual(stages.Count, scoreRules.Count, "Pain Cage one score rule per stage");
-            if (groups.Count == 0 || sections.Count == 0 || scoreRewards.Count == 0 || rewardGoods.Count == 0)
-                throw new InvalidDataException("Pain Cage generated runtime tables are incomplete.");
-
-            int playerLevel = checked((int)player.PlayerData.Level);
-            int currentAfreshId = grades.Max(row => row.AfreshId);
-            List<BossSingleGradeTable> freshEligibleGrades = grades
-                .Where(row => row.AfreshId == currentAfreshId
-                    && playerLevel >= row.MinPlayerLevel
-                    && playerLevel <= row.MaxPlayerLevel
-                    && row.PreGradeType == 0)
-                .ToList();
-            AssertEqual(1, freshEligibleGrades.Count,
-                "Pain Cage fresh level-80 table eligibility has one grade");
-
-            NotifyFubenBossSingleData initialLogin = BuildLogin(player, null);
-            AssertEqual(true, initialLogin.BossListDict is null,
-                "Pain Cage fresh direct-entry login omits BossListDict");
-            AssertEqual(true, initialLogin.FubenBossSingleData.LevelType > 0,
-                "Pain Cage fresh direct-entry login auto-selects its sole eligible grade");
-            AssertEqual(true, initialLogin.FubenBossSingleData.BossList.Count > 0,
-                "Pain Cage fresh direct-entry login commits bosses");
-            AssertEqual(true, initialLogin.FubenBossSingleData.RemainTime > 0, "Pain Cage live remaining time");
-            AssertEqual(2, initialLogin.FubenBossSingleData.RankPlatform,
-                "Pain Cage persisted login platform rank partition");
-            AssertEqual(grades.Max(row => row.AfreshId), initialLogin.FubenBossSingleData.AfreshId,
-                "Pain Cage current refresh id comes from grade tables");
-
-            int directEntryLevel = initialLogin.FubenBossSingleData.LevelType;
-            AssertEqual(freshEligibleGrades.Single().LevelType, directEntryLevel,
-                "Pain Cage fresh direct-entry selected table-eligible grade");
-            BossSingleGradeTable directEntryGrade = grades.Single(row => row.LevelType == directEntryLevel);
-            int[] directEntrySections = initialLogin.FubenBossSingleData.BossList.ToArray();
-            AssertEqual(directEntryGrade.GroupId.Count(groupId => groupId > 0), directEntrySections.Length,
-                "Pain Cage direct-entry one selected section per configured group");
-            AssertEqual(directEntrySections.Length, directEntrySections.Distinct().Count(),
-                "Pain Cage direct-entry selected sections are unique");
-
-            int currentActivityNo = player.SimulatedBattlefield.BossActivityNo;
-            player.SimulatedBattlefield.BossLevelType = 0;
-            player.SimulatedBattlefield.BossList.Clear();
-            player.SimulatedBattlefield.BossListOptions.Clear();
-            player.SimulatedBattlefield.BossListOptions[directEntryLevel] = directEntrySections.ToList();
-            NotifyFubenBossSingleData repairedLogin = BuildLogin(player, null);
-            AssertEqual(currentActivityNo, player.SimulatedBattlefield.BossActivityNo,
-                "Pain Cage persisted one-option repair stays in the current activity");
-            AssertEqual(directEntryLevel, repairedLogin.FubenBossSingleData.LevelType,
-                "Pain Cage persisted one-option repair selects the sole grade");
-            if (!repairedLogin.FubenBossSingleData.BossList.SequenceEqual(directEntrySections))
-                throw new InvalidDataException("Pain Cage persisted one-option repair did not commit the sole offered boss list.");
-            AssertEqual(true, repairedLogin.BossListDict is null,
-                "Pain Cage persisted one-option repair omits BossListDict");
-            int[] directEntryStageIds = directEntrySections
-                .SelectMany(sectionId => sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1).StageId)
-                .Distinct()
-                .ToArray();
-            AssertEqual(true, directEntryStageIds.Length > 0,
-                "Pain Cage direct-entry committed sections contain stages");
-            NotifyLogin accountLogin = MessagePackSerializer.Deserialize<NotifyLogin>(
-                MessagePackSerializer.Serialize(BuildAccountLogin()));
-            Dictionary<long, StageDatum> loginStages = accountLogin.FubenData?.StageData
-                ?? throw new InvalidDataException("Pain Cage AccountModule.BuildNotifyLogin omitted FubenData.StageData.");
-            foreach (int stageId in directEntryStageIds)
-            {
-                AssertEqual(true, loginStages.ContainsKey(stageId),
-                    $"Pain Cage direct-entry NotifyLogin contains committed stage {stageId}");
-            }
-
-            List<BossSingleGradeTable> levelEligibleGrades = grades
-                .Where(row => row.AfreshId == currentAfreshId
-                    && playerLevel >= row.MinPlayerLevel
-                    && playerLevel <= row.MaxPlayerLevel)
-                .ToList();
-            (BossSingleGradeTable Previous, int Score, List<BossSingleGradeTable> Options) chooserFixture =
-                (from previous in grades
-                 from score in levelEligibleGrades.Select(row => row.NeedScore).Append(0).Distinct()
-                 let options = levelEligibleGrades.Where(row =>
-                     row.PreGradeType == 0
-                     || (previous.GradeType >= row.PreGradeType && score >= row.NeedScore)).ToList()
-                 where options.Count == 2
-                 select (previous, score, options)).FirstOrDefault();
-            if (chooserFixture.Previous is null)
-                throw new InvalidDataException("Pain Cage grade tables do not provide a table-qualified two-option fixture.");
-
-            foreach (int stageId in directEntryStageIds)
-                harness.Session.stage.Stages.Remove(checked((uint)stageId));
-
-            player.SimulatedBattlefield.BossOldLevelType = chooserFixture.Previous.LevelType;
-            player.SimulatedBattlefield.BossListOptions.Clear();
-            player.SimulatedBattlefield.BossMaxScore = chooserFixture.Score;
-            player.SimulatedBattlefield.BossLevelType = 0;
-            player.SimulatedBattlefield.BossList.Clear();
-            NotifyFubenBossSingleData chooserLogin = BuildLogin(player, null);
-            Dictionary<int, List<int>> initialOptions = chooserLogin.BossListDict
-                ?? throw new InvalidDataException("Pain Cage table-qualified chooser login omitted BossListDict.");
-            AssertEqual(0, chooserLogin.FubenBossSingleData.LevelType,
-                "Pain Cage two-option login retains chooser state");
-            AssertEqual(0, chooserLogin.FubenBossSingleData.BossList.Count,
-                "Pain Cage two-option login has no prematurely committed bosses");
-            AssertEqual(2, initialOptions.Count, "Pain Cage chooser exposes high/extreme option maps");
-            AssertIntegerSetContainsAll(
-                chooserFixture.Options.Select(row => (long)row.LevelType).ToArray(),
-                initialOptions.Keys.Select(levelType => (long)levelType).ToArray(),
-                "Pain Cage chooser table-qualified grade options");
-
-            int selectedLevel = initialOptions.Keys.Max();
-            BossSingleGradeTable selectedGrade = grades.Single(row => row.LevelType == selectedLevel);
-            int[] selectedSections = initialOptions[selectedLevel].ToArray();
-            AssertEqual(selectedGrade.GroupId.Count(groupId => groupId > 0), selectedSections.Length,
-                "Pain Cage one selected section per configured group");
-            AssertEqual(selectedSections.Length, selectedSections.Distinct().Count(),
-                "Pain Cage selected sections are unique");
-            foreach (int sectionId in selectedSections)
-            {
-                BossSingleSectionTable section = sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1);
-                if (section.StageId.Count == 0)
-                    throw new InvalidDataException($"Pain Cage selected section {sectionId} has no stages.");
-            }
-
-            const int invalidSelectPacketId = 82_000;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleSelectLevelTypeRequest),
-                harness.Session,
-                invalidSelectPacketId,
-                new BossSingleSelectLevelTypeRequest { LevelId = int.MaxValue });
-            BossSingleSelectLevelTypeResponse invalidSelect =
-                ReadResponsePayload<BossSingleSelectLevelTypeResponse>(
-                    harness,
-                    invalidSelectPacketId,
-                    nameof(BossSingleSelectLevelTypeResponse),
-                    "Pain Cage invalid level selection");
-            AssertEqual(1, invalidSelect.Code, "Pain Cage invalid level selection code");
-
-            const int selectPacketId = 82_001;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleSelectLevelTypeRequest),
-                harness.Session,
-                selectPacketId,
-                new BossSingleSelectLevelTypeRequest { LevelId = selectedLevel });
-            BossSingleSelectLevelTypeResponse selectResponse =
-                ReadAfterPushes<BossSingleSelectLevelTypeResponse>(
-                    selectPacketId,
-                    nameof(BossSingleSelectLevelTypeResponse),
-                    "Pain Cage level selection",
-                    out List<string> selectPushes);
-            AssertEqual(0, selectResponse.Code, "Pain Cage level selection code");
-            AssertEqual(selectedLevel, player.SimulatedBattlefield.BossLevelType,
-                "Pain Cage selected level persistence");
-            if (!player.SimulatedBattlefield.BossList.SequenceEqual(selectedSections))
-                throw new InvalidDataException("Pain Cage selected boss list differs from the offered table-derived option.");
-            AssertEqual(0, selectPushes.Count(name => name == nameof(NotifyStageData)),
-                "Pain Cage selection does not duplicate login stage pushes");
-            AssertEqual(true, selectPushes.Contains(nameof(NotifyWheelchairManualActivityUpdate)),
-                "Pain Cage selection refreshes the manual guide subtype");
-            foreach (int stageId in selectedSections
-                         .SelectMany(sectionId => sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1).StageId))
-            {
-                AssertEqual(true, harness.Session.stage.Stages.ContainsKey(checked((uint)stageId)),
-                    $"Pain Cage selected stage {stageId} unlocked");
-            }
-
-            int AuxiliaryStageId(bool bestiary)
-            {
-                BossSingleTrialGradeTable catalog = trialGrades.Single(row => (row.IsBestiaryCfg != 0) == bestiary);
-                return catalog.SectionId
-                    .Where(sectionId => sectionId > 0)
-                    .SelectMany(sectionId => sections
-                        .Where(row => row.SectionId == sectionId)
-                        .OrderByDescending(row => row.AfreshId == 1)
-                        .Take(1)
-                        .SelectMany(row => row.StageId))
-                    .First(stageId => stages.Any(row => row.StageId == stageId));
-            }
-
-            List<(int Remaining, int Score, int Cap)> auxiliaryTimeScores = [];
-            void ExerciseAuxiliaryStage(bool bestiary, int stageType, int fightSeconds, int packetBase)
-            {
-                int stageId = AuxiliaryStageId(bestiary);
-                BossSingleStageTable stage = stages.Single(row => row.StageId == stageId);
-                int challengeCountBefore = player.SimulatedBattlefield.BossChallengeCount;
-                int cycleBestBefore = player.SimulatedBattlefield.BossTotalScore;
-                int cycleCurrentBefore = player.SimulatedBattlefield.BossCurrentTotalScore;
-                PreFightResponse preFight = StartFight(packetBase, stageId, stageType);
-                AssertEqual(0, preFight.Code, $"Pain Cage {(bestiary ? "bestiary" : "trial")} pre-fight code");
-                AssertEqual(stage.PassTimeLimit, preFight.FightData.PassTimeLimit,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} table time limit");
-                FightSettleResponse settle = SettleFight(
-                    packetBase + 1,
-                    preFight,
-                    stage,
-                    characterHp: 100,
-                    bossHp: 0,
-                    fightSeconds: fightSeconds);
-                BossSingleFightResult result = RequiredBossResult(
-                    settle,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} result");
-                AssertEqual(stage.PassTimeLimit - fightSeconds, result.TimeLeft,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} remaining time");
-                BossSingleScoreRuleTable scoreRule = scoreRules.Single(row => row.Id == stageId);
-                int coefficientIndex = (stageType == 4 ? 8 : 4) - 1;
-                double timeCoefficient = scoreRule.LeftTimeScore[coefficientIndex];
-                int expectedTimeScore = Math.Min(stage.LeftTimeScore, checked((int)Math.Floor(
-                    (stage.PassTimeLimit - fightSeconds) * timeCoefficient * stage.PassTimeLimit)));
-                AssertEqual(expectedTimeScore, result.TimeScore,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} table-derived remaining-time score");
-                auxiliaryTimeScores.Add((result.TimeLeft, result.TimeScore, stage.LeftTimeScore));
-                AssertEqual(true, result.TimeScore > 0 && result.TimeScore <= stage.LeftTimeScore,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} remaining-time score is positive and table-capped");
-                AssertEqual(true, result.TotalScore > 0,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} positive score");
-                BossSingleSaveScoreResponse save = SaveScore(
-                    packetBase + 2,
-                    stageId,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} save",
-                    out _);
-                AssertEqual(0, save.Code, $"Pain Cage {(bestiary ? "bestiary" : "trial")} save code");
-                Dictionary<int, int> scores = bestiary
-                    ? player.SimulatedBattlefield.BossBestiaryScores
-                    : player.SimulatedBattlefield.BossTrialScores;
-                AssertEqual(result.TotalScore, scores[stageId],
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} score persistence");
-                // The non-Trial settlement compares the new run against the generic stage datum
-                // (XUiFubenBossSingleSettlement:GetMyTotalHistory only special-cases Trial), so the codex save has
-                // to expose the mode best there or a lower run looks like a new record.
-                AssertEqual(result.TotalScore, harness.Session.stage.Stages[stageId].Score,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear exposes the mode best to the settlement");
-                AssertEqual(cycleBestBefore, player.SimulatedBattlefield.BossTotalScore,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear leaves the cycle best total unchanged");
-                AssertEqual(cycleCurrentBefore, player.SimulatedBattlefield.BossCurrentTotalScore,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} clear leaves the cycle current total unchanged");
-                AssertEqual(challengeCountBefore, player.SimulatedBattlefield.BossChallengeCount,
-                    $"Pain Cage {(bestiary ? "bestiary" : "trial")} does not consume normal attempts");
-            }
-
-            ExerciseAuxiliaryStage(bestiary: false, stageType: 2, fightSeconds: 100, packetBase: 82_010);
-            ExerciseAuxiliaryStage(bestiary: true, stageType: 4, fightSeconds: 12, packetBase: 82_020);
-            AssertEqual(true, auxiliaryTimeScores[0].Score < auxiliaryTimeScores[0].Cap
-                && auxiliaryTimeScores[1].Score < auxiliaryTimeScores[1].Cap,
-                "Pain Cage partial remaining-time scores are below their caps");
-            AssertEqual(true, auxiliaryTimeScores[0].Score != auxiliaryTimeScores[1].Score,
-                "Pain Cage remaining-time scores vary proportionally with distinct durations");
-
-            // A saved codex best followed by a lower run must keep the settlement history at the best, otherwise
-            // the client offers to discard the worse score as though it were a new record.
-            {
-                int codexStageId = AuxiliaryStageId(bestiary: true);
-                BossSingleStageTable codexStage = stages.Single(row => row.StageId == codexStageId);
-                int codexBest = player.SimulatedBattlefield.BossBestiaryScores[codexStageId];
-                PreFightResponse lowerCodexPreFight = StartFight(82_023, codexStageId, stageType: 4);
-                AssertEqual(0, lowerCodexPreFight.Code, "Pain Cage bestiary lower-run pre-fight code");
-                FightSettleResponse lowerCodexSettle = SettleFight(
-                    82_024,
-                    lowerCodexPreFight,
-                    codexStage,
-                    characterHp: 100,
-                    bossHp: 0,
-                    fightSeconds: 240);
-                BossSingleFightResult lowerCodexResult = RequiredBossResult(
-                    lowerCodexSettle,
-                    "Pain Cage bestiary lower-run result");
-                AssertEqual(true, lowerCodexResult.TotalScore < codexBest,
-                    "Pain Cage bestiary lower-run fixture scores below the saved best");
-                BossSingleSaveScoreResponse lowerCodexSave = SaveScore(
-                    82_025,
-                    codexStageId,
-                    "Pain Cage bestiary lower-run save",
-                    out List<string> lowerCodexPushes);
-                AssertEqual(0, lowerCodexSave.Code, "Pain Cage bestiary lower-run save code");
-                AssertEqual(true, lowerCodexPushes.Contains(nameof(NotifyStageData)),
-                    "Pain Cage bestiary lower-run pushes the stage datum");
-                AssertEqual(codexBest, player.SimulatedBattlefield.BossBestiaryScores[codexStageId],
-                    "Pain Cage bestiary lower run keeps the saved best");
-                AssertEqual(codexBest, harness.Session.stage.Stages[codexStageId].Score,
-                    "Pain Cage bestiary lower run keeps the settlement history at the saved best");
-            }
-            List<BossSingleChallengeGradeTable> challengeGrades = TableReaderV2.Parse<BossSingleChallengeGradeTable>();
-            List<BossSingleChallengeFeatureGroupTable> challengeGroups = TableReaderV2.Parse<BossSingleChallengeFeatureGroupTable>();
-            int preIntensiveLevelType = player.SimulatedBattlefield.BossLevelType;
-            List<int> preIntensiveBossList = player.SimulatedBattlefield.BossList.ToList();
-            List<AscNet.Common.Database.BossSingleStageRecordState> preIntensiveRecords = player.SimulatedBattlefield.BossStageRecords.ToList();
-            int preIntensiveTotal = player.SimulatedBattlefield.BossTotalScore;
-            int preIntensiveCurrent = player.SimulatedBattlefield.BossCurrentTotalScore;
-            int preIntensiveMax = player.SimulatedBattlefield.BossMaxScore;
-            int preIntensiveSection = player.SimulatedBattlefield.BossChallengeSelectedSection;
-            int preIntensiveFeatureGroup = player.SimulatedBattlefield.BossChallengeSelectedFeatureGroup;
-            List<AscNet.Common.Database.BossSingleChallengeHistoryRecordState> preIntensiveHistory = player.SimulatedBattlefield.BossChallengeHistory.ToList();
-            player.SimulatedBattlefield.BossLevelType = grades.Where(row => row.GradeType >= challengeGrades.Single().NeedGradeType).OrderBy(row => row.GradeType).First().LevelType;
-            player.SimulatedBattlefield.BossList = groups.Single(row => row.Id == grades.Single(value => value.LevelType == player.SimulatedBattlefield.BossLevelType).GroupId.First()).SectionId.ToList();
-            player.SimulatedBattlefield.BossStageRecords =
-            [
-                new AscNet.Common.Database.BossSingleStageRecordState
-                {
-                    StageId = stages.First().StageId,
-                    Score = challengeGrades.Single().NeedScore,
-                    MaxScore = challengeGrades.Single().NeedScore
-                }
-            ];
-            player.SimulatedBattlefield.BossChallengeSelectedFeatureGroup = challengeGroups.First(row => row.BuffGroupIds.Any(id => id > 0)).Id;
-            NotifyFubenBossSingleData challengeLogin = BuildLogin(player, null);
-            BossSingleSectionTable challengeSection = sections
-                .Single(row => row.Id == challengeLogin.FubenBossSingleData.ChallengeSectionId
-                    && row.AfreshId == sections.Max(section => section.AfreshId));
-            int challengeStageId = challengeSection.StageId.First();
-            BossSingleChallengeFeatureGroupTable challengeFeatureGroup = challengeGroups
-                .Single(row => row.Id == challengeLogin.FubenBossSingleData.ChallengeFeatureGroupId);
-            AssertEqual(3, challengeSection.StageId.Count,
-                "Pain Cage intensive current section has three stages");
-            AssertEqual(3, challengeFeatureGroup.FeatureIds.Count,
-                "Pain Cage intensive feature group has three affixes");
-            AssertEqual(true, challengeSection.StageId.Zip(challengeFeatureGroup.FeatureIds).All(pair =>
-                    challengeSection.StageId.Contains(pair.First)
-                    && challengeFeatureGroup.FeatureIds.Contains(pair.Second)),
-                "Pain Cage intensive stage and affix join preserves table order");
-            int challengeBuffGroup = challengeGroups.Single(row => row.Id == challengeLogin.FubenBossSingleData.ChallengeFeatureGroupId).BuffGroupIds.First(id => id > 0);
-            PreFightResponse intensivePreFight = StartFight(82_030, challengeStageId, stageType: 3, buffGroup: challengeBuffGroup);
-            AssertEqual(0, intensivePreFight.Code, "Pain Cage intensive type3 pre-fight");
-            int challengeFeatureEvent = TableReaderV2.Parse<BossSingleChallengeFeatureTable>()
-                .Single(row => row.Id == challengeFeatureGroup.FeatureIds[
-                    challengeFeatureGroup.BuffGroupIds.IndexOf(challengeBuffGroup)])
-                .FightEventIds;
-            AssertEqual(true, challengeFeatureEvent <= 0
-                || intensivePreFight.FightData.EventIds.Contains(challengeFeatureEvent),
-                "Pain Cage intensive module applies its table-derived fight event");
-            BossSingleStageTable intensiveStage = stages.Single(row => row.StageId == challengeStageId);
-            FightSettleResponse intensiveSettle = SettleFight(82_031, intensivePreFight, intensiveStage, 100, 0, fightSeconds: 8);
-            BossSingleFightResult intensiveResult = RequiredBossResult(intensiveSettle, "Pain Cage intensive result");
-            BossSingleSaveScoreResponse intensiveSave = SaveScore(82_032, challengeStageId, "Pain Cage intensive save", out List<string> intensivePushes);
-            AssertEqual(0, intensiveSave.Code, "Pain Cage intensive save");
-            AssertEqual(true, intensivePushes.Contains(nameof(NotifyBossSingleRankInfo)), "Pain Cage intensive rank push");
-            AssertEqual(intensiveResult.TotalScore, player.SimulatedBattlefield.BossChallengeHistory.Single(row => row.StageId == challengeStageId).Score, "Pain Cage intensive history");
-            dynamic intensiveHistoryBuffGroup = BuildLogin(player, null).FubenBossSingleData
-                .ChallengeStageHistoryList.Single(row => row.StageId == challengeStageId).BuffGroup
-                ?? throw new InvalidDataException("Pain Cage intensive history BuffGroup is nil.");
-            AssertEqual(challengeBuffGroup, (int)intensiveHistoryBuffGroup["BuffGroupId"],
-                "Pain Cage intensive history emits the client BuffGroup object");
-            AssertEqual(0, ((Dictionary<int, int>)intensiveHistoryBuffGroup["BuffChoices"]).Count,
-                "Pain Cage direct BuffGroup keeps empty choice map");
-            player.SimulatedBattlefield.BossChallengeHistory.Add(new AscNet.Common.Database.BossSingleChallengeHistoryRecordState { StageId = challengeSection.StageId[1], Score = intensiveResult.TotalScore + 1 });
-            player.SimulatedBattlefield.BossChallengeHistory.Add(new AscNet.Common.Database.BossSingleChallengeHistoryRecordState { StageId = challengeSection.StageId[2], Score = intensiveResult.TotalScore - 1 });
-            int unrelatedChallengeStageId = sections
-                .SelectMany(row => row.StageId)
-                .First(stageId => !challengeSection.StageId.Contains(stageId));
-            player.SimulatedBattlefield.BossChallengeHistory.Add(
-                new AscNet.Common.Database.BossSingleChallengeHistoryRecordState
-                {
-                    StageId = unrelatedChallengeStageId,
-                    Score = intensiveResult.TotalScore + 100
-                });
-            int[] intensiveScores = player.SimulatedBattlefield.BossChallengeHistory
-                .Where(row => challengeSection.StageId.Contains(row.StageId))
-                .Select(row => row.Score)
-                .ToArray();
-            AssertEqual(3, intensiveScores.Distinct().Count(), "Pain Cage intensive regression uses three distinct scores");
-            AssertEqual(intensiveScores.Sum(), BuildLogin(player, null).FubenBossSingleData.ChallengeTotalScore,
-                "Pain Cage intensive display total sums only current-section stages");
-            player.SimulatedBattlefield.BossChallengeHistory.RemoveAll(
-                row => row.StageId == unrelatedChallengeStageId);
-            const int intensiveRankPacketId = 82_036;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetChallengeRankRequest),
-                harness.Session,
-                intensiveRankPacketId,
-                new BossSingleGetChallengeRankRequest { StageId = 0 });
-            BossSingleGetChallengeRankResponse intensiveRank =
-                ReadResponsePayload<BossSingleGetChallengeRankResponse>(
-                    harness,
-                    intensiveRankPacketId,
-                    nameof(BossSingleGetChallengeRankResponse),
-                    "Pain Cage intensive aggregate rank");
-            AssertEqual(0, intensiveRank.Code, "Pain Cage intensive aggregate rank code");
-            int rankStageCount = challengeGrades.Single(row => row.LevelType == challengeLogin.FubenBossSingleData.ChallengeLevelType).RankStageNum;
-            AssertEqual(intensiveScores.OrderByDescending(score => score).Take(rankStageCount).Sum(), intensiveRank.Score,
-                "Pain Cage intensive aggregate rank retains table top-N total");
-            AscNet.Common.Database.Player intensiveReload = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(player.ToBsonDocument());
-            AssertEqual(3, intensiveReload.SimulatedBattlefield.BossChallengeHistory.Count, "Pain Cage intensive relog history");
-            BossSingleChallengeBuffGroupTable challengeBuffChoice = TableReaderV2
-                .Parse<BossSingleChallengeBuffGroupTable>()
-                .First(row => row.BuffGroupId == challengeBuffGroup && row.Index > 0 && row.Buff.Count > 0);
-            int choiceFeatureEvent = TableReaderV2.Parse<BossSingleChallengeFeatureTable>()
-                .Single(row => row.Id == challengeBuffChoice.Buff[0]).FightEventIds;
-            PreFightResponse clientShapedPreFight = StartFight(
-                82_033,
-                challengeStageId,
-                stageType: 3,
-                buffGroup: new Dictionary<string, object>
-                {
-                    ["BuffGroupId"] = challengeBuffGroup,
-                    ["BuffChoices"] = new Dictionary<int, int> { [challengeBuffChoice.Index] = 1 }
-                });
-            AssertEqual(0, clientShapedPreFight.Code,
-                "Pain Cage client-shaped intensive module pre-fight");
-            AssertEqual(true, clientShapedPreFight.FightData.EventIds.Contains(challengeFeatureEvent)
-                && clientShapedPreFight.FightData.EventIds.Contains(choiceFeatureEvent),
-                "Pain Cage client-shaped module applies base and selected table-derived events");
-            player.SimulatedBattlefield.BossChallengeHistory.RemoveAll(row => row.StageId == challengeStageId);
-            _ = SettleFight(82_034, clientShapedPreFight, intensiveStage, 100, 0, fightSeconds: 8);
-            _ = SaveScore(82_035, challengeStageId, "Pain Cage client-shaped intensive save", out _);
-            dynamic persistedChoiceHistory = BuildLogin(player, null).FubenBossSingleData
-                .ChallengeStageHistoryList.Single(row => row.StageId == challengeStageId).BuffGroup
-                ?? throw new InvalidDataException("Pain Cage intensive choice history BuffGroup is nil.");
-            Dictionary<int, int> persistedChoices = (Dictionary<int, int>)persistedChoiceHistory["BuffChoices"];
-            AssertEqual(1, persistedChoices[challengeBuffChoice.Index],
-                "Pain Cage intensive history persists selected BuffChoices");
-            AscNet.Common.Database.Player choiceReload = MongoDB.Bson.Serialization.BsonSerializer
-                .Deserialize<AscNet.Common.Database.Player>(player.ToBsonDocument());
-            AssertEqual(1, choiceReload.SimulatedBattlefield.BossChallengeHistory
-                .Single(row => row.StageId == challengeStageId).BuffChoices[challengeBuffChoice.Index],
-                "Pain Cage intensive BuffChoices BSON round-trip");
-            player.SimulatedBattlefield.BossLevelType = preIntensiveLevelType;
-            player.SimulatedBattlefield.BossList = preIntensiveBossList;
-            player.SimulatedBattlefield.BossStageRecords = preIntensiveRecords;
-            player.SimulatedBattlefield.BossTotalScore = preIntensiveTotal;
-            player.SimulatedBattlefield.BossCurrentTotalScore = preIntensiveCurrent;
-            player.SimulatedBattlefield.BossMaxScore = preIntensiveMax;
-            player.SimulatedBattlefield.BossChallengeSelectedSection = preIntensiveSection;
-            player.SimulatedBattlefield.BossChallengeSelectedFeatureGroup = preIntensiveFeatureGroup;
-            player.SimulatedBattlefield.BossChallengeHistory = preIntensiveHistory;
-
-
-            List<int> selectedStageIds = selectedSections
-                .SelectMany(sectionId => sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1).StageId)
-                .Distinct()
-                .ToList();
-            BossSingleStageTable normalStage = stages
-                .Where(row => selectedStageIds.Contains(row.StageId) && row.AutoFight != 0)
-                .OrderBy(row => row.StageId)
-                .First();
-            int normalSectionId = selectedSections.Single(sectionId =>
-                sections.Single(row => row.SectionId == sectionId && row.AfreshId == 1).StageId.Contains(normalStage.StageId));
-
-            List<(int SectionId, BossSingleStageTable Opening, BossSingleStageTable Final, uint CharacterId)> historyStages =
-                selectedSections
-                    .Take(3)
-                    .Select((sectionId, index) =>
-                    {
-                        List<int> stageIds = sections
-                            .Single(row => row.SectionId == sectionId && row.AfreshId == 1)
-                            .StageId;
-                        return (
-                            sectionId,
-                            stages.Single(row => row.StageId == stageIds.First()),
-                            stages.Single(row => row.StageId == stageIds.Last()),
-                            historyCharacterIds[index]);
-                    })
-                    .ToList();
-            AssertEqual(3, historyStages.Count, "Pain Cage table-selected three-section history fixture");
-            AssertEqual(true, historyStages.All(fixture => fixture.Opening.StageId != fixture.Final.StageId),
-                "Pain Cage table-selected sections have distinct opening and final stages");
-
-            foreach (var historyStage in historyStages)
-            {
-                int packetBase = 82_100 + historyStages.FindIndex(fixture => fixture.CharacterId == historyStage.CharacterId) * 10;
-                PreFightResponse openingPreFight = StartFight(
-                    packetBase,
-                    historyStage.Opening.StageId,
-                    stageType: 1,
-                    [historyStage.CharacterId]);
-                AssertEqual(0, openingPreFight.Code,
-                    $"Pain Cage section opening {historyStage.Opening.StageId} pre-fight code");
-                FightSettleResponse openingSettle = SettleFight(
-                    packetBase + 1,
-                    openingPreFight,
-                    historyStage.Opening,
-                    100,
-                    0);
-                _ = RequiredBossResult(openingSettle, $"Pain Cage section opening {historyStage.Opening.StageId} result");
-                BossSingleSaveScoreResponse openingSave = SaveScore(
-                    packetBase + 2,
-                    historyStage.Opening.StageId,
-                    $"Pain Cage section opening {historyStage.Opening.StageId} save",
-                    out _);
-                AssertEqual(0, openingSave.Code, $"Pain Cage section opening {historyStage.Opening.StageId} save code");
-            }
-            AssertEqual(3, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage counts first clears in three distinct sections");
-
-            foreach (var historyStage in historyStages.Take(2))
-            {
-                int packetBase = 82_140 + historyStages.FindIndex(fixture => fixture.CharacterId == historyStage.CharacterId) * 10;
-                PreFightResponse finalPreFight = StartFight(
-                    packetBase,
-                    historyStage.Final.StageId,
-                    stageType: 1,
-                    [historyStage.CharacterId]);
-                AssertEqual(0, finalPreFight.Code, $"Pain Cage final stage {historyStage.Final.StageId} pre-fight code");
-                FightSettleResponse finalSettle = SettleFight(
-                    packetBase + 1,
-                    finalPreFight,
-                    historyStage.Final,
-                    100,
-                    0);
-                _ = RequiredBossResult(finalSettle, $"Pain Cage final stage {historyStage.Final.StageId} result");
-                BossSingleSaveScoreResponse finalSave = SaveScore(
-                    packetBase + 2,
-                    historyStage.Final.StageId,
-                    $"Pain Cage final stage {historyStage.Final.StageId} save",
-                    out _);
-                AssertEqual(0, finalSave.Code, $"Pain Cage final stage {historyStage.Final.StageId} save code");
-            }
-            AssertEqual(3, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage later phases retain the three-section attempt count");
-            var retriedFinalStage = historyStages[0];
-            uint lowerScoreCharacterId = historyStages[2].CharacterId;
-            PreFightResponse lowerScorePreFight = StartFight(
-                82_170,
-                retriedFinalStage.Final.StageId,
-                stageType: 1,
-                [lowerScoreCharacterId]);
-            AssertEqual(0, lowerScorePreFight.Code,
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower-score pre-fight code");
-            FightSettleResponse lowerScoreSettle = SettleFight(
-                82_171,
-                lowerScorePreFight,
-                retriedFinalStage.Final,
-                characterHp: 0,
-                bossHp: 100,
-                isWin: false);
-            BossSingleFightResult lowerScoreResult = RequiredBossResult(
-                lowerScoreSettle,
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower-score result");
-            AscNet.Common.Database.BossSingleStageRecordState bestFinalRecord = player.SimulatedBattlefield.BossStageRecords
-                .Single(record => record.StageId == retriedFinalStage.Final.StageId);
-            AssertEqual(true, lowerScoreResult.TotalScore < bestFinalRecord.MaxScore,
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower-score fixture");
-            BossSingleSaveScoreResponse lowerScoreSave = SaveScore(
-                82_172,
-                retriedFinalStage.Final.StageId,
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower-score save",
-                out _);
-            AssertEqual(0, lowerScoreSave.Code,
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower-score save code");
-            AssertIntegerList(
-                [retriedFinalStage.CharacterId],
-                bestFinalRecord.MaxCharacters.Select(Convert.ToInt64).ToArray(),
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower score preserves best team");
-            AssertIntegerList(
-                [lowerScoreCharacterId],
-                bestFinalRecord.Characters.Select(Convert.ToInt64).ToArray(),
-                $"Pain Cage final stage {retriedFinalStage.Final.StageId} lower score retains latest team");
-
-            void AssertFinalStageHistory(AscNet.Common.Database.Player target, string name)
-            {
-                JObject data = RequiredValue<JObject>(
-                    JObject.Parse(MessagePackSerializer.ConvertToJson(MessagePackSerializer.Serialize(BuildLogin(target, null)))),
-                    "FubenBossSingleData",
-                    JTokenType.Object,
-                    name);
-                JArray stageRecords = RequiredValue<JArray>(data, "StageRecordList", JTokenType.Array, name);
-                foreach (var historyStage in historyStages.Take(2))
-                {
-                    JObject record = stageRecords
-                        .OfType<JObject>()
-                        .Single(value => RequiredValue<int>(value, "StageId", JTokenType.Integer, name)
-                            == historyStage.Final.StageId);
-                    uint expectedCurrentCharacterId = historyStage.Final.StageId == retriedFinalStage.Final.StageId
-                        ? lowerScoreCharacterId
-                        : historyStage.CharacterId;
-                    AssertIntegerList(
-                        [expectedCurrentCharacterId],
-                        RequiredValue<JArray>(record, "Characters", JTokenType.Array, name)
-                            .Select(value => value.Value<long>())
-                            .ToArray(),
-                        $"{name} final stage {historyStage.Final.StageId} current team");
-                    AssertIntegerList(
-                        [historyStage.CharacterId],
-                        RequiredValue<JArray>(record, "MaxCharacters", JTokenType.Array, name)
-                            .Select(value => value.Value<long>())
-                            .ToArray(),
-                        $"{name} final stage {historyStage.Final.StageId} best team");
-                }
-            }
-
-            AssertFinalStageHistory(player, "Pain Cage saved final-stage Team History");
-            AscNet.Common.Database.Player historyReloaded =
-                MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(player.ToBsonDocument());
-            AssertFinalStageHistory(historyReloaded, "Pain Cage relogged final-stage Team History");
-
-            player.SimulatedBattlefield.BossChallengeCount = 0;
-            player.SimulatedBattlefield.BossAutoFightCount = 0;
-            player.SimulatedBattlefield.BossCharacterPoints.Clear();
-            player.SimulatedBattlefield.BossHistory.Clear();
-            player.SimulatedBattlefield.BossStageRecords.Clear();
-            player.SimulatedBattlefield.BossResetStageIds.Clear();
-            player.SimulatedBattlefield.BossNormalStageTeams.Clear();
-            player.SimulatedBattlefield.BossTotalScore = 0;
-            player.SimulatedBattlefield.BossCurrentTotalScore = 0;
-            player.SimulatedBattlefield.BossMaxScore = 0;
-            player.SimulatedBattlefield.BossLastScoreTime = 0;
-
-            PreFightResponse discardedPreFight = StartFight(82_024, normalStage.StageId, stageType: 1);
-            AssertEqual(0, discardedPreFight.Code, "Pain Cage discarded-score pre-fight code");
-            _ = SettleFight(82_025, discardedPreFight, normalStage, characterHp: 100, bossHp: 0);
-            AssertEqual(normalStage.StageId, harness.Session.PendingBossSingleScore?.StageId ?? 0,
-                "Pain Cage successful settlement remains provisional");
-            InvokeRegisteredRequestHandler(
-                nameof(LeaveFightRequest),
-                harness.Session,
-                82_026,
-                new LeaveFightRequest());
-            _ = ReadResponsePayload<LeaveFightResponse>(
-                harness,
-                82_026,
-                nameof(LeaveFightResponse),
-                "Pain Cage discard LeaveFightResponse");
-            AssertEqual(null, harness.Session.PendingBossSingleScore,
-                "Pain Cage leaving without save discards provisional score");
-            AssertEqual(0, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage leaving without save leaves attempt count unchanged");
-            AssertEqual(false, player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
-                "Pain Cage leaving without save leaves character stamina unchanged");
-
-            PreFightResponse retreatPreFight = StartFight(82_028, normalStage.StageId, stageType: 1);
-            AssertEqual(0, retreatPreFight.Code, "Pain Cage retreat pre-fight code");
-            FightSettleResponse retreatSettle = SettleFight(
-                82_029,
-                retreatPreFight,
-                normalStage,
-                characterHp: 100,
-                bossHp: 100,
-                isWin: false,
-                isForceExit: true);
-            AssertEqual(false, retreatSettle.Settle?.IsWin ?? true, "Pain Cage retreat settle result");
-            AssertEqual(0, retreatSettle.Settle?.ChallengeCount ?? -1,
-                "Pain Cage retreat settlement consumes no attempts");
-            AssertEqual(0, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage retreat leaves attempt count unchanged");
-            AssertEqual(false, player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
-                "Pain Cage retreat leaves character stamina unchanged");
-            AssertEqual(null, harness.Session.PendingBossSingleScore,
-                "Pain Cage retreat leaves no provisional score");
-
-            PreFightResponse deathPreFight = StartFight(82_027, normalStage.StageId, stageType: 1);
-            AssertEqual(0, deathPreFight.Code, "Pain Cage death pre-fight code");
-            FightSettleResponse deathSettle = SettleFight(
-                82_028,
-                deathPreFight,
-                normalStage,
-                characterHp: 0,
-                bossHp: 100,
-                isWin: false);
-            AssertEqual(0, deathSettle.Code, "Pain Cage death settle code");
-            AssertEqual(true, deathSettle.Settle?.IsWin ?? false, "Pain Cage death settle result");
-            _ = RequiredBossResult(deathSettle, "Pain Cage death FightSettleResponse");
-            AssertEqual(normalStage.StageId, harness.Session.PendingBossSingleScore?.StageId ?? 0,
-                "Pain Cage death settlement remains provisional for save-score");
-            InvokeRegisteredRequestHandler(
-                nameof(LeaveFightRequest),
-                harness.Session,
-                82_029,
-                new LeaveFightRequest());
-            _ = ReadResponsePayload<LeaveFightResponse>(
-                harness,
-                82_029,
-                nameof(LeaveFightResponse),
-                "Pain Cage death discard LeaveFightResponse");
-            AssertEqual(null, harness.Session.PendingBossSingleScore,
-                "Pain Cage death discard clears provisional score");
-
-            const int normalPreFightPacketId = 82_030;
-            PreFightResponse normalPreFight = StartFight(normalPreFightPacketId, normalStage.StageId, stageType: 1);
-            AssertEqual(0, normalPreFight.Code, "Pain Cage normal PreFightResponse code");
-            AssertEqual(checked((uint)normalStage.StageId), normalPreFight.FightData.StageId,
-                "Pain Cage normal PreFightResponse StageId");
-            AssertEqual(1, normalPreFight.FightData.FightCheckType,
-                "Pain Cage normal PreFightResponse fight check type");
-            AssertEqual(normalStage.PassTimeLimit, normalPreFight.FightData.PassTimeLimit,
-                "Pain Cage normal table time limit");
-            AssertIntegerList(
-                [characterId],
-                player.SimulatedBattlefield.BossNormalStageTeams[normalSectionId].Select(Convert.ToInt64).ToArray(),
-                "Pain Cage pre-fight team persistence");
-
-            const int normalFightSeconds = 20;
-            const int normalSettlePacketId = 82_031;
-            FightSettleResponse normalSettle = SettleFight(
-                normalSettlePacketId,
-                normalPreFight,
-                normalStage,
-                characterHp: 100,
-                bossHp: 0,
-                fightSeconds: normalFightSeconds);
-            BossSingleFightResult normalResult = RequiredBossResult(
-                normalSettle,
-                "Pain Cage normal FightSettleResponse");
-            BossSingleScoreRuleTable normalRule = scoreRules.Single(row => row.Id == normalStage.StageId);
-            int coefficientIndex = selectedLevel - 1;
-            int expectedBossScore = Math.Min(
-                normalStage.BossLoseHpScore,
-                checked((int)Math.Floor(
-                    1d / normalRule.BossLoseHp[coefficientIndex]
-                    * normalRule.BossLoseHpScore[coefficientIndex])));
-            double timeCoefficient = normalRule.LeftTimeScore[coefficientIndex];
-            int expectedTimeScore = Math.Min(normalStage.LeftTimeScore,
-                checked((int)Math.Floor((normalStage.PassTimeLimit - normalFightSeconds) * timeCoefficient * normalStage.PassTimeLimit)));
-            double hpCoefficient = normalRule.CharLeftHpSocre[coefficientIndex];
-            int expectedHpScore = normalRule.BaseScore
-                + Math.Min(normalStage.LeftHpScore, checked((int)Math.Floor(100 * hpCoefficient)));
-            int expectedTotalScore = Math.Min(
-                normalStage.Score + normalRule.BaseScore,
-                expectedBossScore + expectedTimeScore + expectedHpScore);
-            AssertEqual(20, normalResult.FightTime, "Pain Cage frame-derived fight time");
-            AssertEqual(100, normalResult.BossDamagePer, "Pain Cage boss damage percentage");
-            AssertEqual(expectedBossScore, normalResult.BossDamageScore, "Pain Cage boss damage score");
-            AssertEqual(expectedTimeScore, normalResult.TimeScore, "Pain Cage remaining-time score");
-            AssertEqual(expectedHpScore, normalResult.HpScore, "Pain Cage character-HP score");
-            AssertEqual(expectedTotalScore, normalResult.TotalScore, "Pain Cage total score");
-            AssertEqual(0, normalSettle.Settle?.ChallengeCount ?? -1,
-                "Pain Cage settlement does not consume client-side stamina before save");
-            AssertEqual(0, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage settlement does not consume an attempt before save");
-            AssertEqual(false, player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
-                "Pain Cage settlement does not consume character stamina before save");
-            AssertEqual(0, player.SimulatedBattlefield.BossStageRecords.Count,
-                "Pain Cage settle is provisional before save-score");
-            AssertEqual(normalStage.StageId, harness.Session.PendingBossSingleScore?.StageId ?? 0,
-                "Pain Cage provisional score session state");
-
-            int playerSavesBeforeNormalScore = playerCollection.ReplaceOneCalls;
-            int stageSavesBeforeNormalScore = stageCollection.ReplaceOneCalls;
-            const int normalSavePacketId = 82_032;
-            BossSingleSaveScoreResponse normalSave = SaveScore(
-                normalSavePacketId,
-                normalStage.StageId,
-                "Pain Cage normal save",
-                out List<string> savePushes);
-            AssertEqual(0, normalSave.Code, "Pain Cage normal save-score code");
-            AssertEqual(playerSavesBeforeNormalScore + 1, playerCollection.ReplaceOneCalls,
-                "Pain Cage normal save persists Player once");
-            AssertEqual(stageSavesBeforeNormalScore + 2, stageCollection.ReplaceOneCalls,
-                "Pain Cage normal save heals the fixture-cleared stage datums and persists the committed Stage");
-            int rankPushIndex = savePushes.IndexOf(nameof(NotifyBossSingleRankInfo));
-            int stagePushIndex = savePushes.IndexOf(nameof(NotifyStageData), rankPushIndex + 1);
-            int loginPushIndex = savePushes.IndexOf(nameof(NotifyFubenBossSingleData));
-            if (rankPushIndex < 0 || stagePushIndex <= rankPushIndex || loginPushIndex <= stagePushIndex)
-                throw new InvalidDataException(
-                    $"Pain Cage save push order: expected rank, stage, login; got {string.Join(",", savePushes)}.");
-            AscNet.Common.Database.BossSingleStageRecordState savedRecord =
-                player.SimulatedBattlefield.BossStageRecords.Single(record => record.StageId == normalStage.StageId);
-            AssertEqual(normalResult.TotalScore, savedRecord.Score, "Pain Cage current stage score persistence");
-            AssertEqual(normalResult.TotalScore, savedRecord.MaxScore, "Pain Cage stage best score persistence");
-            AssertEqual(normalResult.TotalScore, player.SimulatedBattlefield.BossCurrentTotalScore,
-                "Pain Cage current total score");
-            AssertEqual(normalResult.TotalScore, player.SimulatedBattlefield.BossTotalScore,
-                "Pain Cage period best total score");
-            AssertEqual(1, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage first-clear attempt consumption");
-            AssertEqual(1, player.SimulatedBattlefield.BossCharacterPoints[checked((int)characterId)],
-                "Pain Cage character stamina consumption");
-            AscNet.Common.Database.BossSingleHistoryRecordState savedHistory =
-                player.SimulatedBattlefield.BossHistory.Single(record => record.StageId == normalStage.StageId);
-            AssertEqual(normalResult.TotalScore, savedHistory.Score,
-                "Pain Cage save records stage history score");
-            AssertIntegerList(
-                [characterId],
-                savedHistory.Characters.Select(Convert.ToInt64).ToArray(),
-                "Pain Cage save records stage history team");
-            AssertEqual(null, harness.Session.PendingBossSingleScore,
-                "Pain Cage save clears provisional session score");
-
-            const int duplicateSavePacketId = 82_033;
-            BossSingleSaveScoreResponse duplicateSave = SaveScore(
-                duplicateSavePacketId,
-                normalStage.StageId,
-                "Pain Cage duplicate save",
-                out List<string> duplicateSavePushes);
-            AssertEqual(1, duplicateSave.Code, "Pain Cage duplicate save rejected");
-            AssertEqual(0, duplicateSavePushes.Count, "Pain Cage duplicate save emits no pushes");
-            AssertEqual(1, player.SimulatedBattlefield.BossChallengeCount,
-                "Pain Cage duplicate save does not consume attempt");
-
-            const int rankInfoPacketId = 82_034;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleRankInfoRequest),
-                harness.Session,
-                rankInfoPacketId,
-                new BossSingleRankInfoRequest { SectionId = normalSectionId });
-            BossSingleRankInfoResponse rankInfo = ReadResponsePayload<BossSingleRankInfoResponse>(
-                harness,
-                rankInfoPacketId,
-                nameof(BossSingleRankInfoResponse),
-                "Pain Cage personal rank response");
-            AssertEqual(0, rankInfo.Code, "Pain Cage personal rank code");
-            AssertEqual(1, rankInfo.Rank, "Pain Cage personal rank");
-            AssertEqual(true, rankInfo.TotalRank >= 1, "Pain Cage personal rank population");
-
-            const int rankListPacketId = 82_035;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetRankRequest),
-                harness.Session,
-                rankListPacketId,
-                new BossSingleGetRankRequest { Level = selectedLevel, SectionId = normalSectionId });
-            BossSingleGetRankResponse rankList = ReadResponsePayload<BossSingleGetRankResponse>(
-                harness,
-                rankListPacketId,
-                nameof(BossSingleGetRankResponse),
-                "Pain Cage rank list response");
-            AssertEqual(0, rankList.Code, "Pain Cage rank list code");
-            AssertEqual(1, rankList.RankNum, "Pain Cage rank list personal rank");
-            AssertEqual(normalResult.TotalScore, rankList.Score, "Pain Cage rank list section score");
-            AssertEqual(true, rankList.RankList.Count >= 1, "Pain Cage rank list contains participant");
-
-            int pointsBeforeConstraintChecks =
-                player.SimulatedBattlefield.BossCharacterPoints[checked((int)characterId)];
-            int challengeCountBeforeConstraintChecks = player.SimulatedBattlefield.BossChallengeCount;
-            int constraintStageId = selectedStageIds.First(stageId => stageId != normalStage.StageId);
-            player.SimulatedBattlefield.BossCharacterPoints[checked((int)characterId)] = selectedGrade.StaminaCount;
-            PreFightResponse staminaRejected = StartFight(82_036, constraintStageId, stageType: 1);
-            AssertEqual(1, staminaRejected.Code, "Pain Cage exhausted character stamina rejection");
-            AssertEqual(null, harness.Session.fight, "Pain Cage stamina rejection creates no fight");
-            player.SimulatedBattlefield.BossCharacterPoints[checked((int)characterId)] = pointsBeforeConstraintChecks;
-            int constraintSectionId = selectedSections.Single(sectionId =>
-                sections.Single(row => row.SectionId == sectionId && row.AfreshId == currentAfreshId)
-                    .StageId.Contains(constraintStageId));
-            HashSet<int> constraintSectionStageIds = sections
-                .Single(row => row.SectionId == constraintSectionId && row.AfreshId == currentAfreshId)
-                .StageId
-                .ToHashSet();
-            List<AscNet.Common.Database.BossSingleStageRecordState> constraintSectionRecords =
-                player.SimulatedBattlefield.BossStageRecords
-                    .Where(record => constraintSectionStageIds.Contains(record.StageId))
-                    .ToList();
-            player.SimulatedBattlefield.BossStageRecords.RemoveAll(
-                record => constraintSectionStageIds.Contains(record.StageId));
-            player.SimulatedBattlefield.BossChallengeCount = int.MaxValue;
-            PreFightResponse attemptsRejected = StartFight(82_037, constraintStageId, stageType: 1);
-            AssertEqual(1, attemptsRejected.Code, "Pain Cage exhausted challenge-count rejection");
-            AssertEqual(null, harness.Session.fight, "Pain Cage challenge-count rejection creates no fight");
-            player.SimulatedBattlefield.BossStageRecords.AddRange(constraintSectionRecords);
-            player.SimulatedBattlefield.BossChallengeCount = challengeCountBeforeConstraintChecks;
-
-            const int resetPacketId = 82_038;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleResetStageRequest),
-                harness.Session,
-                resetPacketId,
-                new BossSingleResetStageRequest { StageId = normalStage.StageId });
-            BossSingleResetStageResponse reset = ReadAfterPushes<BossSingleResetStageResponse>(
-                resetPacketId,
-                nameof(BossSingleResetStageResponse),
-                "Pain Cage stage reset",
-                out List<string> resetPushes);
-            AssertEqual(0, reset.Code, "Pain Cage reset code");
-            int resetStageCodexBest = Math.Max(
-                player.SimulatedBattlefield.BossTrialScores.GetValueOrDefault(normalStage.StageId),
-                player.SimulatedBattlefield.BossBestiaryScores.GetValueOrDefault(normalStage.StageId));
-            AssertEqual(true,
-                resetPushes.SequenceEqual(resetStageCodexBest > 0
-                    ? [nameof(NotifyFubenBossSingleData)]
-                    : [nameof(NotifyFubenBossSingleData), nameof(NotifyStageData)]),
-                $"Pain Cage reset push ordering: got {string.Join(",", resetPushes)} (codex best {resetStageCodexBest})");
-            AssertEqual(0, player.SimulatedBattlefield.BossCurrentTotalScore,
-                "Pain Cage reset removes current score");
-            AssertEqual(normalResult.TotalScore, player.SimulatedBattlefield.BossTotalScore,
-                "Pain Cage reset preserves period best score");
-            AssertEqual(true, player.SimulatedBattlefield.BossResetStageIds.Contains(normalStage.StageId),
-                "Pain Cage reset marker persistence");
-            AssertEqual(false,
-                player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
-                "Pain Cage reset refunds character stamina");
-            AscNet.Common.Database.BossSingleStageRecordState resetRecord =
-                player.SimulatedBattlefield.BossStageRecords.Single(record => record.StageId == normalStage.StageId);
-            AssertEqual(0, resetRecord.Score, "Pain Cage reset clears current stage score");
-            AssertEqual(normalResult.TotalScore, resetRecord.MaxScore,
-                "Pain Cage reset retains stage best for aggregate progress");
-            AssertEqual(normalResult.TotalScore,
-                player.SimulatedBattlefield.BossStageRecords.Sum(record => record.MaxScore),
-                "Pain Cage reset retains aggregate best progress");
-            JObject resetLoginPayload = JObject.Parse(MessagePackSerializer.ConvertToJson(
-                MessagePackSerializer.Serialize(BuildLogin(player, null))));
-            JObject resetLoginData = RequiredValue<JObject>(
-                resetLoginPayload, "FubenBossSingleData", JTokenType.Object, "Pain Cage reset login");
-            JArray resetProjectedRecords = RequiredValue<JArray>(
-                resetLoginData, "StageRecordList", JTokenType.Array, "Pain Cage reset login");
-            AssertEqual(resetProjectedRecords.OfType<JObject>().Count(),
-                resetProjectedRecords.OfType<JObject>().Select(value => RequiredValue<int>(
-                    value, "StageId", JTokenType.Integer, "Pain Cage reset login")).Distinct().Count(),
-                "Pain Cage reset login projects each stage once");
-            JObject? resetStageEntry = resetProjectedRecords.OfType<JObject>().SingleOrDefault(value =>
-                RequiredValue<int>(value, "StageId", JTokenType.Integer, "Pain Cage reset login")
-                    == normalStage.StageId);
-            AssertEqual(true, resetStageEntry is not null,
-                "Pain Cage reset login projects the reset stage");
-            AssertEqual(0,
-                RequiredValue<int>(resetStageEntry!, "Score", JTokenType.Integer, "Pain Cage reset login"),
-                "Pain Cage reset reports no current score for the reset stage");
-            AssertEqual(0,
-                RequiredValue<JArray>(
-                    resetStageEntry!, "Characters", JTokenType.Array, "Pain Cage reset login").Count,
-                "Pain Cage reset reports no current team for the reset stage");
-            AssertEqual(1,
-                RequiredValue<JArray>(
-                    resetLoginData, "HistoryList", JTokenType.Array, "Pain Cage reset login").Count,
-                "Pain Cage reset preserves team history");
-
-            int savesBeforeDuplicateReset = playerCollection.ReplaceOneCalls;
-            const int duplicateResetPacketId = 82_138;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleResetStageRequest),
-                harness.Session,
-                duplicateResetPacketId,
-                new BossSingleResetStageRequest { StageId = normalStage.StageId });
-            BossSingleResetStageResponse duplicateReset =
-                ReadResponsePayload<BossSingleResetStageResponse>(
-                    harness,
-                    duplicateResetPacketId,
-                    nameof(BossSingleResetStageResponse),
-                    "Pain Cage duplicate stage reset");
-            AssertEqual(1, duplicateReset.Code, "Pain Cage duplicate reset rejected");
-            AssertEqual(savesBeforeDuplicateReset, playerCollection.ReplaceOneCalls,
-                "Pain Cage duplicate reset does not persist");
-            AssertEqual(false,
-                player.SimulatedBattlefield.BossCharacterPoints.ContainsKey(checked((int)characterId)),
-                "Pain Cage duplicate reset does not refund twice");
-
-            int playerSavesBeforeAutoFight = playerCollection.ReplaceOneCalls;
-            int stageSavesBeforeAutoFight = stageCollection.ReplaceOneCalls;
-            const int autoPacketId = 82_039;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleAutoFightRequest),
-                harness.Session,
-                autoPacketId,
-                new BossSingleAutoFightRequest { StageId = normalStage.StageId });
-            BossSingleAutoFightResponse auto = ReadAfterPushes<BossSingleAutoFightResponse>(
-                autoPacketId,
-                nameof(BossSingleAutoFightResponse),
-                "Pain Cage auto-fight",
-                out List<string> autoPushes);
-            AssertEqual(0, auto.Code, "Pain Cage auto-fight code");
-            AssertEqual(playerSavesBeforeAutoFight + 1, playerCollection.ReplaceOneCalls,
-                "Pain Cage auto-fight persists Player once");
-            AssertEqual(stageSavesBeforeAutoFight + 1, stageCollection.ReplaceOneCalls,
-                "Pain Cage auto-fight persists Stage once");
-            AssertEqual(1, player.SimulatedBattlefield.BossAutoFightCount,
-                "Pain Cage auto-fight count");
-            AscNet.Common.Database.BossSingleStageRecordState autoRecord =
-                player.SimulatedBattlefield.BossStageRecords.Single(record => record.StageId == normalStage.StageId);
-            AssertEqual(true, autoRecord.IsUseAutoFight, "Pain Cage auto-fight record marker");
-            AssertEqual(savedHistory.Score, autoRecord.Score, "Pain Cage EN-config auto-fight rebate score");
-            int autoRankPushIndex = autoPushes.IndexOf(nameof(NotifyBossSingleRankInfo));
-            int autoLoginPushIndex = autoPushes.IndexOf(nameof(NotifyFubenBossSingleData));
-            int autoStagePushIndex = autoPushes.IndexOf(nameof(NotifyStageData));
-            if (autoRankPushIndex < 0 || autoLoginPushIndex <= autoRankPushIndex || autoStagePushIndex <= autoLoginPushIndex)
-                throw new InvalidDataException(
-                    $"Pain Cage auto-fight push order: expected rank, login, stage; got {string.Join(",", autoPushes)}.");
-
-            const int duplicateAutoPacketId = 82_040;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleAutoFightRequest),
-                harness.Session,
-                duplicateAutoPacketId,
-                new BossSingleAutoFightRequest { StageId = normalStage.StageId });
-            BossSingleAutoFightResponse duplicateAuto =
-                ReadResponsePayload<BossSingleAutoFightResponse>(
-                    harness,
-                    duplicateAutoPacketId,
-                    nameof(BossSingleAutoFightResponse),
-                    "Pain Cage duplicate auto-fight response");
-            AssertEqual(1, duplicateAuto.Code, "Pain Cage duplicate auto-fight rejected");
-            AssertEqual(1, player.SimulatedBattlefield.BossAutoFightCount,
-                "Pain Cage duplicate auto-fight does not consume quota");
-
-            player.SimulatedBattlefield.BossTotalScore = Math.Max(
-                player.SimulatedBattlefield.BossTotalScore,
-                scoreRewards
-                    .Where(row => row.LevelType == selectedLevel
-                        && row.RewardGroupId == selectedGrade.RewardGroupId)
-                    .Min(row => row.Score));
-
-            const int allRewardPacketId = 82_041;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetAllRewardRequest),
-                harness.Session,
-                allRewardPacketId,
-                new BossSingleGetAllRewardRequest());
-            BossSingleGetAllRewardResponse allRewards =
-                ReadAfterPushes<BossSingleGetAllRewardResponse>(
-                    allRewardPacketId,
-                    nameof(BossSingleGetAllRewardResponse),
-                    "Pain Cage claim-all rewards",
-                    out List<string> rewardPushes);
-            AssertEqual(0, allRewards.Code, "Pain Cage claim-all reward code");
-            AssertEqual(true, allRewards.RewardGoodsList.Count > 0, "Pain Cage claim-all reward goods");
-            AssertEqual(true, player.SimulatedBattlefield.BossClaimedRewardIds.Count > 0,
-                "Pain Cage claimed reward IDs persistence");
-            AssertEqual(true, rewardPushes.Contains(nameof(NotifyFubenBossSingleData)),
-                "Pain Cage reward claim state push");
-            HashSet<int> expectedClaimedRewardIds = scoreRewards
-                .Where(row => row.LevelType == selectedLevel
-                    && row.RewardGroupId == selectedGrade.RewardGroupId
-                    && row.Score <= player.SimulatedBattlefield.BossTotalScore)
-                .Select(row => row.Id)
-                .ToHashSet();
-            if (!player.SimulatedBattlefield.BossClaimedRewardIds.ToHashSet().SetEquals(expectedClaimedRewardIds))
-                throw new InvalidDataException("Pain Cage claim-all persisted IDs differ from eligible table score rewards.");
-            int expectedRewardGoodsCount = rewardGoods.Count(row =>
-                expectedClaimedRewardIds.Contains(row.ScoreRewardId));
-            AssertEqual(expectedRewardGoodsCount, allRewards.RewardGoodsList.Count,
-                "Pain Cage claim-all table reward goods count");
-
-            int claimedCount = player.SimulatedBattlefield.BossClaimedRewardIds.Count;
-            const int duplicateAllRewardPacketId = 82_042;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetAllRewardRequest),
-                harness.Session,
-                duplicateAllRewardPacketId,
-                new BossSingleGetAllRewardRequest());
-            BossSingleGetAllRewardResponse duplicateAllRewards =
-                ReadAfterPushes<BossSingleGetAllRewardResponse>(
-                    duplicateAllRewardPacketId,
-                    nameof(BossSingleGetAllRewardResponse),
-                    "Pain Cage duplicate claim-all",
-                    out _);
-            AssertEqual(0, duplicateAllRewards.Code, "Pain Cage duplicate claim-all code");
-            AssertEqual(0, duplicateAllRewards.RewardGoodsList.Count,
-                "Pain Cage duplicate claim-all grants nothing");
-            AssertEqual(claimedCount, player.SimulatedBattlefield.BossClaimedRewardIds.Count,
-                "Pain Cage duplicate claim-all preserves claims");
-
-            int claimedRewardId = player.SimulatedBattlefield.BossClaimedRewardIds.First();
-            const int duplicateSingleRewardPacketId = 82_043;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetRewardRequest),
-                harness.Session,
-                duplicateSingleRewardPacketId,
-                new BossSingleGetRewardRequest { Id = claimedRewardId });
-            BossSingleGetRewardResponse duplicateSingleReward =
-                ReadResponsePayload<BossSingleGetRewardResponse>(
-                    harness,
-                    duplicateSingleRewardPacketId,
-                    nameof(BossSingleGetRewardResponse),
-                    "Pain Cage duplicate single reward");
-            AssertEqual(1, duplicateSingleReward.Code, "Pain Cage duplicate single reward rejected");
-
-            const int challengeRankInfoPacketId = 82_044;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleChallengeRankInfoRequest),
-                harness.Session,
-                challengeRankInfoPacketId,
-                new BossSingleChallengeRankInfoRequest { StageId = normalStage.StageId });
-            BossSingleChallengeRankInfoResponse challengeRankInfo =
-                ReadResponsePayload<BossSingleChallengeRankInfoResponse>(
-                    harness,
-                    challengeRankInfoPacketId,
-                    nameof(BossSingleChallengeRankInfoResponse),
-                    "Pain Cage challenge rank info response");
-            AssertEqual(0, challengeRankInfo.Code, "Pain Cage challenge rank info code");
-
-            const int challengeRankPacketId = 82_045;
-            InvokeRegisteredRequestHandler(
-                nameof(BossSingleGetChallengeRankRequest),
-                harness.Session,
-                challengeRankPacketId,
-                new BossSingleGetChallengeRankRequest { StageId = normalStage.StageId });
-            BossSingleGetChallengeRankResponse challengeRank =
-                ReadResponsePayload<BossSingleGetChallengeRankResponse>(
-                    harness,
-                    challengeRankPacketId,
-                    nameof(BossSingleGetChallengeRankResponse),
-                    "Pain Cage challenge rank response");
-            AssertEqual(0, challengeRank.Code, "Pain Cage challenge rank code");
-
-            BossSingleChallengeGradeTable challengeGrade = TableReaderV2.Parse<BossSingleChallengeGradeTable>().Single();
-            BossSingleGradeTable challengeNormalGrade = grades
-                .Where(row => row.AfreshId == currentAfreshId
-                    && row.GradeType >= challengeGrade.NeedGradeType)
-                .OrderByDescending(row => row.GradeType)
-                .First();
-            player.SimulatedBattlefield.BossLevelType = challengeNormalGrade.LevelType;
-            int lockedTotal = challengeGrade.NeedScore - 1;
-            int firstBossScore = lockedTotal / 2;
-            int secondBossScore = lockedTotal / 3;
-            int thirdBossScore = lockedTotal - firstBossScore - secondBossScore;
-            // Keep the real normal-stage best out of the synthetic gate records: the weekly
-            // StableHash rotation can place it among the first three, and rollover would then
-            // archive the synthetic score over the settled one.
-            player.SimulatedBattlefield.BossStageRecords = selectedStageIds
-                .Where(stageId => stageId != normalStage.StageId)
-                .Take(3)
-                .Select((stageId, index) => new AscNet.Common.Database.BossSingleStageRecordState
-                {
-                    StageId = stageId,
-                    Score = index == 0 ? firstBossScore : index == 1 ? secondBossScore : thirdBossScore,
-                    MaxScore = index == 0 ? firstBossScore : index == 1 ? secondBossScore : thirdBossScore
-                })
-                .ToList();
-            player.SimulatedBattlefield.BossTotalScore = int.MaxValue;
-            NotifyFubenBossSingleData lockedChallengeLogin = BuildLogin(player, null);
-            AssertEqual(0, lockedChallengeLogin.FubenBossSingleData.ChallengeLevelType,
-                "Pain Cage below normal-score gate has no intensive metadata");
-            AssertEqual(0, lockedChallengeLogin.FubenBossSingleData.ChallengeSectionId,
-                "Pain Cage below normal-score gate has no intensive section");
-            AssertEqual(0, lockedChallengeLogin.FubenBossSingleData.ChallengeFeatureGroupId,
-                "Pain Cage below normal-score gate has no intensive feature group");
-
-            player.SimulatedBattlefield.BossStageRecords[2].Score++;
-            player.SimulatedBattlefield.BossStageRecords[2].MaxScore++;
-            player.SimulatedBattlefield.BossTotalScore = 0;
-            player.SimulatedBattlefield.BossChallengeSelectedFeatureGroup = challengeGroups.First(row => row.BuffGroupIds.Any(id => id > 0)).Id;
-            NotifyFubenBossSingleData eligibleChallengeLogin = BuildLogin(player, null);
-            AssertEqual(challengeGrade.LevelType, eligibleChallengeLogin.FubenBossSingleData.ChallengeLevelType,
-                "Pain Cage normal total score unlocks table-backed intensive level");
-            AssertEqual(challengeGrade.NeedScore, eligibleChallengeLogin.FubenBossSingleData.TotalScore,
-                "Pain Cage login repairs total score from persisted stage bests");
-            AssertEqual(challengeNormalGrade.RewardGroupId,
-                grades.Single(row => row.LevelType == player.SimulatedBattlefield.BossLevelType).RewardGroupId,
-                "Pain Cage intensive rank rewards share the selected normal reward group");
-            BossSingleSectionTable eligibleChallengeSection = sections.Single(row =>
-                row.Id == eligibleChallengeLogin.FubenBossSingleData.ChallengeSectionId
-                && row.AfreshId == sections.Max(section => section.AfreshId));
-            BossSingleChallengeFeatureGroupTable eligibleChallengeFeatureGroup = challengeGroups.Single(row =>
-                row.Id == eligibleChallengeLogin.FubenBossSingleData.ChallengeFeatureGroupId);
-            AssertEqual(true, eligibleChallengeSection.StageId.Count > 0
-                && eligibleChallengeFeatureGroup.FeatureIds.Count > 0,
-                "Pain Cage intensive PK section and feature joins are nonempty");
-            AssertEqual(true,
-                eligibleChallengeFeatureGroup.FeatureIds.Count == eligibleChallengeFeatureGroup.BuffGroupIds.Count
-                && eligibleChallengeFeatureGroup.BuffGroupIds.All(id => id > 0),
-                "Pain Cage intensive features map positionally to client BuffGroup ids");
-            AssertEqual(0, eligibleChallengeLogin.FubenBossSingleData.ChallengeTotalScore,
-                "Pain Cage intensive score does not reuse normal total score");
-            NotifyFubenBossSingleData repeatedChallengeLogin = BuildLogin(player, null);
-            AssertEqual(eligibleChallengeLogin.FubenBossSingleData.ChallengeSectionId,
-                repeatedChallengeLogin.FubenBossSingleData.ChallengeSectionId,
-                "Pain Cage intensive section is stable within an activity");
-            AssertEqual(eligibleChallengeLogin.FubenBossSingleData.ChallengeFeatureGroupId,
-                repeatedChallengeLogin.FubenBossSingleData.ChallengeFeatureGroupId,
-                "Pain Cage intensive feature group is stable within an activity");
-
-            int ultimateStageId = sections
-                .Where(row => row.Id == eligibleChallengeLogin.FubenBossSingleData.ChallengeSectionId
-                    && row.AfreshId == sections.Max(section => section.AfreshId))
-                .SelectMany(row => row.StageId)
-                .First(stageId => stages.Any(row => row.StageId == stageId
-                    && row.PassTimeLimit == 300
-                    && row.LeftTimeScore == 180000));
-            BossSingleStageTable ultimateStage = stages.Single(row => row.StageId == ultimateStageId);
-            BossSingleScoreRuleTable ultimateRule = scoreRules.Single(row => row.Id == ultimateStage.StageId);
-            double ultimateTimeCoefficient = ultimateRule.LeftTimeScore[8 - 1];
-            AssertEqual(2d, ultimateTimeCoefficient,
-                "Pain Cage Ultimate Zone table time coefficient");
-            const int ultimateFightSeconds = 19;
-            int ultimateBuffGroup = challengeGroups
-                .Single(row => row.Id == eligibleChallengeLogin.FubenBossSingleData.ChallengeFeatureGroupId)
-                .BuffGroupIds.First(id => id > 0);
-            PreFightResponse ultimatePreFight = StartFight(
-                82_046,
-                ultimateStage.StageId,
-                stageType: 3,
-                buffGroup: ultimateBuffGroup);
-            AssertEqual(ultimateStage.PassTimeLimit, ultimatePreFight.FightData.PassTimeLimit,
-                "Pain Cage Ultimate Zone table time limit");
-            FightSettleResponse ultimateSettle = SettleFight(
-                82_047,
-                ultimatePreFight,
-                ultimateStage,
-                characterHp: 100,
-                bossHp: 0,
-                fightSeconds: ultimateFightSeconds);
-            BossSingleFightResult ultimateResult = RequiredBossResult(
-                ultimateSettle,
-                "Pain Cage Ultimate Zone result");
-            int expectedUltimateTimeLeft = ultimateStage.PassTimeLimit - ultimateFightSeconds;
-            AssertEqual(expectedUltimateTimeLeft, ultimateResult.TimeLeft,
-                "Pain Cage Ultimate Zone remaining time from fight input");
-            int expectedUltimateTimeScore = Math.Min(
-                ultimateStage.LeftTimeScore,
-                checked((int)Math.Floor(
-                    expectedUltimateTimeLeft * ultimateTimeCoefficient * ultimateStage.PassTimeLimit)));
-            AssertEqual(true, expectedUltimateTimeScore < ultimateStage.LeftTimeScore,
-                "Pain Cage Ultimate Zone 19-second fight remains below table time-score cap");
-            AssertEqual(expectedUltimateTimeScore, ultimateResult.TimeScore,
-                "Pain Cage Ultimate Zone table-derived remaining-time score");
-
-            int previousActivity = player.SimulatedBattlefield.BossActivityNo;
-            long rolloverTime = DateTimeOffset.UtcNow.AddDays(8).ToUnixTimeSeconds();
-            NotifyFubenBossSingleData rolloverLogin = BuildLogin(player, rolloverTime);
-            AssertEqual(true, rolloverLogin.FubenBossSingleData.ActivityNo > previousActivity,
-                "Pain Cage weekly activity rollover");
-            AssertEqual(0, rolloverLogin.FubenBossSingleData.LevelType,
-                "Pain Cage rollover requires level selection");
-            AssertEqual(0, player.SimulatedBattlefield.BossStageRecords.Count,
-                "Pain Cage rollover clears current stage records");
-            AssertEqual(0, player.SimulatedBattlefield.BossClaimedRewardIds.Count,
-                "Pain Cage rollover clears reward claims");
-            AssertEqual(true, player.SimulatedBattlefield.BossHistory.Any(record =>
-                    record.StageId == normalStage.StageId && record.Score == normalResult.TotalScore),
-                "Pain Cage rollover archives stage best");
-            AssertEqual(true, player.SimulatedBattlefield.BossMaxScore >= normalResult.TotalScore,
-                "Pain Cage rollover preserves promotion score");
-            AssertEqual(true, rolloverLogin.BossListDict is { Count: > 0 },
-                "Pain Cage rollover rebuilds table-derived boss options");
-
-            AscNet.Common.Database.Player reloaded =
-                MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(
-                    player.ToBsonDocument());
-            NotifyFubenBossSingleData reloadLogin = BuildLogin(reloaded, rolloverTime);
-            AssertEqual(player.SimulatedBattlefield.BossActivityNo,
-                reloadLogin.FubenBossSingleData.ActivityNo,
-                "Pain Cage BSON reload activity persistence");
-            AssertEqual(true, reloaded.SimulatedBattlefield.BossHistory.Any(record =>
-                    record.StageId == normalStage.StageId && record.Score == normalResult.TotalScore),
-                "Pain Cage BSON reload history persistence");
-            AssertEqual(0, reloaded.SimulatedBattlefield.BossClaimedRewardIds.Count,
-                "Pain Cage BSON reload reset claim persistence");
-        }
-
-        private static void ValidateBossSingleLoginCompatibilityShape()
-        {
-            NotifyFubenBossSingleData notification = new()
-            {
-                FubenBossSingleData = new()
-                {
-                    ActivityNo = 260,
-                    TotalScore = 0,
-                    MaxScore = 0,
-                    OldLevelType = 8,
-                    LevelType = 8,
-                    ChallengeCount = 0,
-                    RemainTime = 3600 * 24,
-                    AutoFightCount = 0,
-                    RankPlatform = 1,
-                    TrialStageInfoList =
-                    [
-                        BuildBossSingleStageInfo(30302803),
-                        BuildBossSingleStageInfo(30302804),
-                        BuildBossSingleStageInfo(30302805)
-                    ],
-                    AfreshId = 1,
-                    ChallengeLevelType = 0,
-                    IsResetOpen = true,
-                    NormalStageTeamInfos =
-                    [
-                        BuildBossSingleTeamInfo(2030),
-                        BuildBossSingleTeamInfo(2034),
-                        BuildBossSingleTeamInfo(2038)
-                    ]
-                },
-                BossListDict = new()
-                {
-                    [7] = new() { 102, 104, 109 },
-                    [8] = new() { 2030, 2034, 2038 }
-                }
-            };
-
-            NotifyFubenBossSingleData roundTrip = MessagePackSerializer.Deserialize<NotifyFubenBossSingleData>(
-                MessagePackSerializer.Serialize(notification));
-
-            NotifyFubenBossSingleData.NotifyFubenBossSingleDataFubenBossSingleData bossSingleData = roundTrip.FubenBossSingleData
-                ?? throw new InvalidDataException("NotifyFubenBossSingleData FubenBossSingleData serialized as nil.");
-            AssertEmptyList(bossSingleData.CharacterPoints, "NotifyFubenBossSingleData FubenBossSingleData.CharacterPoints");
-            AssertEmptyList(bossSingleData.HistoryList, "NotifyFubenBossSingleData FubenBossSingleData.HistoryList");
-            AssertEmptyList(bossSingleData.RewardIds, "NotifyFubenBossSingleData FubenBossSingleData.RewardIds");
-            AssertEmptyList(bossSingleData.BossList, "NotifyFubenBossSingleData FubenBossSingleData.BossList");
-            AssertEmptyList(bossSingleData.BestiraryStageInfoList, "NotifyFubenBossSingleData FubenBossSingleData.BestiraryStageInfoList");
-            AssertEmptyList(bossSingleData.ChallengeStageHistoryList, "NotifyFubenBossSingleData FubenBossSingleData.ChallengeStageHistoryList");
-            AssertEmptyList(bossSingleData.StageRecordList, "NotifyFubenBossSingleData FubenBossSingleData.StageRecordList");
-            AssertEqual(3, bossSingleData.TrialStageInfoList.Count, "NotifyFubenBossSingleData FubenBossSingleData.TrialStageInfoList count");
-            AssertEqual(3, bossSingleData.NormalStageTeamInfos.Count, "NotifyFubenBossSingleData FubenBossSingleData.NormalStageTeamInfos count");
-            AssertEqual(true, bossSingleData.IsResetOpen, "NotifyFubenBossSingleData FubenBossSingleData.IsResetOpen");
-            AssertEqual(1, bossSingleData.AfreshId, "NotifyFubenBossSingleData FubenBossSingleData.AfreshId");
-            AssertEqual(8, bossSingleData.LevelType, "NotifyFubenBossSingleData FubenBossSingleData.LevelType");
-            AssertEqual(8, bossSingleData.OldLevelType, "NotifyFubenBossSingleData FubenBossSingleData.OldLevelType");
-            if (roundTrip.BossListDict is null)
-                throw new InvalidDataException("NotifyFubenBossSingleData BossListDict serialized as nil.");
-            AssertEqual(2, roundTrip.BossListDict.Count, "NotifyFubenBossSingleData BossListDict section count");
-            AssertBossListDictValues(roundTrip.BossListDict, 7, [102, 104, 109]);
-            AssertBossListDictValues(roundTrip.BossListDict, 8, [2030, 2034, 2038]);
-            if (!roundTrip.BossListDict.ContainsKey(bossSingleData.LevelType))
-                throw new InvalidDataException("NotifyFubenBossSingleData BossListDict: expected a section list for FubenBossSingleData.LevelType.");
-            if (bossSingleData.RemainTime == 0)
-                throw new InvalidDataException("NotifyFubenBossSingleData FubenBossSingleData.RemainTime: expected a positive value.");
-
-            static Dictionary<string, object> BuildBossSingleStageInfo(int stageId)
-            {
-                return new()
-                {
-                    ["StageId"] = stageId,
-                    ["Score"] = 0
-                };
-            }
-
-            static Dictionary<string, object> BuildBossSingleTeamInfo(int sectionId)
-            {
-                return new()
-                {
-                    ["SectionId"] = sectionId,
-                    ["CharacterIds"] = Array.Empty<int>()
-                };
-            }
-
-            static void AssertBossListDictValues(
-                IReadOnlyDictionary<int, List<int>> bossListDict,
-                int sectionId,
-                int[] expectedBossIds)
-            {
-                if (!bossListDict.TryGetValue(sectionId, out List<int>? actualBossIds))
-                    throw new InvalidDataException($"NotifyFubenBossSingleData BossListDict: expected section {sectionId}.");
-                if (!actualBossIds.SequenceEqual(expectedBossIds))
-                    throw new InvalidDataException($"NotifyFubenBossSingleData BossListDict section {sectionId}: expected {string.Join(",", expectedBossIds)}, got {string.Join(",", actualBossIds)}.");
-            }
-        }
 
         private static void ValidateCurrentClientGuideTableCompatibility()
         {
@@ -30102,6 +26345,41 @@ namespace AscNet.Test
 
             throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {target.DeclaringType?.FullName}.{target.Name}.");
         }
+        private static void AssertSessionCharacterEquipsFeedsCall(MethodInfo method, MethodInfo consumer, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
+        {
+            List<IlInstruction> instructions = ReadIlInstructions(method).ToList();
+            int consumerIndex = FindCallIndex(instructions, consumer, startIndex: 0);
+            if (consumerIndex < 0)
+                throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {consumer.DeclaringType?.FullName}.{consumer.Name}.");
+
+            AssertRecentSessionCharacterEquipsSource(instructions, consumerIndex, sessionCharacter, characterEquipsGetter, name);
+        }
+
+        private static void AssertRecentSessionCharacterEquipsSource(List<IlInstruction> instructions, int consumerIndex, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
+        {
+            int equipsGetterIndex = -1;
+            int firstGetterCandidate = Math.Max(0, consumerIndex - 24);
+            for (int index = consumerIndex - 1; index >= firstGetterCandidate; index--)
+            {
+                if (instructions[index].Operand is MethodBase calledMethod && MethodsMatch(calledMethod, characterEquipsGetter))
+                {
+                    equipsGetterIndex = index;
+                    break;
+                }
+            }
+
+            if (equipsGetterIndex < 0)
+                throw new InvalidDataException($"{name}: expected the consumed equip list to come from Character.Equips.");
+
+            int firstCharacterCandidate = Math.Max(0, equipsGetterIndex - 8);
+            for (int index = equipsGetterIndex - 1; index >= firstCharacterCandidate; index--)
+            {
+                if (instructions[index].Operand is FieldInfo loadedField && FieldsMatch(loadedField, sessionCharacter))
+                    return;
+            }
+
+            throw new InvalidDataException($"{name}: expected Character.Equips to be loaded from Session.character.");
+        }
 
         private static void AssertCallPrecedes(MethodInfo method, MethodInfo firstTarget, MethodInfo secondTarget, string name)
         {
@@ -30129,15 +26407,6 @@ namespace AscNet.Test
                 throw new InvalidDataException($"{name}: expected {target.DeclaringType?.FullName}.{target.Name} to be reached through a conditional branch.");
         }
 
-        private static void AssertSessionCharacterEquipsFeedsCall(MethodInfo method, MethodInfo consumer, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
-        {
-            List<IlInstruction> instructions = ReadIlInstructions(method).ToList();
-            int consumerIndex = FindCallIndex(instructions, consumer, startIndex: 0);
-            if (consumerIndex < 0)
-                throw new InvalidDataException($"{name}: expected {method.DeclaringType?.FullName}.{method.Name} to call {consumer.DeclaringType?.FullName}.{consumer.Name}.");
-
-            AssertRecentSessionCharacterEquipsSource(instructions, consumerIndex, sessionCharacter, characterEquipsGetter, name);
-        }
 
 
         private static void AssertEquipDataPayloadEquals(EquipData expected, EquipData actual, string name)
@@ -30486,6 +26755,11 @@ namespace AscNet.Test
 
             InvokeRegisteredRequestHandler(nameof(EquipPutOnRequest), harness.Session, 934,
                 new EquipPutOnRequest { EquipId = (int)targetEquip.Id, CharacterId = targetCharacter.Id, Site = targetTable.Site });
+            Packet validEquipPacket = harness.ReadPacket("EquipPutOn valid equipment push");
+            AssertEqual(Packet.ContentType.Push, validEquipPacket.Type, "EquipPutOn valid equipment push packet type");
+            Packet.Push validEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(validEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), validEquipPush.Name, "EquipPutOn valid equipment push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnResponse>(
                 harness, 934, nameof(EquipPutOnResponse), "EquipPutOn valid response").Code,
                 "EquipPutOn valid equipment succeeds");
@@ -30494,6 +26768,11 @@ namespace AscNet.Test
 
             InvokeRegisteredRequestHandler(nameof(EquipPutOnRequest), harness.Session, 935,
                 new EquipPutOnRequest { EquipId = (int)memoryEquip.Id, CharacterId = targetCharacter.Id, Site = memoryTable.Site });
+            Packet memoryEquipPacket = harness.ReadPacket("EquipPutOn valid Memory push");
+            AssertEqual(Packet.ContentType.Push, memoryEquipPacket.Type, "EquipPutOn valid Memory push packet type");
+            Packet.Push memoryEquipPush = MessagePackSerializer.Deserialize<Packet.Push>(memoryEquipPacket.Content);
+            AssertEqual(nameof(NotifyEquipDataList), memoryEquipPush.Name, "EquipPutOn valid Memory push name");
+
             AssertEqual(0, ReadResponsePayload<EquipPutOnResponse>(
                 harness, 935, nameof(EquipPutOnResponse), "EquipPutOn valid Memory response").Code,
                 "EquipPutOn valid Memory succeeds");
@@ -32145,31 +28424,6 @@ namespace AscNet.Test
         }
 
 
-        private static void AssertRecentSessionCharacterEquipsSource(List<IlInstruction> instructions, int consumerIndex, FieldInfo sessionCharacter, MethodInfo characterEquipsGetter, string name)
-        {
-            int equipsGetterIndex = -1;
-            int firstGetterCandidate = Math.Max(0, consumerIndex - 24);
-            for (int index = consumerIndex - 1; index >= firstGetterCandidate; index--)
-            {
-                if (instructions[index].Operand is MethodBase calledMethod && MethodsMatch(calledMethod, characterEquipsGetter))
-                {
-                    equipsGetterIndex = index;
-                    break;
-                }
-            }
-
-            if (equipsGetterIndex < 0)
-                throw new InvalidDataException($"{name}: expected the consumed equip list to come from Character.Equips.");
-
-            int firstCharacterCandidate = Math.Max(0, equipsGetterIndex - 8);
-            for (int index = equipsGetterIndex - 1; index >= firstCharacterCandidate; index--)
-            {
-                if (instructions[index].Operand is FieldInfo loadedField && FieldsMatch(loadedField, sessionCharacter))
-                    return;
-            }
-
-            throw new InvalidDataException($"{name}: expected Character.Equips to be loaded from Session.character.");
-        }
 
         private static void AssertLevelUpMaxCapResponsePrecedesInventoryMutation(MethodInfo method, MethodInfo inventoryDo, MethodInfo inventorySave, string name)
         {

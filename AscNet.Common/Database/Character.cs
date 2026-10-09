@@ -752,7 +752,7 @@ namespace AscNet.Common.Database
                         .Select(skillId => (uint)skillId)
                         .ToArray());
         }
-        private const int CharacterSkillClientLevelCap = 28;
+        public const int CharacterSkillClientLevelCap = 29;
 
         private sealed class CharacterSkillTableIndexes
         {

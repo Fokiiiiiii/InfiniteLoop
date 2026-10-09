@@ -27,11 +27,64 @@ from typing import BinaryIO, Iterable
 from region_profile import ConfigMode, ConfigSmokeTarget, get_region_profile, region_names
 
 ROOT = Path(__file__).resolve().parent
-CONFIG_SMOKE_TARGETS = [
-    (target.label, target.path, target.channel_assertion)
-    for target in get_region_profile("global").config_smoke_targets
-]
-CURRENT_DOCUMENT_VERSION = "4.8.10"
+CURRENT_DOCUMENT_VERSION = "4.8.12"
+_APPDATA = Path(os.environ.get("APPDATA") or Path.home() / "AppData/Roaming")
+_LOCAL_APP_DATA = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData/Local")
+_LOCALLOW = _LOCAL_APP_DATA.parent / "LocalLow"
+DEFAULT_CLIENT_DIR = (
+    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
+    / "Steam/steamapps/common/Punishing Gray Raven"
+    if sys.platform == "win32"
+    else Path("/Volumes/Lucia/Steam Games/SteamLibrary/steamapps/common/Punishing Gray Raven")
+)
+# region -> (KR_ProjectId, KR_ProductId from KRSDK.bin, Unity productName from globalgamemanagers). Used when no client is installed to read.
+# KRSDK cache dir = %APPDATA%/KR_<project>/<product>; game profile dir = LocalLow/kurogame/<productName>.
+REGION_IDENTITIES = {
+    "en": ("G143", "A1855", "PGR"),
+    "tw": ("G279", "A1760", "戰雙帕彌什"),
+    "kr": ("G286", "A1794", "퍼니싱"),
+    "jp": ("G282", "A1778", "パニグレ"),
+}
+
+
+def read_client_identity(client_dir: Path) -> tuple[str, str, str] | None:
+    """(project, product, productName) from an installed client's KRSDK.bin and globalgamemanagers, or None if KRSDK.bin is unreadable.
+    productName falls back to the region table when globalgamemanagers is absent (e.g. a partial download)."""
+    try:
+        sdk = dict(line.split("=", 1) for line in (client_dir / "PGR_Data/Plugins/KRSDKRes/KRSDK.bin").read_text(encoding="utf-8").splitlines() if "=" in line)
+        project, product = sdk["KR_ProjectId"].strip(), sdk["KR_ProductId"].strip()
+    except (OSError, KeyError, ValueError, UnicodeDecodeError):
+        return None
+    try:
+        ggm = (client_dir / "PGR_Data/globalgamemanagers").read_bytes()
+        # PlayerSettings: length-prefixed companyName then productName, each padded to 4 bytes.
+        at = ggm.index(b"\x08\x00\x00\x00kurogame") + 12
+        size = int.from_bytes(ggm[at:at + 4], "little")
+        return project, product, ggm[at + 4:at + 4 + size].decode("utf-8")
+    except (OSError, ValueError, UnicodeDecodeError):
+        return project, product, next((ident[2] for ident in REGION_IDENTITIES.values() if ident[0] == project), "")
+
+
+def resolve_region(client_dir: Path | None, override: str | None) -> tuple[str, tuple[str, str, str], str]:
+    """(region, identity, source). Identity comes from the client when readable, else the region table; region from override, else the client's ProjectId, else en."""
+    found = read_client_identity(client_dir) if client_dir else None
+    region = override or next((name for name, ident in REGION_IDENTITIES.items() if found and ident[0] == found[0]), "en")
+    if found and not override or found and found[0] == REGION_IDENTITIES[region][0]:
+        return region, found, "client"
+    return region, REGION_IDENTITIES[region], "table"
+
+
+def krsdk_cache_dir(identity: tuple[str, str, str]) -> Path:
+    return _APPDATA / f"KR_{identity[0]}" / identity[1]
+
+
+def local_low_dir(identity: tuple[str, str, str]) -> Path:
+    return _LOCALLOW / "kurogame" / identity[2]
+
+
+LOCAL_KRSDK_OAUTH_CODE = "ascnet-local-oauth-code"
+
+
 LOCAL_SDK_HTTP = None
 
 
@@ -93,6 +146,25 @@ def parse_args() -> argparse.Namespace:
         help="Local AscNet account password used when --ascnet-username must be created. Defaults to ASCNET_PASSWORD or test.",
     )
     parser.add_argument("--no-ensure-account", action="store_true", help="Do not create/check a local account or implicitly map unknown Steam/KRSDK users to one.")
+    parser.add_argument(
+        "--krsdk-cache-dir",
+        default=os.environ.get("ASCNET_KRSDK_CACHE_DIR"),
+        help="KRSDK cache directory to repair and optionally seed. Empty disables cache maintenance. Default: KR_<ProjectId>/<ProductId> derived from the installed client's KRSDK.bin.",
+    )
+    parser.add_argument(
+        "--client-dir",
+        default=os.environ.get("ASCNET_CLIENT_DIR") or os.environ.get("PGR_ASCNET_DIR") or DEFAULT_CLIENT_DIR,
+        help="Installed game directory whose KRSDK.bin/globalgamemanagers identify the region. Default: %(default)s",
+    )
+    parser.add_argument(
+        "--client-region",
+        choices=sorted(REGION_IDENTITIES),
+        default=os.environ.get("ASCNET_CLIENT_REGION"),
+        help="Override the region auto-detected from --client-dir (falls back to en if the client is unreadable).",
+    )
+    parser.add_argument("--seed-krsdk-cache", action="store_true", help="Opt in to writing a local AscNet account into KRSDKUserCache.json/KRSDKUserLauncherCache.json. Usually not needed for Steam; live KRSDK login plus gate fallback is safer.")
+    parser.add_argument("--no-seed-krsdk-cache", action="store_true", help="Legacy guard: do not write KRSDKUserCache.json/KRSDKUserLauncherCache.json.")
+    parser.add_argument("--no-repair-krsdk-cache", action="store_true", help="Do not remove stale AscNet-local KRSDK cache entries created by older runner versions.")
     parser.add_argument("--no-proxy", action="store_true", help="Only run AscNet; do not start mitmproxy.")
     parser.add_argument("--no-smoke", action="store_true", help="Skip the Steam config smoke check before starting the bridge.")
     parser.add_argument("--smoke-timeout", type=float, default=30.0, help="Seconds to wait for AscNet config smoke. Default: %(default)s")
@@ -130,6 +202,44 @@ def resolve_mitm(value: str | None) -> str:
         if candidate and shutil.which(candidate):
             return candidate
     raise SystemExit("mitmproxy not found. Install mitmproxy or pass --mitm /path/to/mitmdump.")
+
+def merge_version_dll_override(current: str) -> str:
+    parts = [part.strip() for part in current.split(";") if part.strip()]
+    has_version = False
+    for part in parts:
+        names = part.split("=", 1)[0]
+        if any(name.strip().lower() == "version" for name in names.split(",")):
+            has_version = True
+            break
+    if not has_version:
+        parts.append("version=n,b")
+    return ";".join(parts)
+
+
+def executable_basename(path: str) -> str:
+    normalized = path.replace("\\", "/").rstrip("/")
+    return normalized.rsplit("/", 1)[-1]
+
+
+def local_mongod_command(mongod: str, dbpath: str, host: str, port: int, logpath: str) -> list[str]:
+    command = [
+        mongod,
+        "--dbpath",
+        dbpath,
+        "--bind_ip",
+        host,
+        "--port",
+        str(port),
+        "--logpath",
+        logpath,
+        "--logappend",
+        "--quiet",
+    ]
+    # pathlib on Linux does not split Windows paths, and Wine launches mongod.exe that way.
+    if sys.platform != "win32" and executable_basename(mongod).lower() == "mongod.exe":
+        command.extend(["--setParameter", "diagnosticDataCollectionEnabled=false"])
+    return command
+
 
 def resolve_mongod(value: str | None) -> str:
     candidates = [value, shutil.which("mongod")]
@@ -507,6 +617,8 @@ def main() -> int:
     env = os.environ.copy()
 
     env["ASCNET_PUBLIC_HTTP_ORIGIN"] = args.sdk_url.rstrip("/")
+    env["ASCNET_PATCH_ORIGIN"] = args.sdk_url.rstrip("/")
+    env["WINEDLLOVERRIDES"] = merge_version_dll_override(env.get("WINEDLLOVERRIDES", ""))
     gate_fallback = gate_fallback_username(args)
     if gate_fallback:
         env["ASCNET_GATE_FALLBACK_USERNAME"] = gate_fallback
@@ -568,24 +680,25 @@ def main() -> int:
             dbpath = (ROOT / args.mongo_dbpath).resolve()
             dbpath.mkdir(parents=True, exist_ok=True)
             logpath = dbpath.parent / "mongod.log"
-            mongo = popen([
-                mongod,
-                "--dbpath",
-                str(dbpath),
-                "--bind_ip",
-                args.mongo_host,
-                "--port",
-                str(args.mongo_port),
-                "--logpath",
-                str(logpath),
-                "--logappend",
-                "--quiet",
-            ], env=env)
+            mongo = popen(local_mongod_command(mongod, str(dbpath), args.mongo_host, args.mongo_port, str(logpath)), env=env)
             processes.append(mongo)
             wait_for_tcp(args.mongo_host, args.mongo_port, 20.0, "MongoDB")
     elif not can_connect(args.mongo_host, args.mongo_port):
         print(f"MongoDB not reachable on {args.mongo_host}:{args.mongo_port}; config endpoints work, but login/player APIs will fail until MongoDB is running.", flush=True)
 
+    client_region = args.client_region or ("en" if profile.name == "global" else profile.name)
+    if client_region not in REGION_IDENTITIES:
+        client_region = "en"
+    region, identity, source = resolve_region(Path(args.client_dir).expanduser(), client_region)
+    print(f"Client region {region} ({source}): KRSDK cache {krsdk_cache_dir(identity)}, profile {local_low_dir(identity)}", flush=True)
+    cache_dir_arg = krsdk_cache_dir(identity) if args.krsdk_cache_dir is None else args.krsdk_cache_dir
+    cache_dir = Path(cache_dir_arg).expanduser() if cache_dir_arg else None
+    if (profile.name == "jp" or region == "jp") and args.proxy_local:
+        if args.seed_krsdk_cache or args.krsdk_cache_dir:
+            raise SystemExit("JP local-capture mode does not modify KRSDK cache files")
+        cache_dir = None
+    if cache_dir and not args.no_repair_krsdk_cache and not args.seed_krsdk_cache:
+        repair_krsdk_login_cache(cache_dir)
     try:
         build_ascnet(dotnet, env)
         ascnet = popen(ascnet_run_command(dotnet, args.sdk_url), env=env)
@@ -602,6 +715,12 @@ def main() -> int:
         account = None
         if not args.no_ensure_account:
             account = ensure_ascnet_account(args.sdk_url, args.ascnet_username, args.ascnet_password, args.smoke_timeout)
+
+        if args.seed_krsdk_cache and not args.no_seed_krsdk_cache and cache_dir:
+            if account is None:
+                print("Skipping KRSDK cache seeding because --no-ensure-account was used.", flush=True)
+            else:
+                seed_krsdk_login_cache(cache_dir, account)
 
         if mitm:
             if args.proxy_local:

@@ -1,0 +1,15 @@
+Id	Name	Icon	TotalProgress	Priority	SkipId	CollectionLevelId	ComputeParams[1]	ComputeParams[2]	ConditionIds[1]	ConditionIds[2]
+101	Commercial District - 1F	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	6	3	11	0				
+102	Commercial District - 2F	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	7	2	12	0				
+103	Commercial District - 3F	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	6	1	13	0				
+201	Commercial District - 1F	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	3	2	14	0	4001			
+202	Commercial District - 3F	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	3	1	15	0	4001			
+1001	Babylonia Universal Cinema	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	2	4	21	0				
+1002	Olympia Art Gallery	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	3	3	22	0				
+1003	Dreamglow Gardens	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	2	2	23	0				
+1004	Military Security Area	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	3	1	24	0				
+2001	Transportation Hub	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	1	6	31	0				
+2002	Contact Platform	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	2	5	32	0				
+2003	Domain Training Grounds	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	2	4	33	0				
+2005	F.O.S. Monument	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	4	2	35	0				
+2006	Golden Hall	Assets/Product/Texture/Atlas/BigWorld/Common/UiBigWorldProcess/UiBigWorldProcessIcon18.png	1	1	36	0				

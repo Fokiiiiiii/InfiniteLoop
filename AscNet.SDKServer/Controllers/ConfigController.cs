@@ -49,7 +49,8 @@ namespace AscNet.SDKServer.Controllers
             app.MapGet("/prod/client/notice/html/{fileName}", HandleNoticeHtmlRequest);
 
 
-            app.MapPost("/feedback", () => "1");
+            // Client log/feedback uploads (EN and TW) are accepted and discarded locally.
+            app.Map("/feedback", () => "1");
         }
 
         private static string HandleConfigRequest(HttpContext ctx)
@@ -69,9 +70,12 @@ namespace AscNet.SDKServer.Controllers
             bool currentClient = IsVersionAtLeast(version, 4, 5, 0);
             string publicHttpOrigin = PublicHttpOrigin(ctx);
             ServerVersionConfig versionConfig = GetVersionConfig(version);
+            versionConfig = versionConfig.Packages?.GetValueOrDefault(package) ?? versionConfig;
 
             List<RemoteConfig> remoteConfigs = new();
-            if (currentClient)
+            if (versionConfig.ConfigRows is not null)
+                remoteConfigs.AddRange(versionConfig.ConfigRows.Select(row => new RemoteConfig { Key = row.Key, Type = row.Type, Value = row.Value.Replace("{origin}", publicHttpOrigin) }));
+            else if (currentClient)
                 AddCurrentClientConfig(remoteConfigs, package, version, versionConfig, publicHttpOrigin);
             else
                 AddLegacyClientConfig(remoteConfigs, package, version, versionConfig, publicHttpOrigin);
@@ -352,7 +356,9 @@ namespace AscNet.SDKServer.Controllers
             // Keep both forms so the client cannot fall back to its embedded
             // production game-server endpoint.
             remoteConfigs.AddConfig($"ServerListStr_{version}", CurrentServerListStr(publicHttpOrigin));
-            remoteConfigs.AddConfig("IndexMd5", versionConfig.IndexMd5);
+            // TW's authoritative config carries no IndexMd5; only emit it where the region publishes one.
+            if (versionConfig.IndexMd5 is not null)
+                remoteConfigs.AddConfig("IndexMd5", versionConfig.IndexMd5);
             remoteConfigs.AddConfig("AndroidReturnEnabled", false);
             remoteConfigs.AddConfig("AndroidPayCallbackList", $"{publicHttpOrigin}/api/XPay/HeroHgAndroidPayResult");
             remoteConfigs.AddConfig("AndroidPayCallbackUrl", $"{publicHttpOrigin}/api/XPay/HeroHgAndroidPayResult");
@@ -402,12 +408,16 @@ namespace AscNet.SDKServer.Controllers
             return package switch
             {
                 "com.kurogame.haru.kuro" => (
+                    "http://prod-zspns-txcdn.kurogame.com/prod",
                     "http://prod-zspnsalicdn.kurogame.com/prod",
-                    "http://prod-zspnstxcdn.kurogame.com/prod",
-                    2),
+                    5),
                 "com.kurogame.punishing.grayraven.en" or "com.kurogame.gplay.punishing.grayraven.en" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",
                     "http://prod-encdn-aliyun.kurogame.net/prod",
+                    5),
+                "com.kurogame.punishing.grayraven.tw" when currentClient => (
+                    "http://prod-twcdn-ak.pgr-game.com/prod",
+                    "http://prod-twcdn-aliyun.kurogame.net/prod",
                     5),
                 "com.kurogame.pc.punishing.grayraven.en" when currentClient => (
                     "http://prod-encdn-ak.pgr-game.com/prod",

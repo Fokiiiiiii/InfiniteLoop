@@ -447,7 +447,7 @@ namespace AscNet.GameServer.Handlers
             };
             Dictionary<int, int> maxSkillLevels = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
                 .GroupBy(row => row.SkillId)
-                .ToDictionary(group => group.Key, group => group.Max(row => row.Level));
+                .ToDictionary(group => group.Key, group => Math.Min(Character.CharacterSkillClientLevelCap, group.Max(row => row.Level)));
             ILookup<int, CharacterSkillUpgradeTable> upgrades = TableReaderV2.Parse<CharacterSkillUpgradeTable>()
                 .ToLookup(row => row.SkillId);
             HashSet<int> liberationConditions = TableReaderV2.Parse<ConditionTable>()

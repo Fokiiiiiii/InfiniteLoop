@@ -18,6 +18,7 @@ internal static partial class Program
     /// </summary>
     private static void ValidateAudioPlayerCompatibility()
     {
+        using MongoCollectionOverride noOpStages = MongoCollectionOverride.InstallNoOpStageCollection(); // login persists Stage rollover
         Type module = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AudioPlayerModule");
         MethodInfo buildLogin = RequiredMethod(module, "BuildLoginData", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, [typeof(Player)]);
         MethodInfo addFav = RequiredMethod(module, "AddFavoriteSong", BindingFlags.Static | BindingFlags.Public, [typeof(Session), typeof(AscNet.GameServer.Packet.Request)]);
