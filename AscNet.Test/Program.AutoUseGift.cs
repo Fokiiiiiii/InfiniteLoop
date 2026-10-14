@@ -430,10 +430,32 @@ internal static partial class Program
             }, 20012005);
         }
 
+        AssertEqual(false, ConstructResearchFortuneBagPolicy.Applies(1011), "Fortune bag is not keyed on Reward 1011");
+        AssertEqual(true, ConstructResearchFortuneBagPolicy.TryResolve(94033,
+            out int fortuneTicket, out IReadOnlyList<(int Count, int Weight)> fortuneTiers),
+            "Fortune bag policy is the item");
+        string ticketName = items[fortuneTicket].Name ?? "";
+        string fortuneDesc = items[94033].WorldDesc ?? "";
+        AssertEqual(ticketName, "Event Construct R&D Ticket", "Fortune bag ticket is the named item");
+        AssertEqual(true, fortuneDesc.Contains(ticketName), "Fortune bag description names that ticket");
+        List<(int Count, int Weight)> printedTiers = new();
+        foreach (string part in fortuneDesc.Split('·', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            int percentAt = part.IndexOf("% chance to get ", StringComparison.Ordinal);
+            int countAt = part.LastIndexOf(" x", StringComparison.Ordinal);
+            int countEnd = countAt + 2;
+            while (countEnd < part.Length && char.IsDigit(part[countEnd]))
+                countEnd++;
+            AssertEqual(true, percentAt > 0 && countEnd > countAt + 2, "Fortune bag description tier");
+            printedTiers.Add((int.Parse(part[(countAt + 2)..countEnd]), int.Parse(part[..percentAt])));
+        }
         AssertEqual("250:10;225:15;200:20;175:25;150:30",
-            string.Join(";", ConstructResearchFortuneBagPolicy.Tiers.Select(tier => $"{tier.Count}:{tier.Weight}")),
-            "Fortune bag odds are the item description");
-        HashSet<int> fortuneCounts = ConstructResearchFortuneBagPolicy.Tiers.Select(tier => tier.Count).ToHashSet();
+            string.Join(";", printedTiers.Select(tier => $"{tier.Count}:{tier.Weight}")),
+            "Fortune bag description still prints those chances");
+        AssertEqual(string.Join(";", printedTiers.Select(tier => $"{tier.Count}:{tier.Weight}")),
+            string.Join(";", fortuneTiers.Select(tier => $"{tier.Count}:{tier.Weight}")),
+            "Fortune bag policy matches the item description");
+        HashSet<int> fortuneCounts = fortuneTiers.Select(tier => tier.Count).ToHashSet();
         using (MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(
             out _, out _, out _))
         using (LoopbackSessionHarness h = new(CreateDrawCompatibilityCharacter(++uid), CreateDrawCompatibilityPlayer(uid),
@@ -443,7 +465,7 @@ internal static partial class Program
             ItemUseResponse response = OpenChoice(h, new ItemUseRequest { Id = 94033, Count = 1 });
             AssertEqual(0, response.Code, "Fortune bag succeeds");
             RewardGoods ticket = response.RewardGoodsList.Single();
-            AssertEqual(ConstructResearchFortuneBagPolicy.TicketItemId, ticket.TemplateId, "Fortune bag grants Event Construct R&D Tickets");
+            AssertEqual(fortuneTicket, ticket.TemplateId, "Fortune bag grants Event Construct R&D Tickets");
             AssertEqual(true, fortuneCounts.Contains(ticket.Count), "Fortune bag count is one published tier");
             AssertEqual((long)ticket.Count, Balance(h, ticket.TemplateId), "Fortune bag ticket balance");
             AssertEqual(0L, Balance(h, 1), "Fortune bag does not pay Cogs");

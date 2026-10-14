@@ -8,7 +8,7 @@ Normal, Fine, and Precious Gift Boxes (40691, 40692, 40693) are open. Each gives
 
 Rewards 1003, 1004, and 1005 pay Black Cards, Cogs, and Skill Points. Those rows are not the gift pool. Quality 6 affection items 40800–40811 are a separate tier and are not in these boxes.
 
-94033 Construct Research Surprise Fortune Bag is not one of these boxes. It opens from the chances printed on the item: 10/15/20/25/30% for 250/225/200/175/150 Event Construct R&D Tickets (50005). Reward 1011 pays Cogs and Black Cards and is not that grant.
+94033 Construct Research Surprise Fortune Bag is not one of these boxes. It opens from the chances printed on the item: 10/15/20/25/30% for 250/225/200/175/150 Event Construct R&D Tickets (50005). Those chances are recorded in `ConstructResearchFortuneBagPolicy.tsv`, keyed on item 94033. Reward 1011 pays Cogs and Black Cards and is not that grant.
 
 ## Other packs with no drop table
 

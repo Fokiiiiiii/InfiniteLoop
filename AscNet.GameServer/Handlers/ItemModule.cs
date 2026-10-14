@@ -594,9 +594,9 @@ namespace AscNet.GameServer.Handlers
                     return true;
                 case 2:
                 case 6:
-                    if (ConstructResearchFortuneBagPolicy.Applies(sourceId))
+                    if (ConstructResearchFortuneBagPolicy.Applies(item.Id))
                     {
-                        if (!ConstructResearchFortuneBagPolicy.TryGrant(count, out RewardGoodsTable ticket)
+                        if (!ConstructResearchFortuneBagPolicy.TryGrant(item.Id, count, out RewardGoodsTable ticket)
                             || RewardHandler.GetRewardType(ticket) is null)
                             return false;
                         goods.Add(ticket);
