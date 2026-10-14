@@ -325,8 +325,11 @@ internal static partial class GuildBossModule
                 throw new ServerCodeException("Guild boss damage team changed.", 20063300);
             damage = checked(damage + npc.DamageTotal);
         }
-        if (damage != result.TotalDamage)
-            throw new ServerCodeException($"Guild boss total damage does not match deployed character damage: reported={result.TotalDamage}, recorded={damage}.", 20063304);
+        // Native XFightResult.OnDamage adds to TotalDamage only when the raw launcher has a Role, but credits
+        // DamageTotal to the launcher's owner (RecordNpc[7] chain) on the player camp, so summon damage lands in
+        // the owning character's DPS row without counting toward TotalDamage. Only TotalDamage <= DPS sum holds.
+        if (damage < result.TotalDamage)
+            throw new ServerCodeException($"Guild boss total damage exceeds deployed character damage: reported={result.TotalDamage}, recorded={damage}.", 20063304);
     }
 
     private static double BossTeamHp(GuildBossAttemptState attempt, FightSettleResult result)

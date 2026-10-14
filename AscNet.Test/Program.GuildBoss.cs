@@ -393,6 +393,8 @@ internal partial class Program
         RejectFirstSettlement();
         firstFight.Result.NpcDpsTable.Remove(2);
         firstFight.Result.NpcDpsTable[2] = new NpcDpsTable { RoleId = 0, CharacterId = 0, Cure = 1, DamageTotal = 0 };
+        // Native OnDamage credits summon hits to the owner's DPS row but excludes them from TotalDamage.
+        firstFight.Result.NpcDpsTable[1].DamageTotal = checked(firstFight.Result.TotalDamage + 54_054);
         JObject firstCandidate = Candidate(leader, firstFight, 198_612);
         byte[] settledInventory = LoadInventory(leaderId).ToBson();
         byte[] settledPlayer = LoadPlayer(leaderId).GuildState.Boss.ToBson();
