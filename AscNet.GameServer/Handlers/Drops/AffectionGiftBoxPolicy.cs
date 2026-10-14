@@ -6,6 +6,7 @@ using AscNet.Table.V2.share.trust;
 
 namespace AscNet.GameServer.Handlers.Drops
 {
+    // User-authorized private-server equal-chance affection gift policy, not retail drop weights.
     // The client ships no DropGroup rows for 1003, 1004, or 1005. Each box description
     // says one random gift of that tier, and the tier is the box quality. Members are
     // the favor gifts of that quality in CharacterTrustItem. No rates are published,
