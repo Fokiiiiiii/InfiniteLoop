@@ -1,14 +1,13 @@
 {
   description = "AscNet dev shell and Windows launcher zip";
 
-  # The background fetch below has no hash, so flake evaluation has to be
-  # allowed to use the network. tarball-ttl = 0 makes that fetch recheck
-  # the latest release instead of reusing an earlier download. Accept this
-  # flake config once, or pass --impure to nix build.
-  nixConfig = {
-    pure-eval = false;
-    tarball-ttl = 0;
-  };
+  # The background fetch below has no hash, so it is not allowed during pure
+  # evaluation. Build the zip with `nix build --impure --option tarball-ttl 0`.
+  # This flake has no nixConfig. `.envrc` must not pass --accept-flake-config,
+  # or a later nixConfig change would be trusted on every cd.
+  #
+  # The dev shell and the MinGW cross build are x86_64-linux. This flake does
+  # not define a shell for aarch64-darwin.
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -21,6 +20,7 @@
   outputs =
     { self, nixpkgs, rust-overlay }:
     let
+      # x86_64-linux only. See the note at the top of this file.
       system = "x86_64-linux";
       lib = nixpkgs.lib;
       pkgs = import nixpkgs {
