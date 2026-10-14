@@ -15,7 +15,7 @@ pub extern "C" fn kurosdk_login() {
     let resumed = if let Some(session) = ui::current_session() {
         println!("[KRSDK] resuming the in-game session");
         ui::finish_login(session)
-    } else if let Some(stored) = crate::auth::session::load() {
+    } else if let Some(stored) = crate::auth::session::load(&crate::auth::client::origin()) {
         println!("[KRSDK] verifying the saved session");
         match crate::auth::client::verify(&stored.token) {
             Ok(session) => ui::finish_login(session),

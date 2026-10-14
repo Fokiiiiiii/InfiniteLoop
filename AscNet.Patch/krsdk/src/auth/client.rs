@@ -25,8 +25,15 @@ fn account_from(status: reqwest::StatusCode, data: LoginResponse) -> Result<User
     })
 }
 
-fn origin() -> String {
-    std::env::var("ASCNET_PATCH_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
+pub(crate) fn origin() -> String {
+    let configured = std::env::var("ASCNET_PATCH_ORIGIN")
+        .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
+    let normalized = configured.trim().trim_end_matches('/');
+    if normalized.is_empty() {
+        "http://127.0.0.1:8080".to_string()
+    } else {
+        normalized.to_string()
+    }
 }
 
 /// Confirms a saved account token with the existing `/api/AscNet/verify` route.

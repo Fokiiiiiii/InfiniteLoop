@@ -41,7 +41,7 @@ pub fn finish_login(session: UserSession) -> bool {
         "msg": "",
         "statusCode": 0
     });
-    crate::auth::session::save(&session);
+    crate::auth::session::save(&crate::auth::client::origin(), &session);
     *SESSION.lock().unwrap() = Some(session);
     send_callback("LOGIN", &response.to_string());
     true
