@@ -2142,7 +2142,7 @@
     },
     {
       "columns": 7,
-      "contentSha256": "023816b80572279d63f4fbda92652cdae367282671a7096f252639badfc289a1",
+      "contentSha256": "9eece0e602ceadbcd5b18a6ef8a5579dc665d893a9b486e4ddd169cf49baa3a5",
       "filter": "all",
       "naturalKey": "Id",
       "path": "share/fuben/bosssingle/BossSingleChallengeFeatureGroup.tsv",
@@ -4676,7 +4676,7 @@
       "path": "share/draw/DrawServerCatalog.tsv",
       "rows": 12,
       "columns": 11,
-      "contentSha256": "66e7d95e9e98da045ca0a93a23151affdac104db3d6d836083f4f8de760ff037",
+      "contentSha256": "4aa35907d7cadadb48c38a25ed18f804e0b0101a4d91c85f0e218c72e23013d8",
       "source": [
         {
           "path": "client/draw/drawpreview.tab",
@@ -4701,8 +4701,68 @@
           "authority": "official 4.8 event schedule; derived server availability windows"
         }
       ],
-      "transformation": "4.8 banner IDs/targets from preview and client group rules; window from official 4.8 notice; collab groups 37–40 (draws 5612/5613/381/7068) open at the 4.8 maintenance end 1790226000 (AscNet user-approved early-open policy; retail start 1790676000), end unchanged; Tag 5 on 5612/5613 from client DrawTabs Id=5 (Collab / Kurumi Tokisaki Pool); collab Fate 5613 stays fail-closed (published pity only an 80–100 range)",
+      "transformation": "4.8 banner IDs/targets from preview and client group rules; window from official 4.8 notice; collab groups 37–40 (draws 5612/5613/381/7068) open at the 4.8 maintenance end 1790226000 (AscNet user-approved early-open policy; retail start 1790676000), end unchanged; Tag 5 from client DrawTabs Id=5 (Collab / Kurumi Tokisaki Pool) on 5612/5613 and on collab weapon 381 (group 39, Order 2) and CUB 7068 (group 40, Order 1). The client sorts that tab by Order descending: frame 4002, weapon 2, CUB 1. Priorities stay 22000, 510, and 8100. Season weapon 383 and CUB 7071 stay on tags 1 and 7 with Order 1. Collab Fate 5613 stays fail-closed (published pity only an 80–100 range)",
       "naturalKey": "Id"
+    },
+    {
+      "path": "share/item/AffectionGiftBoxPolicy.tsv",
+      "rows": 3,
+      "columns": 3,
+      "contentSha256": "d15c250a9283ee730cc4cbb3fabf99663fe5055e29989e405be01a65bd7cb91e",
+      "naturalKey": "Id",
+      "filter": "drop groups 1003, 1004, and 1005",
+      "source": [
+        "AscNet policy. The client ships no DropGroup for these ids. Each box description says one random gift of that quality and publishes no rates."
+      ],
+      "transformation": "Equal chance among CharacterTrustItem favor gifts of the row Quality. Not Reward 1003–1005. Quality 6 stays out."
+    },
+    {
+      "path": "share/item/ConstructResearchFortuneBagPolicy.tsv",
+      "rows": 5,
+      "columns": 4,
+      "contentSha256": "9e0b0774db19ccc4713d5aa4dd8a0d017df0d4f4cbbc0d134999bfe4dd16dc4b",
+      "naturalKey": "Id,Count",
+      "filter": "item 94033",
+      "source": [
+        "AscNet policy keyed on item 94033. Counts and weights are the chances printed on that item. Reward 1011 is not this grant."
+      ],
+      "transformation": "One row per printed tier. TicketItemId 50005 is the Event Construct R&D Ticket the description names."
+    },
+    {
+      "path": "share/pay/AccumulatedPay.tsv",
+      "rows": 1,
+      "columns": 17,
+      "contentSha256": "3c2357bd32e869ceac81def16a9a0e56ac2f209fbbdf5713390d5f49d93551d6",
+      "naturalKey": "Id",
+      "filter": "the single Type 2 forever row",
+      "source": [
+        "Decoded client AccumulatedPay tab. No tiers were added."
+      ],
+      "transformation": "Copied the client forever accumulated-pay row. Money is a rainbow-card count, not USD."
+    },
+    {
+      "path": "share/pay/AccumulatedPayReward.tsv",
+      "rows": 14,
+      "columns": 6,
+      "contentSha256": "307fd679ae392084a92a8380ce7f0a294cfeeb3f59b10c3a8f8d44ae83445266",
+      "naturalKey": "Id",
+      "filter": "all decoded rows",
+      "source": [
+        "Decoded client AccumulatedPayReward tab. MailId is 0 on every row."
+      ],
+      "transformation": "Copied the client rows. SmallRewardId 0 means that tier has no small reward."
+    },
+    {
+      "path": "share/pay/AccumulatedExtraPayReward.tsv",
+      "rows": 14,
+      "columns": 3,
+      "contentSha256": "68d15167f8481d1248b72e6e1333eea4e5c2a6b6ebd9b3037b38e3ae3454c223",
+      "naturalKey": "Id",
+      "filter": "all decoded rows",
+      "source": [
+        "Decoded client AccumulatedExtraPayReward tab."
+      ],
+      "transformation": "Copied the client rows. ExtraSmallRewardId 0 means that tier has no extra small reward."
     },
     {
       "path": "share/activity/EventCatalog.tsv",
@@ -4763,11 +4823,11 @@
     },
     {
       "columns": 2,
-      "contentSha256": "6894f282cddc6549ac5c68256ab56e7a55b90c2be2e0be46b4f2612fc0509bb4",
+      "contentSha256": "87ee6058c7b23e87a74f67eb8466019c95794c4589c18f19dbee029341092c4e",
       "filter": "all",
       "naturalKey": "Id",
       "path": "share/fuben/bosssingle/BossSingleChallengeFeature.tsv",
-      "rows": 83,
+      "rows": 85,
       "source": [
         "share/fuben/bosssingle/BossSingleChallengeFeature.json"
       ]
