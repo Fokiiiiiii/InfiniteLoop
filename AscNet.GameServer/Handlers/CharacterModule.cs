@@ -1,5 +1,6 @@
 using AscNet.Common;
 using AscNet.Common.Database;
+using AscNet.GameServer.Game;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
 using AscNet.Table.V2.share.character;
@@ -445,9 +446,7 @@ namespace AscNet.GameServer.Handlers
                 Star = character.Star,
                 EnhanceSkillList = character.EnhanceSkillList
             };
-            Dictionary<int, int> maxSkillLevels = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
-                .GroupBy(row => row.SkillId)
-                .ToDictionary(group => group.Key, group => Math.Min(Character.CharacterSkillClientLevelCap, group.Max(row => row.Level)));
+            Dictionary<int, int> maxSkillLevels = CharacterPower.CharacterSkillMaxLevelsForClient(session, character);
             ILookup<int, CharacterSkillUpgradeTable> upgrades = TableReaderV2.Parse<CharacterSkillUpgradeTable>()
                 .ToLookup(row => row.SkillId);
             HashSet<int> liberationConditions = TableReaderV2.Parse<ConditionTable>()
@@ -484,6 +483,7 @@ namespace AscNet.GameServer.Handlers
             foreach ((CharacterSkill skill, int level) in skillLevels)
                 skill.Level = level;
             session.character.UnlockQualityGatedSkills(character, session.player.GatherRewards);
+            CharacterPower.ClampCharacterSkillLevelsForClient(session);
             Item spent = session.inventory.Do(trainingItemId, -1);
             session.SendPush(new NotifyItemDataList { ItemDataList = { spent } });
             session.SendPush(new NotifyCharacterDataList { CharacterDataList = { character } });
@@ -869,6 +869,7 @@ namespace AscNet.GameServer.Handlers
             }
 
             character.SkillList.Add(new CharacterSkill { Id = defaultSkillId, Level = 1 });
+            CharacterPower.ClampCharacterSkillLevelsForClient(session, character);
             NotifyCharacterDataList notifyCharacterData = new();
             notifyCharacterData.CharacterDataList.Add(character);
             session.SendPush(notifyCharacterData);
@@ -905,7 +906,11 @@ namespace AscNet.GameServer.Handlers
             UpgradeCharacterSkillResult upgradeResult;
             try
             {
-                upgradeResult = session.character.UpgradeCharacterSkillGroup(request.SkillGroupId, request.Count, session.player.GatherRewards);
+                upgradeResult = session.character.UpgradeCharacterSkillGroup(
+                    request.SkillGroupId,
+                    request.Count,
+                    session.player.GatherRewards,
+                    (character, skillId) => CharacterPower.CharacterSkillMaxLevelsForClient(session, character).GetValueOrDefault(skillId));
             }
             catch (ServerCodeException ex)
             {
@@ -928,6 +933,7 @@ namespace AscNet.GameServer.Handlers
                     character.SkillList.First(s => s.Id == skillId).Level += request.Count;
             }
             session.character.NormalizeCharactersForCurrentTables(session.player.GatherRewards);
+            CharacterPower.ClampCharacterSkillLevelsForClient(session);
 
             NotifyCharacterDataList notifyCharacterData = new();
             notifyCharacterData.CharacterDataList.AddRange(session.character.Characters.Where(x => upgradeResult.AffectedCharacters.Contains(x.Id)));

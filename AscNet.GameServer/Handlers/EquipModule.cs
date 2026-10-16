@@ -1,6 +1,7 @@
 using System.Globalization;
 using AscNet.Common;
 using AscNet.Common.Database;
+using AscNet.GameServer.Game;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
 using AscNet.Table.V2.share.attrib;
@@ -1939,7 +1940,9 @@ namespace AscNet.GameServer.Handlers
 
         private static void SyncCharacterAfterResonance(Session session, int characterId)
         {
-            if (!session.character.NormalizeCharactersForCurrentTables(session.player.GatherRewards))
+            bool changed = session.character.NormalizeCharactersForCurrentTables(session.player.GatherRewards);
+            changed |= CharacterPower.ClampCharacterSkillLevelsForClient(session).Count > 0;
+            if (!changed)
                 return;
 
             session.character.Save();
@@ -2294,10 +2297,17 @@ namespace AscNet.GameServer.Handlers
             notifyItems.ItemDataList.Add(session.inventory.Do(itemId, -itemCount));
 
             equip.WeaponOverrunData.Level = progression.Level;
+            List<CharacterData> clampedCharacters = CharacterPower.ClampCharacterSkillLevelsForClient(session);
             session.character.Save();
             session.inventory.Save();
             TaskModule.RecordTableDrivenProgress(session, [(11202, (int?)itemId, itemCount)]);
             session.SendPush(notifyItems);
+            if (clampedCharacters.Count > 0)
+            {
+                NotifyCharacterDataList characterUpdate = new();
+                characterUpdate.CharacterDataList.AddRange(clampedCharacters);
+                session.SendPush(characterUpdate);
+            }
             session.SendResponse(new EquipWeaponOverrunLevelUpResponse
             {
                 WeaponOverrunData = equip.WeaponOverrunData

@@ -752,7 +752,9 @@ namespace AscNet.GameServer.Handlers
                 bool isOwnedCharacter = characterData is not null;
                 if (characterData is null)
                     continue;
-                IEnumerable<EquipData> equips = BuildTeamPrefabFightEquips(session, cardId);
+                List<EquipData> equips = BuildTeamPrefabFightEquips(session, cardId).ToList();
+                if (CharacterPower.ClampCharacterSkillLevelsForClient(session, characterData, equips))
+                    session.character.Save();
                 int weaponFashionId = session.character.WeaponFashions
                     .Find(fashion =>
                         (fashion.ExpireTime == 0 || fashion.ExpireTime > currentUnixTime)

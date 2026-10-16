@@ -261,6 +261,8 @@ namespace AscNet.GameServer.Handlers
                 session.inventory = Inventory.FromUid(player.PlayerData.Id);
                 if (player.NormalizeEquipReferences(session.character.Equips.Select(equip => equip.Id).ToHashSet()))
                     player.Save();
+                if (CharacterPower.ClampCharacterSkillLevelsForClient(session).Count > 0)
+                    session.character.Save();
 
                 session.AppliedTeamPrefabId = null;
                 session.GuildIdentityReady = false;
@@ -340,6 +342,8 @@ namespace AscNet.GameServer.Handlers
                 }
 
                 session.player = player;
+                if (CharacterPower.ClampCharacterSkillLevelsForClient(session).Count > 0)
+                    session.character.Save();
                 session.ContinuePushSequenceFrom(request.LastMsgSeqNo);
                 session.SendResponse(new ReconnectResponse
                 {

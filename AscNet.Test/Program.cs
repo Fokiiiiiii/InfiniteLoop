@@ -469,11 +469,32 @@ namespace AscNet.Test
                     AssertEqual(lowerTableMax.MaxLevel,
                         AscNet.Common.Database.Character.CharacterSkillMaxLevel(lowerTableMax.SkillId),
                         "character skill table maximum below the client cap");
-                    int skillId = TableReaderV2.Parse<CharacterSkillLevelEffectTable>().First(row => row.Level >= 29).SkillId;
-                    AssertEqual(29, AscNet.Common.Database.Character.CharacterSkillMaxLevel(skillId), "character skill client cap");
+                    int skillId = TableReaderV2.Parse<CharacterSkillLevelEffectTable>().First(row => row.SkillId == 153521 && row.Level == 35).SkillId;
+                    AssertEqual(29, AscNet.Common.Database.Character.CharacterSkillMaxLevel(skillId), "character skill base cap");
+                    int bonusLimitedLevel = AscNet.Common.Database.Character.CharacterSkillMaxLevel(skillId, 10);
+                    AssertEqual(25, bonusLimitedLevel, "character skill cap reserves active bonuses");
+                    AssertEqual(35, bonusLimitedLevel + 10, "character skill total including active bonuses");
+
+                    foreach (var skill in TableReaderV2.Parse<CharacterSkillLevelEffectTable>().GroupBy(row => row.SkillId))
+                    {
+                        int tableMax = skill.Max(row => row.Level);
+                        foreach (int bonus in Enumerable.Range(0, AscNet.Common.Database.Character.CharacterSkillEffectiveLevelCap + 1))
+                        {
+                            int inputLevel = AscNet.Common.Database.Character.CharacterSkillEffectiveLevelCap;
+                            int outputLevel = Math.Min(inputLevel,
+                                AscNet.Common.Database.Character.CharacterSkillLevelCap(tableMax, bonus));
+                            if (outputLevel + bonus > AscNet.Common.Database.Character.CharacterSkillEffectiveLevelCap)
+                                throw new InvalidOperationException($"Skill {skill.Key} exceeds the client cap with bonus {bonus}.");
+                        }
+                    }
                     return;
                 }
 
+                if (args.Contains("--character-skill-effective-cap-db-only"))
+                {
+                    ValidateCharacterSkillEffectiveCapDatabaseCompatibility();
+                    return;
+                }
                 if (args.Contains("--version-48-compat-only"))
                 {
                     ValidateVersion48Frames();

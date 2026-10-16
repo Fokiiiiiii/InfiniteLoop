@@ -1,4 +1,5 @@
 using AscNet.Common.Database;
+using AscNet.GameServer.Game;
 using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
 using AscNet.Table.V2.share.fuben.assign;
@@ -144,7 +145,19 @@ internal static class AssignModule
         {
             AssignChapterState? own = state.Chapters.FirstOrDefault(record => record.ChapterId == request.ChapterId);
             if (own is null) { SendCharacter(session, packet, CharacterMissing); return; }
-            if (own.CharacterId != 0) { own.CharacterId = 0; session.player.Save(); }
+            if (own.CharacterId != 0)
+            {
+                own.CharacterId = 0;
+                session.player.Save();
+                List<CharacterData> clampedCharacters = CharacterPower.ClampCharacterSkillLevelsForClient(session);
+                if (clampedCharacters.Count > 0)
+                {
+                    session.character.Save();
+                    NotifyCharacterDataList characterUpdate = new();
+                    characterUpdate.CharacterDataList.AddRange(clampedCharacters);
+                    session.SendPush(characterUpdate);
+                }
+            }
             SendCharacter(session, packet);
             return;
         }
@@ -154,6 +167,14 @@ internal static class AssignModule
         if (state.Chapters.Any(record => record.ChapterId != request.ChapterId && record.CharacterId == request.CharacterId)) { SendCharacter(session, packet, CharacterOccupied); return; }
         Chapter(state, request.ChapterId).CharacterId = request.CharacterId;
         session.player.Save();
+        List<CharacterData> adjustedCharacters = CharacterPower.ClampCharacterSkillLevelsForClient(session);
+        if (adjustedCharacters.Count > 0)
+        {
+            session.character.Save();
+            NotifyCharacterDataList characterUpdate = new();
+            characterUpdate.CharacterDataList.AddRange(adjustedCharacters);
+            session.SendPush(characterUpdate);
+        }
         SendCharacter(session, packet);
     }
 

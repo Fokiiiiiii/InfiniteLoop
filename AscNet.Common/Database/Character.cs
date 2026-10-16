@@ -540,8 +540,6 @@ namespace AscNet.Common.Database
                         changed = true;
                     }
 
-                    if (NormalizeSkillLevelsForResonance(character, skillTableIndexes.MaxLevelBySkillId))
-                        changed = true;
                 }
 
                 if (characterRow.DefaultNpcFashtionId > 0 && fashionRowsById.ContainsKey(characterRow.DefaultNpcFashtionId))
@@ -622,41 +620,6 @@ namespace AscNet.Common.Database
             return changed;
         }
 
-        private bool NormalizeSkillLevelsForResonance(
-            CharacterData character,
-            IReadOnlyDictionary<int, int> maxLevelBySkillId)
-        {
-            if (character.SkillList is null || Equips is null)
-                return false;
-
-            int resonanceCount = Equips
-                .Where(equip => equip.CharacterId == character.Id)
-                .SelectMany(equip => equip.ResonanceInfo ?? [])
-                .Where(resonance => resonance.Type == EquipResonanceType.CharacterSkill
-                    && resonance.CharacterId == character.Id
-                    && resonance.TemplateId > 0)
-                .Count();
-            if (resonanceCount <= 0)
-                return false;
-
-            bool changed = false;
-            foreach (CharacterSkill skill in character.SkillList)
-            {
-                int maxLevel = maxLevelBySkillId.GetValueOrDefault((int)skill.Id);
-                // Evolution passives cap at levels 1-3; resonance only reduces normal skills.
-                if (maxLevel <= 3)
-                    continue;
-
-                int effectiveMaxLevel = Math.Max(1, maxLevel - resonanceCount);
-                if (skill.Level > effectiveMaxLevel)
-                {
-                    skill.Level = effectiveMaxLevel;
-                    changed = true;
-                }
-            }
-
-            return changed;
-        }
         public bool NormalizeWeaponFashionsForCurrentTables()
         {
             if (WeaponFashions is null)
@@ -753,6 +716,7 @@ namespace AscNet.Common.Database
                         .ToArray());
         }
         public const int CharacterSkillClientLevelCap = 29;
+        public const int CharacterSkillEffectiveLevelCap = 35;
 
         private sealed class CharacterSkillTableIndexes
         {
@@ -1233,17 +1197,30 @@ namespace AscNet.Common.Database
         /// being a costless marker, so upgrade-row costs alone over-state the ceiling for short-level
         /// skills (QTE/signature/ultimate) and would let the server grant an unconstructible level.
         /// </summary>
-        public static int CharacterSkillMaxLevel(int skillId)
+        public static int CharacterSkillMaxLevel(int skillId) => CharacterSkillMaxLevel(skillId, 0);
+
+        public static int CharacterSkillMaxLevel(int skillId, int addedLevel)
         {
             int maxLevel = TableReaderV2.Parse<CharacterSkillLevelEffectTable>()
                 .Where(row => row.SkillId == skillId)
                 .Select(row => row.Level)
                 .DefaultIfEmpty()
                 .Max();
-            return Math.Min(CharacterSkillClientLevelCap, maxLevel);
+            return CharacterSkillLevelCap(maxLevel, addedLevel);
         }
 
-        public UpgradeCharacterSkillResult UpgradeCharacterSkillGroup(int skillGroupId, int count, IReadOnlyCollection<int> gatherRewards)
+        public static int CharacterSkillLevelCap(int tableMaxLevel, int addedLevel)
+        {
+            return Math.Max(0, Math.Min(
+                Math.Min(CharacterSkillClientLevelCap, tableMaxLevel),
+                CharacterSkillEffectiveLevelCap - Math.Max(0, addedLevel)));
+        }
+
+        public UpgradeCharacterSkillResult UpgradeCharacterSkillGroup(
+            int skillGroupId,
+            int count,
+            IReadOnlyCollection<int> gatherRewards,
+            Func<CharacterData, int, int>? maxSkillLevelForCharacter = null)
         {
             HashSet<uint> affectedCharacters = new();
             int totalCoinCost = 0;
@@ -1258,9 +1235,10 @@ namespace AscNet.Common.Database
 
             foreach (uint skillId in affectedSkills)
             {
-                int skillMaxLevel = CharacterSkillMaxLevel((int)skillId);
                 foreach (CharacterData character in Characters.Where(character => character.SkillList.Any(skill => skill.Id == skillId)))
                 {
+                    int skillMaxLevel = maxSkillLevelForCharacter?.Invoke(character, (int)skillId)
+                        ?? CharacterSkillMaxLevel((int)skillId);
                     CharacterSkill characterSkill = character.SkillList.First(skill => skill.Id == skillId);
                     int targetLevel = characterSkill.Level + count;
 

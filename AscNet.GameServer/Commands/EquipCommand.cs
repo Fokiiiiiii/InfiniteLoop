@@ -4,6 +4,7 @@ using AscNet.Common.Database;
 using AscNet.Table.V2.share.equip;
 using AscNet.Common.MsgPack;
 using AscNet.GameServer.Handlers;
+using AscNet.GameServer.Game;
 
 namespace AscNet.GameServer.Commands
 {
@@ -119,6 +120,8 @@ namespace AscNet.GameServer.Commands
         private void SyncEquipsFromDatabase()
         {
             session.character = Character.FromUid(session.player.PlayerData.Id, session.player.GatherRewards);
+            if (CharacterPower.ClampCharacterSkillLevelsForClient(session).Count > 0)
+                session.character.Save();
             AccountModule.SendLoginState(session);
         }
     }

@@ -17,6 +17,7 @@ internal static partial class CharacterPower
     private static readonly Dictionary<int, CharacterSkillGroupTable> PowerSkillGroups = TableReaderV2.Parse<CharacterSkillGroupTable>().ToDictionary(row => row.Id);
     private static readonly Dictionary<int, CharacterSkillGroupTable> PowerSkillGroupsBySkill = PowerSkillGroups.Values.SelectMany(group => group.SkillId.Where(id => id != 0).Select(id => (id, group))).ToDictionary(pair => pair.id, pair => pair.group);
     private static readonly Dictionary<(int, int), CharacterSkillLevelEffectTable> PowerSkillEffects = TableReaderV2.Parse<CharacterSkillLevelEffectTable>().ToDictionary(row => (row.SkillId, row.Level));
+    private static readonly Dictionary<int, int> PowerSkillMaximumLevels = PowerSkillEffects.Keys.GroupBy(key => key.Item1).ToDictionary(group => group.Key, group => group.Max(key => key.Item2));
     private static readonly Dictionary<int, CharacterSkillTypeTable> PowerSkillTypes = TableReaderV2.Parse<CharacterSkillTypeTable>().ToDictionary(row => row.Id);
     private static readonly Dictionary<int, CharacterSkillTypePlusTable> PowerSkillPlusTypes = TableReaderV2.Parse<CharacterSkillTypePlusTable>().ToDictionary(row => row.Id);
     private static readonly Dictionary<int, AssignChapterTable> PowerAssignChapters = TableReaderV2.Parse<AssignChapterTable>().ToDictionary(row => row.ChapterId);
@@ -119,6 +120,87 @@ internal static partial class CharacterPower
             }
         }
         return result;
+    }
+
+
+    internal static List<CharacterData> ClampCharacterSkillLevelsForClient(Session session)
+    {
+        List<CharacterData> changed = new();
+        foreach (CharacterData character in session.character.Characters)
+            if (ClampCharacterSkillLevelsForClient(session, character))
+                changed.Add(character);
+        return changed;
+    }
+
+    internal static bool ClampCharacterSkillLevelsForClient(
+        Session session,
+        CharacterData character,
+        IEnumerable<EquipData>? activeEquips = null)
+    {
+        bool changed = false;
+        foreach ((int skillId, int maxLevel) in CharacterSkillMaxLevelsForClient(session, character, activeEquips))
+        {
+            CharacterSkill? skill = character.SkillList.FirstOrDefault(candidate => candidate.Id == skillId);
+            if (skill is not null && skill.Level > maxLevel)
+            {
+                skill.Level = maxLevel;
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+
+    internal static Dictionary<int, int> CharacterSkillMaxLevelsForClient(
+        Session session,
+        CharacterData character,
+        IEnumerable<EquipData>? activeEquips = null)
+    {
+        Dictionary<int, int> bonuses = CharacterSkillBonusesForClient(session, character, activeEquips);
+        return bonuses.ToDictionary(
+            entry => entry.Key,
+            entry => AscNet.Common.Database.Character.CharacterSkillLevelCap(
+                PowerSkillMaximumLevels.GetValueOrDefault(entry.Key),
+                entry.Value));
+    }
+
+    internal static Dictionary<int, int> CharacterSkillBonusesForClient(
+        Session session,
+        CharacterData character,
+        IEnumerable<EquipData>? activeEquips = null)
+    {
+        if (character.SkillList is null)
+            return new();
+
+        List<EquipData> equips = (activeEquips
+            ?? session.character.Equips.Where(equip => equip.CharacterId == character.Id)).ToList();
+        HashSet<int> skillIds = character.SkillList.Select(skill => (int)skill.Id).ToHashSet();
+        Dictionary<int, int> bonuses = skillIds.ToDictionary(skillId => skillId, _ => 0);
+        foreach (EquipData equip in equips)
+        {
+            foreach (ResonanceInfo resonance in equip.ResonanceInfo ?? [])
+            {
+                if (resonance.Type != EquipResonanceType.CharacterSkill
+                    || resonance.CharacterId != character.Id
+                    || !PowerSkillGroupsBySkill.TryGetValue(resonance.TemplateId, out CharacterSkillGroupTable? group))
+                    continue;
+                foreach (int skillId in group.SkillId.Where(skillIds.Contains))
+                    bonuses[skillId]++;
+            }
+
+            foreach (WeaponOverrunTable overrun in GetPowerOverruns(equip))
+            {
+                if (overrun.UpSkillGroupId <= 0
+                    || !PowerSkillGroups.TryGetValue(overrun.UpSkillGroupId, out CharacterSkillGroupTable? group))
+                    continue;
+                foreach (int skillId in group.SkillId.Where(skillIds.Contains))
+                    bonuses[skillId] += overrun.UpSkillGroupLevel;
+            }
+        }
+
+        foreach ((int skillId, int bonus) in GetAssignmentLevels(session, character))
+            bonuses[skillId] = bonuses.GetValueOrDefault(skillId) + bonus;
+        return bonuses;
     }
 
     private static long GetEquipmentSkillPower(CharacterData character, IReadOnlyList<EquipData> equips)
