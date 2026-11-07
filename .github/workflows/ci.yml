@@ -1,0 +1,128 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET 10 and 4.9 harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      - name: Build server and compatibility harness
+        run: |
+          dotnet build AscNet/AscNet.csproj --configuration Release
+          dotnet build AscNet.Test/AscNet.Test.csproj --configuration Release
+      - name: Check 4.9 event availability
+        run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --version49-events-only
+      - name: Check 4.9 Memory Shop
+        run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --version49-memory-shop-only
+      - name: Check 4.9 BigWorld tables
+        run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --big-world-49-only
+      - name: Check 4.9 Sky Tower
+        run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --sky-tower-only
+      - name: Check anniversary preheating
+        run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --anniversary-preheating-only
+
+  legacy-parser:
+    name: .NET Framework 4.8.1 parser
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - uses: NuGet/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
+      - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.nuget/packages
+            packages
+          key: windows-nuget-${{ hashFiles('AscNet.PcapParser/packages.config') }}
+          restore-keys: |
+            windows-nuget-
+      - name: Restore packages.config
+        run: nuget restore AscNet.PcapParser/AscNet.PcapParser.csproj -PackagesDirectory packages -NonInteractive
+      - name: Build .NET Framework 4.8.1 parser
+        run: msbuild AscNet.PcapParser/AscNet.PcapParser.csproj /m /p:Configuration=Release /verbosity:minimal
+
+  rust:
+    name: Rust launcher and patch tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        with:
+          toolchain: stable
+          build-warnings: allow
+          cache-workspaces: |
+            AscNet.Launcher -> AscNet.Launcher/target
+            AscNet.Patch -> AscNet.Patch/target
+      - name: Test launcher
+        run: cargo test --manifest-path AscNet.Launcher/Cargo.toml
+      - name: Test patch
+        run: cargo test --manifest-path AscNet.Patch/Cargo.toml
+
+  python:
+    name: Python bridge and release packaging tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - name: Install pinned test dependencies
+        run: python -m pip install -r requirements-ci.txt
+      - name: Run Python tests
+        run: >-
+          python -m unittest
+          test_run_steam.py
+          test_proxy.py
+          Scripts.test_pgr_bundles
+          Scripts.test_restore_document_patch
+          Scripts.test_store_catalog_patch
+          Scripts.test_prepare_upstream_launcher_release
