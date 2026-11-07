@@ -18,55 +18,55 @@ concurrency:
 jobs:
   mirror:
     if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main') }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
       - name: Find and verify upstream release asset
         id: upstream
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
-          release="$(gh api repos/reiserFSs/InfiniteLoop/releases/latest)"
-          tag="$(jq -r '.tag_name // empty' <<< "$release")"
-          if [[ ! "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Unexpected upstream release tag: $tag" >&2
-            exit 1
-          fi
-          asset="$(jq -c '[.assets[] | select(.name == "AscNetLauncher.zip" and .state == "uploaded")][0] // empty' <<< "$release")"
-          if [[ -z "$asset" ]]; then
-            echo "Upstream release $tag has no uploaded AscNetLauncher.zip" >&2
-            exit 1
-          fi
-          digest="$(jq -r '.digest // empty' <<< "$asset")"
-          if [[ ! "$digest" =~ ^sha256:[[:xdigit:]]{64}$ ]]; then
-            echo "Upstream release $tag has no valid SHA-256 asset digest" >&2
-            exit 1
-          fi
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "Release $tag is already mirrored."
+          $releaseJson = gh api repos/reiserFSs/InfiniteLoop/releases/latest
+          if ($LASTEXITCODE -ne 0) { throw "Failed to query the upstream release." }
+          $release = $releaseJson | ConvertFrom-Json
+          $tag = [string]$release.tag_name
+          if ($tag -notmatch '^v?[0-9]+\.[0-9]+\.[0-9]+$') { throw "Unexpected upstream release tag: $tag" }
+          $assets = @($release.assets | Where-Object { $_.name -eq "AscNetLauncher.zip" -and $_.state -eq "uploaded" })
+          if ($assets.Count -ne 1) { throw "Upstream release $tag must contain one uploaded AscNetLauncher.zip." }
+          $digest = [string]$assets[0].digest
+          if ($digest -notmatch '^sha256:[0-9a-fA-F]{64}$') { throw "Upstream release $tag has no valid SHA-256 asset digest." }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            "needed=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Release $tag is already mirrored."
             exit 0
-          fi
-          mkdir -p "$RUNNER_TEMP/upstream"
-          gh release download "$tag" --repo reiserFSs/InfiniteLoop --pattern AscNetLauncher.zip --dir "$RUNNER_TEMP/upstream"
-          archive="$RUNNER_TEMP/upstream/AscNetLauncher.zip"
-          printf '%s  %s\n' "$(cut -d: -f2 <<< "$digest")" "$archive" | sha256sum --check -
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
-          echo "needed=true" >> "$GITHUB_OUTPUT"
+          }
+          $downloadDir = Join-Path $env:RUNNER_TEMP "upstream"
+          New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
+          gh release download $tag --repo reiserFSs/InfiniteLoop --pattern AscNetLauncher.zip --dir $downloadDir
+          if ($LASTEXITCODE -ne 0) { throw "Failed to download upstream release $tag." }
+          $archive = Join-Path $downloadDir "AscNetLauncher.zip"
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $digest.Substring(7).ToLowerInvariant()) { throw "Upstream release asset SHA-256 mismatch." }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "archive=$archive" >> $env:GITHUB_OUTPUT
+          "needed=true" >> $env:GITHUB_OUTPUT
       - name: Point the packaged updater at this repository
         id: prepare
         if: steps.upstream.outputs.needed == 'true'
         run: |
-          archive="$RUNNER_TEMP/upstream/AscNetLauncher.zip"
-          output="$RUNNER_TEMP/AscNetLauncher.zip"
-          python3 Scripts/prepare_upstream_launcher_release.py "$archive" "$output" "$GITHUB_REPOSITORY"
-          echo "archive=$output" >> "$GITHUB_OUTPUT"
+          $archive = Join-Path $env:RUNNER_TEMP "upstream\AscNetLauncher.zip"
+          $output = Join-Path $env:RUNNER_TEMP "AscNetLauncher.zip"
+          python Scripts/prepare_upstream_launcher_release.py $archive $output $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Failed to prepare the upstream launcher package." }
+          "archive=$output" >> $env:GITHUB_OUTPUT
       - name: Publish prebuilt launcher to this repository
         if: steps.upstream.outputs.needed == 'true'
         env:
@@ -74,8 +74,8 @@ jobs:
           TAG: ${{ steps.upstream.outputs.tag }}
           ARCHIVE: ${{ steps.prepare.outputs.archive }}
         run: |
-          gh release create "$TAG" "$ARCHIVE" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "AscNet Launcher v$TAG" \
-            --notes "Prebuilt launcher mirrored from reiserFSs/InfiniteLoop release $TAG. The package updater points to $GITHUB_REPOSITORY (main)."
-          echo "Published upstream launcher $TAG to $GITHUB_REPOSITORY."
+          $notes = "Prebuilt launcher mirrored from reiserFSs/InfiniteLoop release $env:TAG. The package updater points to $env:GITHUB_REPOSITORY (main)."
+          $arguments = @("release", "create", $env:TAG, $env:ARCHIVE, "--repo", $env:GITHUB_REPOSITORY, "--title", "AscNet Launcher v$env:TAG", "--notes", $notes)
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw "Failed to publish the prebuilt launcher release." }
+          Write-Host "Published upstream launcher $env:TAG to $env:GITHUB_REPOSITORY."
