@@ -31,6 +31,55 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.config') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/mongodb-windows-x86_64-8.0.32.zip
+          key: windows-mongodb-8.0.32-sha256-5a0675fdec49b544cd5d374ad50a9a594cf5b3278b5ace658aa51cbb4df17177
+      - name: Start verified MongoDB on Windows
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "mongodb-windows-x86_64-8.0.32.zip"
+          if (-not (Test-Path -LiteralPath $archive)) {
+            Invoke-WebRequest -Uri "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-8.0.32.zip" -OutFile $archive
+          }
+          $expected = "5a0675fdec49b544cd5d374ad50a9a594cf5b3278b5ace658aa51cbb4df17177"
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "MongoDB archive SHA-256 mismatch." }
+          $extract = Join-Path $env:RUNNER_TEMP "mongodb-8.0.32"
+          Expand-Archive -LiteralPath $archive -DestinationPath $extract -Force
+          $mongod = Get-ChildItem -LiteralPath $extract -Filter mongod.exe -File -Recurse | Select-Object -First 1
+          if (-not $mongod) { throw "mongod.exe is missing from the verified archive." }
+          $dbPath = Join-Path $env:RUNNER_TEMP "mongodb-data"
+          $logPath = Join-Path $env:RUNNER_TEMP "mongod.log"
+          New-Item -ItemType Directory -Force -Path $dbPath | Out-Null
+          $mongoProcess = Start-Process -FilePath $mongod.FullName -WorkingDirectory $mongod.DirectoryName -ArgumentList @("--dbpath", $dbPath, "--port", "27017", "--bind_ip", "127.0.0.1", "--logpath", $logPath, "--logappend") -WindowStyle Hidden -PassThru
+          "ASCNET_MONGOD_PID=$($mongoProcess.Id)" >> $env:GITHUB_ENV
+          $ready = $false
+          $deadline = [DateTime]::UtcNow.AddSeconds(90)
+          while ([DateTime]::UtcNow -lt $deadline) {
+            $client = [System.Net.Sockets.TcpClient]::new()
+            try {
+              $connect = $client.ConnectAsync("127.0.0.1", 27017)
+              if ($connect.Wait(500)) {
+                $connect.GetAwaiter().GetResult()
+                $ready = $client.Connected
+              }
+            } catch {
+              $ready = $false
+            } finally {
+              $client.Dispose()
+            }
+            if ($ready) { break }
+            if ($mongoProcess.HasExited) {
+              Get-Content -LiteralPath $logPath -Tail 60
+              throw "mongod exited before becoming ready."
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ready) {
+            Get-Content -LiteralPath $logPath -Tail 60
+            throw "mongod did not listen on 127.0.0.1:27017."
+          }
       - name: Build server and compatibility harness
         run: |
           dotnet build AscNet/AscNet.csproj --configuration Release
@@ -45,6 +94,13 @@ jobs:
         run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --sky-tower-only
       - name: Check anniversary preheating
         run: dotnet run --project AscNet.Test/AscNet.Test.csproj --configuration Release --no-build --no-restore -- --anniversary-preheating-only
+      - name: Stop MongoDB
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:ASCNET_MONGOD_PID) {
+            Stop-Process -Id ([int]$env:ASCNET_MONGOD_PID) -Force -ErrorAction SilentlyContinue
+          }
 
   legacy-parser:
     name: .NET Framework 4.8.1 parser
