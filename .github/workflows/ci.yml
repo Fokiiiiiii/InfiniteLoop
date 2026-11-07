@@ -15,19 +15,9 @@ concurrency:
 
 jobs:
   dotnet:
-    name: .NET 10 and 4.9 harness
-    runs-on: ubuntu-latest
+    name: Windows .NET 10 and 4.9 harness
+    runs-on: windows-latest
     timeout-minutes: 30
-    services:
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,8 +93,8 @@ jobs:
         run: cargo test --manifest-path AscNet.Patch/Cargo.toml
 
   python:
-    name: Python bridge and release packaging tests
-    runs-on: ubuntu-latest
+    name: Windows Python bridge and release packaging tests
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
