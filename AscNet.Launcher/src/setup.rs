@@ -80,6 +80,11 @@ pub fn run(
     }
 }
 
+/// Use the retained checkout directly so Setup updates mods even when reusing a cached build.
+pub fn mods_directory(root: &Path) -> PathBuf {
+    root.join("checkout").join("Mods")
+}
+
 pub(crate) fn without_program_files_git_include(text: &str) -> String {
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let mut kept = Vec::new();
@@ -1346,7 +1351,14 @@ fn run_windows(
     fs::create_dir_all(&build_root)?;
     let final_dir = build_root.join(&revision);
     let stage = build_root.join(format!("{revision}.tmp-{}", std::process::id()));
-    if !final_dir.join("server").join("AscNet.dll").is_file() || !final_dir.join("patch").join("supported-client.json").is_file() {
+    // A cached build is reused only while its whole patch package is present: antivirus software can quarantine
+    // version.dll after the build, which left every later Setup failing on the same missing file.
+    let complete = final_dir.join("server").join("AscNet.dll").is_file()
+        && crate::package::load_package(&final_dir.join("patch")).is_ok();
+    if !complete && final_dir.exists() {
+        note(progress, log, &format!("Cached build {revision} is incomplete; rebuilding it"))?;
+    }
+    if !complete {
         if stage.exists() {
             fs::remove_dir_all(&stage)?;
         }

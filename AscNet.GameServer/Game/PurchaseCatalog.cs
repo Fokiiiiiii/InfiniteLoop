@@ -7,6 +7,7 @@ namespace AscNet.GameServer.Game;
 public sealed class PurchaseCatalog
 {
     private readonly Dictionary<uint, JObject> entries = new();
+    private readonly Dictionary<uint, JObject> combos = new();
     private static readonly string[] PlayerFields =
     [
         "BuyTimes", "LastBuyTime", "DailyRewardRemainDay", "BuyLimitRemainDay",
@@ -46,6 +47,36 @@ public sealed class PurchaseCatalog
             if (entry["DailyRewardDays"] is not null && entry.Value<int>("DailyRewardDays") <= 0)
                 throw new InvalidDataException($"Purchase {id} has an invalid daily reward duration.");
         }
+        // Optional server-owned bundles (client XPurchaseComboDataForClient). No combo definitions
+        // ship with the client, so none are authored here; the list may stay empty.
+        if (root["Combos"] is JArray comboRows)
+            foreach (JToken token in comboRows)
+            {
+                if (token is not JObject combo)
+                    throw new InvalidDataException("Purchase combos must be objects.");
+                uint id = combo.Value<uint>("Id");
+                if (id == 0 || id > int.MaxValue || catalog.entries.ContainsKey(id) || !catalog.combos.TryAdd(id, combo))
+                    throw new InvalidDataException($"Invalid or duplicate purchase combo Id {id}.");
+                if (combo.Property("BuyTimes") is not null || combo.Property("ComboInfo") is not null)
+                    throw new InvalidDataException($"Combo {id} contains player state instead of catalog data.");
+                if (combo["SubPackageDiscounts"] is not JObject subs || !subs.HasValues
+                    || combo.Value<int>("UiType") <= 0 || combo["ConsumeId"] is null || combo.Value<int>("ConsumeId") < 0
+                    || combo["BuyLimitParam"] is null || combo.Value<int>("BuyLimitParam") < 0)
+                    throw new InvalidDataException($"Combo {id} requires a UI type, currency, buy limit and sub-packages.");
+                foreach (string field in new[] { "TimeToShelve", "TimeToUnShelve", "TimeToInvalid" })
+                    if (combo[field] is null || combo.Value<long>(field) < 0)
+                        throw new InvalidDataException($"Combo {id} requires nonnegative {field} (0 means unrestricted).");
+                foreach (JProperty sub in subs.Properties())
+                {
+                    if (!uint.TryParse(sub.Name, out uint subId) || !catalog.entries.TryGetValue(subId, out JObject? package)
+                        || package.Value<int>("UiType") != combo.Value<int>("UiType")
+                        || package.Value<int>("ConsumeId") != combo.Value<int>("ConsumeId")
+                        || sub.Value.Type != JTokenType.Integer
+                        || sub.Value.Value<int>() < 0 || sub.Value.Value<int>() > package.Value<int>("ConsumeCount")
+                        || package.Value<int>("ConsumeCount") <= 0)
+                        throw new InvalidDataException($"Combo {id} has an invalid sub-package {sub.Name}.");
+                }
+            }
         return catalog;
     }
 
@@ -66,6 +97,28 @@ public sealed class PurchaseCatalog
 
     public int DailyRewardDays(uint id) => entries.TryGetValue(id, out JObject? entry)
         ? entry.Value<int?>("DailyRewardDays") ?? 0 : 0;
+
+    public List<dynamic> ListCombos(IEnumerable<int>? uiTypes, long now)
+    {
+        HashSet<int>? requested = uiTypes?.ToHashSet();
+        return combos.Values
+            .Where(combo => combo.Value<bool?>("Enabled") != false
+                && (requested is null || requested.Contains(combo.Value<int>("UiType")))
+                && !HasEnded(combo.Value<long>("TimeToInvalid"), now)
+                && !HasEnded(combo.Value<long>("TimeToUnShelve"), now))
+            .Select(combo => (dynamic)ToComboInfo(combo)).ToList();
+    }
+
+    public Dictionary<dynamic, dynamic>? FindCombo(uint id) =>
+        combos.TryGetValue(id, out JObject? combo) && combo.Value<bool?>("Enabled") != false
+            ? ToComboInfo(combo) : null;
+
+    private static Dictionary<dynamic, dynamic> ToComboInfo(JObject combo)
+    {
+        Dictionary<dynamic, dynamic> info = JsonSnapshot.ReadDynamic(combo)!;
+        info.Remove("Enabled");
+        return info;
+    }
 
     private static bool HasEnded(long end, long now) => end > 0 && end <= now;
 

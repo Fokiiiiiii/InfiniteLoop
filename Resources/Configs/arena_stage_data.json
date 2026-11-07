@@ -158,6 +158,7 @@
       "MarkId": 4,
       "Archetype": "Duo Challenge: Refresh 2 Elite enemies per wave",
       "ReusableArchetype": true,
+      "LevelReferenceChallengeId": 14,
       "NpcGroupRefs": [
         0,
         1,

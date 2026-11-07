@@ -211,7 +211,7 @@ internal static partial class BiancaTheatreModule
             else
             {
                 character = mutation.Session.character.Characters.Single(row => row.Id == cardId);
-                equips = FightModule.BuildTeamPrefabFightEquips(mutation.Session, checked((uint)cardId));
+                equips = mutation.Session.character.Equips.Where(equip => equip.CharacterId == checked((uint)cardId)).ToList();
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 weaponFashionId = mutation.Session.character.WeaponFashions.FirstOrDefault(row =>
                     (row.ExpireTime == 0 || row.ExpireTime > now) && row.UseCharacterList.Contains(cardId))?.Id ?? 0;

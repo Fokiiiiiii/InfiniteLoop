@@ -147,6 +147,10 @@ namespace AscNet.Common.Database
         [BsonElement("prequel_rewarded_stages")]
         public List<int> PrequelRewardedStages { get; set; } = new();
 
+        [BsonElement("experiment_star_claims")]
+        [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+        public Dictionary<int, List<int>> ExperimentStarClaims { get; set; } = new();
+
         [BsonElement("finished_tasks")]
         public List<int> FinishedTasks { get; set; } = new();
         [BsonElement("unlock_events")]

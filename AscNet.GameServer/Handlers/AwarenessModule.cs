@@ -15,6 +15,8 @@ namespace AscNet.GameServer.Handlers;
 [MessagePackObject(true)] public sealed class AwarenessSetTeamResponse { public int Code { get; set; } }
 [MessagePackObject(true)] public sealed class AwarenessResetStageRequest { public int ChapterId { get; set; } public int StageId { get; set; } }
 [MessagePackObject(true)] public sealed class AwarenessResetStageResponse { public int Code { get; set; } }
+[MessagePackObject(true)] public sealed class AwarenessGetRewardRequest { public int ChapterId { get; set; } }
+[MessagePackObject(true)] public sealed class AwarenessGetRewardResponse { public int Code { get; set; } public List<RewardGoods> RewardList { get; set; } = new(); }
 [MessagePackObject(true)] public sealed class AwarenessInfo { public List<AwarenessChapterInfo> ChapterRecords { get; set; } = new(); public List<AwarenessChallengeInfo> ChallengeRecords { get; set; } = new(); public List<AwarenessTeamInfo> TeamRecords { get; set; } = new(); }
 [MessagePackObject(true)] public sealed class AwarenessChapterInfo { public int ChapterId { get; set; } public long CharacterId { get; set; } }
 [MessagePackObject(true)] public sealed class AwarenessChallengeInfo { public int ChapterId { get; set; } public int Count { get; set; } public List<int> FinishStageIds { get; set; } = new(); }
@@ -44,6 +46,20 @@ internal static class AwarenessModule
 
     [RequestPacketHandler("AwarenessGetDataRequest")]
     public static void GetData(Session session, Packet.Request packet) => session.SendResponse(new AwarenessGetDataResponse { AwarenessInfo = BuildInfo(session.player) }, packet.Id);
+
+    [RequestPacketHandler("AwarenessGetRewardRequest")]
+    public static void GetReward(Session session, Packet.Request packet)
+    {
+        AwarenessGetRewardRequest request = packet.Deserialize<AwarenessGetRewardRequest>();
+        int code;
+        if (!Runtime.Value.ByChapter.ContainsKey(request.ChapterId)) code = ChapterMissing;
+        else if (session.player.Awareness?.Chapters.Any(x => x.ChapterId == request.ChapterId) != true
+            && session.player.Awareness?.Challenges.Any(x => x.ChapterId == request.ChapterId && x.Count > 0) != true)
+            code = ChapterUnfinished;
+        // The installed AwarenessChapter schema has no RewardId. Do not infer a reward from its chapter id.
+        else code = 20020003; // RewardManagerGetRewardGoodsNotFound (client CodeText).
+        session.SendResponse(new AwarenessGetRewardResponse { Code = code }, packet.Id);
+    }
 
     [RequestPacketHandler("AwarenessSetCharacterRequest")]
     public static void SetCharacter(Session session, Packet.Request packet)

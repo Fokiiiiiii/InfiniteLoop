@@ -82,7 +82,7 @@ namespace AscNet.GameServer.Handlers
                 .Any(chapter => CountChapterStars(session, chapter.StageId) >= requiredStars);
         }
 
-        private static int CountChapterStars(Session session, IEnumerable<int> stageIds)
+        internal static int CountChapterStars(Session session, IEnumerable<int> stageIds)
         {
             int total = 0;
             foreach (int stageId in stageIds)

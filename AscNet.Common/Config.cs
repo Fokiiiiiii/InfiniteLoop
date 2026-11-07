@@ -22,6 +22,9 @@ namespace AscNet.Common
         [Option(DefaultValue = false)]
         bool SkipCommonGuides { get; set; }
 
+        [Option]
+        IClient Client { get; set; }
+
 
         interface IGameServer
         {
@@ -60,6 +63,25 @@ namespace AscNet.Common
 
             [Option]
             string? MinimumLauncherVersion { get; set; }
+        }
+
+        /// <summary>
+        /// Remote-config overrides for the game client, for local research only. Off by default.
+        /// </summary>
+        interface IClient
+        {
+            /// <summary>
+            /// Sends remote-config <c>Debug = 1</c>: the client's debug environment, including its external
+            /// Lua / table loaders (persistentDataPath/Lua, /Table), local InjectFix patch and login server input.
+            /// </summary>
+            [Option(DefaultValue = false)]
+            bool Debug { get; set; }
+
+            /// <summary>
+            /// Sends <c>IsShowInspector = 1</c>. The client only opens its Proxima inspector when Debug is also on.
+            /// </summary>
+            [Option(DefaultValue = false)]
+            bool ShowInspector { get; set; }
         }
 
     }

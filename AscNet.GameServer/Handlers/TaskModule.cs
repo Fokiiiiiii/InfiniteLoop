@@ -876,7 +876,10 @@ namespace AscNet.GameServer.Handlers
                 .Where(x => existingIds.Add((uint)x.TaskId))
                 .Select(ToLoginTask));
             tasks.AddRange(BuildTransfiniteTowerTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
+            tasks.AddRange(BuildCerberusGameTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
+            tasks.AddRange(BuildSkyTowerLoginTasks(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
             tasks.AddRange(BuildPunishaarTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
+            tasks.AddRange(BuildReformTaskProgress(session).Where(x => existingIds.Add((uint)x.TaskId)).Select(ToLoginTask));
             tasks.AddRange(BuildDayTaskProgress(session)
                 .Where(x => existingIds.Add((uint)x.TaskId))
                 .Select(ToLoginTask));
@@ -935,7 +938,10 @@ namespace AscNet.GameServer.Handlers
                         .Concat(BuildEnvelopeTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildFangKuaiTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildTransfiniteTowerTaskProgress(session).Select(ToSyncTask))
+                        .Concat(BuildCerberusGameTaskProgress(session).Select(ToSyncTask))
+                        .Concat(BuildSkyTowerTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildPunishaarTaskProgress(session).Select(ToSyncTask))
+                        .Concat(BuildReformTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildDayTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildPassportTaskProgress(session).Select(ToSyncTask))
                         .Concat(BuildTransfiniteTaskProgress(session).Select(ToSyncTask))
@@ -1122,23 +1128,27 @@ namespace AscNet.GameServer.Handlers
                 session.player.MissionProgress.ConditionCounters[condition.Id] = value;
                 changedConditions.Add(condition.Id);
             }
+            // Challenge tasks are typed by their condition, not their target: 103003 counts rounds cleared within the
+            // stage time limit, 103002 is the win streak (Eternal Observation targets 14, Eternal Observation II 15).
+            Dictionary<int, int> conditionTypes = TableReaderV2.Parse<AscNet.Table.V2.share.task.ConditionTable>()
+                .GroupBy(condition => condition.Id).ToDictionary(group => group.Key, group => group.First().Type ?? 0);
             foreach (TaskTable task in tasks.Where(task => task.Type == 79))
             {
                 int target = task.Result ?? 1;
                 int current = session.player.MissionProgress.ConditionCounters.GetValueOrDefault(task.Condition);
-                int value = target < 14 && timeLimit is > 0 && spendTime < timeLimit
-                    ? Math.Min(target, checked(current + 1))
-                    : target == 14 ? Math.Max(current, Math.Min(winStreak, target)) : current;
+                int value = conditionTypes.GetValueOrDefault(task.Condition) switch
+                {
+                    103003 when timeLimit is > 0 && spendTime < timeLimit => Math.Min(target, checked(current + 1)),
+                    103002 => Math.Max(current, Math.Min(winStreak, target)),
+                    _ => current
+                };
                 if (value != current)
                 {
                     session.player.MissionProgress.ConditionCounters[task.Condition] = value;
                     changedConditions.Add(task.Condition);
                 }
             }
-            int? stageGroupType = TableReaderV2.Parse<TransfiniteStageGroupTable>()
-                .SingleOrDefault(group => group.StageGroupId == stageGroupId)?.Type;
-            HashSet<int> achievementTaskGroupIds = TableReaderV2.Parse<TransfiniteAchievementTable>()
-                .Where(achievement => achievement.Type == stageGroupType && achievement.StageGroupId.Contains(stageGroupId))
+            HashSet<int> achievementTaskGroupIds = TransfiniteAchievements(session.player.Transfinite?.RegionId ?? 0, new HashSet<int> { stageGroupId })
                 .Select(achievement => achievement.Id)
                 .ToHashSet();
             HashSet<int> achievementTaskIds = TableReaderV2.Parse<TransfiniteTaskGroupTable>()
@@ -1188,6 +1198,7 @@ namespace AscNet.GameServer.Handlers
             return condition?.Type switch
             {
                 10101 => 1,
+                10202 => session.player.Passport.LoginDays,
                 11203 => checked((int)Math.Min(int.MaxValue, balance?.Invoke(Inventory.DailyActiveness)
                     ?? session.inventory.Items.FirstOrDefault(item => item.Id == Inventory.DailyActiveness)?.Count ?? 0)),
                 _ => session.player.MissionProgress.ConditionCounters.GetValueOrDefault(task.Condition)
@@ -1243,14 +1254,8 @@ namespace AscNet.GameServer.Handlers
             stageGroups.UnionWith(TableReaderV2.Parse<TransfiniteIslandTable>()
                 .Where(island => island.Id == region.IslandId)
                 .SelectMany(island => island.StageGroupId));
-            Dictionary<int, int> stageGroupTypes = TableReaderV2.Parse<TransfiniteStageGroupTable>()
-                .Where(group => stageGroups.Contains(group.StageGroupId))
-                .ToDictionary(group => group.StageGroupId, group => group.Type);
             HashSet<int> taskGroups = [region.TaskGroupId];
-            taskGroups.UnionWith(TableReaderV2.Parse<TransfiniteAchievementTable>()
-                .Where(achievement => achievement.StageGroupId.Any(groupId =>
-                    stageGroupTypes.GetValueOrDefault(groupId) == achievement.Type))
-                .Select(achievement => achievement.Id));
+            taskGroups.UnionWith(TransfiniteAchievements(region.RegionId, stageGroups).Select(achievement => achievement.Id));
             List<TransfiniteTaskGroupTable> groups = TableReaderV2.Parse<TransfiniteTaskGroupTable>()
                 .Where(group => taskGroups.Contains(group.Id))
                 .ToList();
@@ -1268,6 +1273,17 @@ namespace AscNet.GameServer.Handlers
                 .Where(task => taskIds.Contains(task.Id) && task.Type is 79 or 80)
                 .ToList();
         }
+
+        // XViewModelTransfiniteAchievement: a stage group's Normal (Low Power Zone) achievement row is open to every
+        // player, and its Senior (High Power Zone) row only when XTransfiniteRegion:GetIsSeniorRegion (RegionId == 2).
+        // Achievement Type is XTransfiniteConfigs.TaskTypeEnum (Normal 1, Senior 2), unrelated to the stage group's
+        // Type (Normal 1, Island 2). Normal rows' conditions also list the high group's stages, so high clears count.
+        private const int TransfiniteNormalAchievement = 1, TransfiniteSeniorAchievement = 2, TransfiniteSeniorRegion = 2;
+        private static IEnumerable<TransfiniteAchievementTable> TransfiniteAchievements(int regionId, IReadOnlySet<int> stageGroupIds) =>
+            TableReaderV2.Parse<TransfiniteAchievementTable>()
+                .Where(achievement => achievement.StageGroupId.Any(stageGroupIds.Contains)
+                    && (achievement.Type == TransfiniteNormalAchievement
+                        || achievement.Type == TransfiniteSeniorAchievement && regionId == TransfiniteSeniorRegion));
         private static bool IsTransfiniteTask(Session session, int taskId) =>
             TransfiniteTasks(session).Any(task => task.Id == taskId);
 
@@ -1641,11 +1657,13 @@ namespace AscNet.GameServer.Handlers
                 }
             });
         }
+        // Test seam: task windows gate progress crediting; tests pin it so assertions don't depend on the wall clock.
+        internal static Func<DateTimeOffset> ProgressClock = () => DateTimeOffset.UtcNow;
         internal static void RecordTableDrivenProgress(GuildMutation mutation, int conditionType, int amount, int? parameter = null)
         {
             if (amount <= 0) return;
             Session session = mutation.ActorSession;
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = ProgressClock();
             HashSet<int> active = TableReaderV2.Parse<TaskTable>().Where(task => IsTaskActive(task, now)
                     && (task.Type != 51 || PassportModule.IsActivePassportTask(session, task.Id)))
                 .Select(task => task.Condition)
@@ -1696,7 +1714,7 @@ namespace AscNet.GameServer.Handlers
         {
             if (ResolveTableDrivenAmounts(changes) is not { } resolved) return false;
             (Dictionary<int, int> conditionAmounts, Dictionary<int, int> currentAmounts) = resolved;
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = ProgressClock();
             HashSet<int> legacyConditions = TableReaderV2.Parse<TaskTable>()
                 .Where(task => conditionAmounts.ContainsKey(task.Condition)
                     && IsTaskActive(task, now) && !IsDayTask(task.Id)
@@ -1756,7 +1774,7 @@ namespace AscNet.GameServer.Handlers
             if (conditionAmounts.Count == 0 && currentAmounts.Count == 0)
                 return;
             if (theatre is null && theatre5 is null && theatre4 is null && theatre6 is null) EnsureMissionResets(session);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = ProgressClock();
             List<TaskTable> tasks = TableReaderV2.Parse<TaskTable>()
                 .Where(task => conditionAmounts.ContainsKey(task.Condition)
                     && IsTaskActive(task, now) && !IsDayTask(task.Id)
@@ -1985,7 +2003,7 @@ namespace AscNet.GameServer.Handlers
                 });
         }
 
-        private enum TaskClaimKind { Current, Transfinite, Passport, Dorm, Story, LifeTree, GuildAchievement, SameColorGame, LinkageDraw, Envelope, FangKuai, DayTask, TransfiniteTower, Punishaar }
+        private enum TaskClaimKind { Current, Transfinite, Passport, Dorm, Story, LifeTree, GuildAchievement, SameColorGame, LinkageDraw, Envelope, FangKuai, DayTask, TransfiniteTower, Punishaar, CerberusGame, Reform, SkyTower }
 
         private sealed record PreparedTaskClaim(int TaskId, TaskClaimKind Kind, string ClaimKey, List<RewardGoodsTable> Goods);
 
@@ -2054,12 +2072,33 @@ namespace AscNet.GameServer.Handlers
                 achieved = BuildPunishaarTaskProgress(session, claimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
                 goods = RewardHandler.GetRewardGoods(punishaar.RewardId ?? 0);
             }
+            else if (TaskRowsById.Value.GetValueOrDefault(taskId) is { } reform && IsReformTask(reform))
+            {
+                kind = TaskClaimKind.Reform;
+                key = $"reform-task:{taskId}";
+                achieved = BuildReformTaskProgress(session, claimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
+                goods = RewardHandler.GetRewardGoods(reform.RewardId ?? 0);
+            }
             else if (TaskRowsById.Value.GetValueOrDefault(taskId) is { } tower && IsTransfiniteTowerTask(tower))
             {
                 kind = TaskClaimKind.TransfiniteTower;
                 key = $"transfinite-tower-task:{taskId}";
                 achieved = BuildTransfiniteTowerTaskProgress(session, claimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
                 goods = RewardHandler.GetRewardGoods(tower.RewardId ?? 0);
+            }
+            else if (TaskRowsById.Value.GetValueOrDefault(taskId) is { } cerberus && IsCerberusGameTask(cerberus))
+            {
+                kind = TaskClaimKind.CerberusGame;
+                key = $"cerberus-game-task:{taskId}";
+                achieved = BuildCerberusGameTaskProgress(session, claimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
+                goods = RewardHandler.GetRewardGoods(cerberus.RewardId ?? 0);
+            }
+            else if (IsSkyTowerActivityTask(taskId) && SkyTowerModule.Catalog.Value[taskId] is { } skyTower)
+            {
+                kind = TaskClaimKind.SkyTower;
+                key = SkyTowerClaimKey(session, taskId);
+                achieved = BuildSkyTowerTaskProgress(session, claimed).Any(row => row.TaskId == taskId && row.State == TaskStateAchieved);
+                goods = RewardHandler.GetRewardGoods(skyTower.Row.RewardId ?? 0);
             }
             else if (DayTasks.Value.GetValueOrDefault(taskId) is { } dayTask)
             {
@@ -2593,23 +2632,22 @@ namespace AscNet.GameServer.Handlers
             session.player.MissionProgress.ConditionCounters[conditionId] = checked(current + Math.Max(0, increment));
         }
 
-        internal static long CurrentDailyResetPeriod(long timestamp) => timestamp / 86_400;
+        // One implementation (Config.tsv DailyResetTimestamp/DayOfWeeklyReset), shared with GuildModule.
+        internal static long CurrentDailyResetPeriod(long timestamp) =>
+            GuildModule.DailyPeriod(DateTimeOffset.FromUnixTimeSeconds(timestamp));
 
         internal static long CurrentWeeklyResetPeriod(long timestamp) =>
-            (CurrentDailyResetPeriod(timestamp) + 3) / 7;
+            GuildModule.WeeklyPeriod(DateTimeOffset.FromUnixTimeSeconds(timestamp));
 
-        internal static int WeeklyResetDayIndex(long timestamp)
-        {
-            long day = CurrentDailyResetPeriod(timestamp);
-            long weekStartDay = checked(CurrentWeeklyResetPeriod(timestamp) * 7 - 3);
-            return checked((int)(day - weekStartDay));
-        }
+        // Days elapsed since the latest weekly reset day (0 on the reset day itself).
+        internal static int WeeklyResetDayIndex(long timestamp) =>
+            checked((int)(CurrentDailyResetPeriod(timestamp) - (CurrentDailyResetPeriod(NextWeeklyResetTime(timestamp)) - 7)));
 
-        internal static long RemainingSecondsInWeeklyResetPeriod(long timestamp)
-        {
-            long nextWeekStartDay = checked((CurrentWeeklyResetPeriod(timestamp) + 1) * 7 - 3);
-            return checked(nextWeekStartDay * 86_400 - timestamp);
-        }
+        private static long NextWeeklyResetTime(long timestamp) =>
+            GuildModule.NextWeeklyReset(DateTimeOffset.FromUnixTimeSeconds(timestamp)).ToUnixTimeSeconds();
+
+        internal static long RemainingSecondsInWeeklyResetPeriod(long timestamp) =>
+            NextWeeklyResetTime(timestamp) - timestamp;
 
         internal static void RecordLoginDay(Session session, long? timestamp = null)
         {
@@ -2660,7 +2698,10 @@ namespace AscNet.GameServer.Handlers
                 EnsureMissionResets(session);
         }
 
-        internal static void EnsureMissionResets(Session session)
+        internal static void EnsureMissionResets(Session session) =>
+            EnsureMissionResets(session, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+        internal static void EnsureMissionResets(Session session, long timestamp)
         {
             // The owner must match/recover its pending intent before shared resets can mutate it.
             if (session.player.Theatre5.PendingMutation is not null || session.player.Theatre4.PendingMutation is not null
@@ -2674,12 +2715,31 @@ namespace AscNet.GameServer.Handlers
             if (session.player.Theatre3.PendingMutation?.ResponseName is nameof(FinishTaskResponse) or nameof(FinishMultiTaskResponse))
                 Theatre3Module.ReplayPending(session);
             session.player.MissionProgress ??= new MissionProgressState();
-            long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long day = CurrentDailyResetPeriod(timestamp);
             long week = CurrentWeeklyResetPeriod(timestamp);
             bool changed = false;
             bool inventoryChanged = false;
             bool characterChanged = false;
+
+            // One-time cutover: periods persisted before ResetEpoch 1 were UTC-midnight based (ts / 86400,
+            // (ts / 86400 + 3) / 7). A value that is still "today/this week" under that scheme is the same
+            // authored period now, so rebase it instead of firing a spurious reset in the 00:00-DailyResetTimestamp window.
+            if (session.player.MissionProgress.ResetEpoch < 1)
+            {
+                long legacyDay = timestamp / 86_400;
+                if (session.player.MissionProgress.DailyResetDay == legacyDay && legacyDay != day)
+                {
+                    session.player.MissionProgress.DailyResetDay = day;
+                    changed = true;
+                }
+                if (session.player.MissionProgress.WeeklyResetWeek == (legacyDay + 3) / 7 && (legacyDay + 3) / 7 != week)
+                {
+                    session.player.MissionProgress.WeeklyResetWeek = week;
+                    changed = true;
+                }
+                // Only persisted together with a rebase or later saves; an unchanged document needs no write.
+                session.player.MissionProgress.ResetEpoch = 1;
+            }
 
             if (session.player.MissionProgress.DailyResetDay < 0)
             {
@@ -2716,6 +2776,11 @@ namespace AscNet.GameServer.Handlers
                 ResetMissionType(session, 3);
                 ResetPassportTaskType(session, 2);
                 session.player.PlayerData.WeeklyActivenessRewardStatus = 0;
+                session.player.MissionProgress.WeeklyTaskActivenessProgress.Clear();
+                HashSet<int> weeklyTaggedIds = TableReaderV2.Parse<TaskTable>().Where(task => task.Tag == 1).Select(task => task.Id).ToHashSet();
+                session.player.MissionProgress.ClaimedTaskIds.RemoveAll(weeklyTaggedIds.Contains);
+                if (session.stage.FinishedTasks.RemoveAll(weeklyTaggedIds.Contains) > 0)
+                    session.stage.Save();
                 Item? weeklyActiveness = session.inventory.Items.FirstOrDefault(item => item.Id == Inventory.WeeklyActiveness);
                 if (weeklyActiveness is not null && weeklyActiveness.Count != 0)
                 {
@@ -2770,6 +2835,41 @@ namespace AscNet.GameServer.Handlers
             session.player.MissionProgress.ClaimedTaskIds.RemoveAll(taskIds.Contains);
             foreach (int conditionId in tasks.Select(task => task.Condition).Distinct())
                 session.player.MissionProgress.ConditionCounters.Remove(conditionId);
+        }
+
+        // Season rollover: every Passport activity task (type 51) is season-scoped; rewards are claim-keyed per activity.
+        internal static void ResetPassportSeasonTasks(Session session)
+        {
+            List<TaskTable> tasks = TableReaderV2.Parse<TaskTable>().Where(task => task.Type == 51).ToList();
+            HashSet<int> taskIds = tasks.Select(task => task.Id).ToHashSet();
+            session.player.MissionProgress.ClaimedTaskIds.RemoveAll(taskIds.Contains);
+            foreach (int conditionId in tasks.Select(task => task.Condition).Distinct())
+                session.player.MissionProgress.ConditionCounters.Remove(conditionId);
+        }
+
+        // Committed gameplay event: credit active Passport conditions of one type, persist, then push the changed tasks.
+        internal static void AddPassportConditionProgress(Session session, int conditionType, int amount, Func<ConditionTable, bool>? filter = null)
+        {
+            if (amount <= 0) return;
+            EnsureMissionResets(session);
+            HashSet<int> active = BuildPassportTaskProgress(session).Select(task => task.ConditionId).ToHashSet();
+            List<int> ids = TableReaderV2.Parse<ConditionTable>()
+                .Where(condition => condition.Type == conditionType && active.Contains(condition.Id) && (filter?.Invoke(condition) ?? true))
+                .Select(condition => condition.Id).ToList();
+            if (ids.Count == 0) return;
+            Dictionary<int, int> counters = session.player.MissionProgress.ConditionCounters;
+            Dictionary<int, int> previous = ids.ToDictionary(id => id, id => counters.GetValueOrDefault(id));
+            try
+            {
+                foreach (int id in ids) counters[id] = checked(previous[id] + amount);
+                session.player.SaveChecked();
+            }
+            catch
+            {
+                foreach ((int id, int value) in previous) counters[id] = value;
+                throw;
+            }
+            SendPassportConditionTypeSync(session, conditionType);
         }
 
         private static (bool Inventory, bool Character) ResetDormMissionType(Session session, int taskType)

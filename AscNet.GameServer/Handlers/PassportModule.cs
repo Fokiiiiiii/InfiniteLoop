@@ -514,6 +514,9 @@ internal static class PassportModule
             state.IsGetSupplyReward = false;
             state.IsActivateRegressionTask = false;
             state.IsActivateNewbieTask = false;
+            state.LoginDays = 0;
+            state.LastLoginPeriod = 0;
+            TaskModule.ResetPassportSeasonTasks(session);
             playerChanged = true;
             Item? expItem = session.inventory.Items
                 .FirstOrDefault(item => item.Id == Inventory.PassportExp);
@@ -534,6 +537,14 @@ internal static class PassportModule
                     playerChanged = true;
                 }
             }
+        }
+
+        long period = TaskModule.CurrentDailyResetPeriod(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        if (period > state.LastLoginPeriod)
+        {
+            state.LoginDays = checked(state.LoginDays + 1);
+            state.LastLoginPeriod = period;
+            playerChanged = true;
         }
 
         if (playerChanged) session.player.SaveChecked();
@@ -622,13 +633,10 @@ internal static class PassportModule
 
     private static int CurrentRound(PassportActivityTable activity, DateTimeOffset now)
     {
-        if (activity.TimeId is not > 0
-            || !ActivityScheduleService.TryGet(activity.TimeId.Value, out ActivityScheduleEntry schedule))
-            return 0;
-        long firstWeeklyReset = checked(schedule.StartTime
-            + TaskModule.RemainingSecondsInWeeklyResetPeriod(schedule.StartTime));
-        if (now.ToUnixTimeSeconds() < firstWeeklyReset) return 0;
-        return checked(1 + (int)((now.ToUnixTimeSeconds() - firstWeeklyReset) / 604_800));
+        List<(long TimeId, long Start, long End)> windows = ActivityScheduleService.PassportRoundWindows(activity);
+        long unix = now.ToUnixTimeSeconds();
+        int round = windows.FindLastIndex(window => unix >= window.Start);
+        return Math.Max(round, 0);
     }
 
     private static bool BuyWindowOpen(PassportActivityTable activity, DateTimeOffset now) =>

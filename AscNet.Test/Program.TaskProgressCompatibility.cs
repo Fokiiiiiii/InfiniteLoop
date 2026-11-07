@@ -15,6 +15,13 @@ namespace AscNet.Test;
 
 internal static partial class Program
 {
+    private static long CurrentDailyResetPeriodForTest()
+    {
+        Type taskModule = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.TaskModule");
+        MethodInfo current = RequiredMethod(taskModule, "CurrentDailyResetPeriod", BindingFlags.Static | BindingFlags.NonPublic, [typeof(long)]);
+        return (long)current.Invoke(null, [DateTimeOffset.UtcNow.ToUnixTimeSeconds()])!;
+    }
+
     private static void ValidateTaskProgressCompatibility()
     {
         using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForShopCompatibility();
@@ -133,7 +140,7 @@ internal static partial class Program
             AssertEqual(20026006, retry.Code, "Claimed Passport retry rejected after reload");
             AssertEqual(awardedExp, inventory.Items.Single(item => item.Id == Inventory.PassportExp).Count, "Passport retry does not duplicate EXP");
 
-            player.MissionProgress.DailyResetDay = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 86_400 - 1;
+            player.MissionProgress.DailyResetDay = CurrentDailyResetPeriodForTest() - 1;
             GetActivenessRewardResponse staleActivity = Dispatch<GetActivenessRewardRequest, GetActivenessRewardResponse>(
                 harness, nameof(GetActivenessRewardRequest), new() { RewardType = 1 }).Response;
             AssertEqual(20026010, staleActivity.Code, "Daily reset precedes activeness reward eligibility");

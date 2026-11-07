@@ -250,7 +250,7 @@ namespace AscNet.GameServer.Handlers
             OfflineMessageResponse offlineMessageResponse = new()
             {
                 Code = 0,
-                Messages = Array.Empty<dynamic>()
+                Messages = ChatSocialModule.OfflineMessages(session, packet.Deserialize<OfflineMessageRequest>().MessageId)
             };
             session.SendResponse(offlineMessageResponse, packet.Id);
         }
@@ -286,7 +286,13 @@ namespace AscNet.GameServer.Handlers
                 session.SendResponse(new SendChatResponse { Code = 5 }, packet.Id);
                 return;
             }
-
+            if (request.ChatData.MsgType == ChatMsgType.Gift)
+            {
+                int giftCode = ChatSocialModule.SendGifts(session, request.ChatData, request.TargetIdList);
+                session.SendResponse(new SendChatResponse { Code = giftCode, RefreshTime = 0 }, packet.Id);
+                if (giftCode == 0) session.SendPush(new NotifyWorldChat());
+                return;
+            }
             NotifyChatMessage notifyChatMessage = BuildNotifyChatMessage(session, request.ChatData);
             string? commandFeedback = null;
             NotifyWorldChat notifyWorldChat = new();
@@ -432,7 +438,7 @@ namespace AscNet.GameServer.Handlers
             session.SendResponse(new GetEmojiPackageIdResponse()
             {
                 Code = 0,
-                OrderEmojiPackageIds = TableReaderV2.Parse<EmojiPackTable>().Select(x => x.Id).ToList()
+                OrderEmojiPackageIds = ChatSocialModule.EmojiPackOrder(session)
             }, packet.Id);
         }
         #endregion

@@ -13,3 +13,4 @@ anyhow.workspace = true
 lazy_static.workspace = true
 libloading.workspace = true
 windows.workspace = true
+hudhook = { version = "0.9.3", default-features = false, features = ["dx11"] }

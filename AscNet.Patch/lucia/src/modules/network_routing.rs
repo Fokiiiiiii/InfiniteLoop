@@ -12,6 +12,8 @@ fn owned_path(path: &str) -> bool {
                     | "GameNotice.json"
                     | "SecondMenuNotice.json"
                     | "PopUpPicNotice.json"
+                    | "ScrollPicNotice.json"
+                    | "ScrollTextNotice.json"
             )
         )
 }
@@ -75,6 +77,8 @@ mod tests {
             "client/notice/config/cdn-key/package/version/GameNotice.json",
             "client/notice/config/cdn-key/package/version/SecondMenuNotice.json",
             "client/notice/config/cdn-key/package/version/PopUpPicNotice.json",
+            "client/notice/config/cdn-key/package/version/ScrollPicNotice.json",
+            "client/notice/config/cdn-key/package/version/ScrollTextNotice.json",
             "client/notice/html/cdn-key/package/version/en-US.html",
         ] {
             assert_eq!(
@@ -99,8 +103,6 @@ mod tests {
         );
 
         for path in [
-            "client/notice/config/cdn-key/package/version/ScrollPicNotice.json",
-            "client/notice/config/cdn-key/package/version/ScrollTextNotice.json",
             "client/notice/pic/cdn-key/package/version/banner.png",
         ] {
             assert_eq!(redirected_url(ORIGIN, path), None);

@@ -410,7 +410,7 @@ internal partial class Program
         finally { test.Players.BeforeReplaceOne = null; }
         AssertEqual(true, test.State.PendingMutation != null, "Foreign task fixture retains a real non-task owner journal");
 
-        long today = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 86_400;
+        long today = CurrentDailyResetPeriodForTest();
         test.Session.player.MissionProgress.DailyResetDay = today - 1;
         test.Session.player.MissionProgress.ConditionCounters[2003] = 4;
         int story = TableReaderV2.Parse<AscNet.Table.V2.share.fuben.StageTable>()

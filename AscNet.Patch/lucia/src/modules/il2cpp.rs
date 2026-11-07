@@ -1,5 +1,5 @@
-//! IL2CPP runtime access shared by the native game-tweak workers (no-fade, FPS unlock): export table,
-//! waiting for the domain + attaching the worker thread, class/method lookup, and OK/FAILED logging.
+//! IL2CPP runtime access for the native graphics worker (render scale, overrides, FPS unlock, no camera fade): export
+//! table, waiting for the domain + attaching the worker thread, class/method lookup, and OK/FAILED logging.
 //! Everything goes through the `il2cpp_*` exports of GameAssembly.dll; no offsets, no bundle edits.
 use std::{ffi::{c_void, CString}, time::Duration};
 
@@ -9,7 +9,6 @@ use crate::diag;
 use crate::util::{c_string, get_export};
 
 pub const FLAG_STATIC: u32 = 0x10;
-pub const PERIOD: Duration = Duration::from_secs(2);
 
 type DomainGet = unsafe extern "system" fn() -> *mut c_void;
 type DomainGetAssemblies = unsafe extern "system" fn(*mut c_void, *mut usize) -> *mut *mut c_void;
@@ -32,8 +31,9 @@ type RuntimeInvoke = unsafe extern "system" fn(*mut c_void, *mut c_void, *mut *m
 type ObjectUnbox = unsafe extern "system" fn(*mut c_void) -> *mut c_void;
 type ThreadCurrent = unsafe extern "system" fn() -> *mut c_void;
 type ThreadAttach = unsafe extern "system" fn(*mut c_void) -> *mut c_void;
+type ThreadDetach = unsafe extern "system" fn(*mut c_void);
 
-unsafe fn export<T>(name: &str) -> Result<T> {
+pub unsafe fn export<T>(name: &str) -> Result<T> {
     Ok(std::mem::transmute_copy(&get_export(name)?))
 }
 
@@ -46,24 +46,13 @@ pub fn failed(what: &str, reason: &str, consequence: &str) {
     diag::log(&diag::failed_line("lucia", what, &format!("{reason}; {consequence}")));
 }
 
-/// Logs the first result and every later change; the steady state stays silent.
-pub fn report(last: &mut Option<bool>, good: bool, what: &str, problem: &str, consequence: &str) {
-    if *last == Some(good) {
-        return;
-    }
-    *last = Some(good);
-    if good {
-        ok(what, "re-applied every 2 s");
-    } else {
-        failed(what, problem, consequence);
-    }
-}
-
+#[derive(Clone, Copy)]
 pub struct Il2cpp {
     domain_get: DomainGet,
     domain_assemblies: DomainGetAssemblies,
     thread_current: ThreadCurrent,
     thread_attach: ThreadAttach,
+    thread_detach: ThreadDetach,
     class_from_name: ClassFromName,
     image_name: ImageGetName,
     image_of: AssemblyGetImage,
@@ -80,7 +69,7 @@ pub struct Il2cpp {
     type_name: TypeName,
     free: Free,
     pub invoke: RuntimeInvoke,
-    unbox: ObjectUnbox,
+    pub unbox: ObjectUnbox,
 }
 
 impl Il2cpp {
@@ -90,6 +79,7 @@ impl Il2cpp {
             domain_assemblies: export("il2cpp_domain_get_assemblies")?,
             thread_current: export("il2cpp_thread_current")?,
             thread_attach: export("il2cpp_thread_attach")?,
+            thread_detach: export("il2cpp_thread_detach")?,
             class_from_name: export("il2cpp_class_from_name")?,
             image_name: export("il2cpp_image_get_name")?,
             image_of: export("il2cpp_assembly_get_image")?,
@@ -128,6 +118,15 @@ impl Il2cpp {
             bail!("il2cpp_thread_attach failed")
         }
         Ok(assemblies)
+    }
+
+    /// Detaches the calling thread. IL2CPP's shutdown (`il2cpp_shutdown`) waits for every attached thread to
+    /// exit, so a worker that outlives the game's quit must detach first or the process hangs on exit.
+    pub unsafe fn detach_current(&self) {
+        let thread = (self.thread_current)();
+        if !thread.is_null() {
+            (self.thread_detach)(thread);
+        }
     }
 
     pub unsafe fn type_name_of(&self, type_info: *mut c_void) -> String {
@@ -184,5 +183,12 @@ impl Il2cpp {
         let mut exception = std::ptr::null_mut();
         let boxed = (self.invoke)(method, std::ptr::null_mut(), std::ptr::null_mut(), &mut exception);
         (exception.is_null() && !boxed.is_null()).then(|| *((self.unbox)(boxed) as *const i32))
+    }
+
+    /// Calls a static `bool m()`; `None` if the call threw or returned null.
+    pub unsafe fn call_get_bool(&self, method: *mut c_void) -> Option<bool> {
+        let mut exception = std::ptr::null_mut();
+        let boxed = (self.invoke)(method, std::ptr::null_mut(), std::ptr::null_mut(), &mut exception);
+        (exception.is_null() && !boxed.is_null()).then(|| *((self.unbox)(boxed) as *const u8) != 0)
     }
 }

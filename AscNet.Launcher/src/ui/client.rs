@@ -246,9 +246,7 @@ fn view_ids() -> Vec<i32> {
 pub(super) unsafe fn layout(hwnd: HWND, width: i32, height: i32) {
     for id in [
         ID_STATUS, ID_DETAIL, ID_STATUS_LINE, ID_HOME_ACTION, ID_CHECK, ID_PATH_LABEL, ID_PATH_FIELD, ID_PATH,
-        ID_BROWSE, ID_RESTORE, ID_RERUN_SETUP, ID_OPEN, ID_FPS_ENABLED, ID_FPS_VALUE_FIELD, ID_FPS_VALUE, ID_FPS_ACTION,
-        ID_FPS_STATUS, ID_MUSIC_MUTED, ID_GAME_TWEAKS, ID_LAUNCHER_HEADING, ID_FPS_LABEL, ID_MUSIC_LABEL,
-        ID_NOFADE, ID_NOFADE_LABEL, ID_FPS_UNIT,
+        ID_BROWSE, ID_RESTORE, ID_RERUN_SETUP, ID_OPEN, ID_MUSIC_MUTED, ID_LAUNCHER_HEADING, ID_MUSIC_LABEL,
     ] {
         let _ = ShowWindow(GetDlgItem(hwnd, id), SW_HIDE);
     }
@@ -704,13 +702,17 @@ pub(super) unsafe fn finish(hwnd: HWND, state: &mut Window, work: Work) {
             let dir = state.client.dir.clone();
             state.client.fraction = None;
             let mut message = format!(
-                "Game files ready: {} repaired, {} downloaded, {} removed",
+                "Game files ready: {} repaired, {} downloaded, {} removed, {} patch files restored",
                 outcome.repaired,
                 fmt_bytes(outcome.downloaded_bytes),
-                outcome.deleted
+                outcome.deleted,
+                outcome.document_files
             );
             if !outcome.skipped_variants.is_empty() {
                 message += &format!(" (left as is: {})", outcome.skipped_variants.join(", "));
+            }
+            for note in &outcome.document_notes {
+                message += &format!("\n{note}");
             }
             append_log(hwnd, state, &message);
             let Some(dir) = dir.filter(|d| crate::steam::valid_game_directory(d)) else {

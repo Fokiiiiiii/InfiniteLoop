@@ -13,15 +13,14 @@ use windows::{
 };
 
 mod cn_sdk;
-mod fps;
+mod graphics;
 mod il2cpp;
 mod network;
-mod nofade;
+pub(crate) mod net_audit;
 
 pub use cn_sdk::{identity_line as cn_identity_line, is_cn_client, CnSdk};
 pub use network::Http;
-pub use fps::spawn_if_enabled as spawn_fps_if_enabled;
-pub use nofade::spawn_if_enabled as spawn_nofade_if_enabled;
+pub use graphics::spawn_if_enabled as spawn_graphics_if_enabled;
 
 #[derive(Default)]
 pub struct ModuleManager {

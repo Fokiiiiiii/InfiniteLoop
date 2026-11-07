@@ -23,7 +23,9 @@ XGameplayDormitory places the photo wall / frame wall / frame goods at spots of 
 Scene place ids start at 1: the lounge's interaction anchors (ConfigGroup_5001 place ids 1-8: photo wall, frame wall, DIY)
 are below 1000 (Level_4003_Present.lua GetSceneObjectUUID(1|2|5|8)).
 
-Run from the AscNet root: python3 Scripts/import_bigworld_scene_objects_4_7.py
+Run from the AscNet root: python3 Scripts/import_bigworld_scene_objects_4_7.py [--version 4.8|4.9]
+(--version is parsed by the tables importer this file execs; the config groups themselves always come from the
+installed client, document layer first).
 """
 import json
 import re
@@ -33,7 +35,7 @@ from pathlib import Path
 SCRIPT = Path('Scripts/import_bigworld_tables_4_7.py')
 _g = {'__name__': 'import_bigworld_tables', '__file__': str(SCRIPT)}
 exec(compile(SCRIPT.read_text(encoding='utf-8').split('\ndef main')[0], str(SCRIPT), 'exec'), _g)
-dbt, _assets, _starter, _manifest = _g['dbt'], _g['_assets'], _g['_starter'], _g['_manifest']
+dbt, _assets, pgr_bundles = _g['dbt'], _g['_assets'], _g['pgr_bundles']
 
 TABLE = Path('Resources/table/share/statussyncfight/level/sceneconfig/LevelSceneObject.tsv')
 PREFIX = 'assets/temp/bytes/share/statussyncfight/level/sceneconfig/skygarden'
@@ -463,15 +465,13 @@ def npc_options(data, key_offset):
 
 
 def main():
-    source = Path(str(_manifest['source_install']))
-    _, _, index = _starter.decode_matrix_index_file(_assets, source / 'PGR_Data/StreamingAssets/resource/matrix/index')
     # Group ids are unique only per sector bundle (sceneconfig/<Level.SectorName lower>.ab): ConfigGroup_1001 exists in
     # seven bundles, ConfigGroup_5001 in skygarden (District B) and skygarden_sushe (Commandant's Lounge). Rows carry Sector.
     groups = {}
-    for bundle in sorted(k for k in index if k.startswith(PREFIX) and k.count('/') == 7):
+    for bundle in (k for k in sorted(set(pgr_bundles.Resolver().names(PREFIX))) if k.count('/') == 7):
         sector = bundle.rsplit('/', 1)[1].removesuffix('.ab')
-        _, _, path = dbt.resolve_matrix_bundle(_starter, _assets, _manifest, bundle, 'resource')
-        _, _, payload = _assets.decode_bundle_payload(path.read_bytes())
+        path = pgr_bundles.resolve(bundle)
+        payload = pgr_bundles.payload(path)
         for item in dbt.iter_text_assets(_assets, payload):
             name = str(item['name'])
             if name.startswith('ConfigGroup_'):

@@ -544,7 +544,7 @@ internal static partial class Theatre4Module
             {
                 character = session.character.Characters.FirstOrDefault(row => row.Id == cardId)
                     ?? throw new ServerCodeException("Theatre4 character is not owned.", RecruitmentError);
-                equips = FightModule.BuildTeamPrefabFightEquips(session, checked((uint)cardId));
+                equips = session.character.Equips.Where(equip => equip.CharacterId == checked((uint)cardId)).ToList();
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 weaponFashionId = session.character.WeaponFashions.FirstOrDefault(row =>
                     (row.ExpireTime == 0 || row.ExpireTime > now) && row.UseCharacterList.Contains(cardId))?.Id ?? 0;

@@ -892,7 +892,6 @@ namespace AscNet.GameServer.Handlers
             if (changed)
             {
                 session.character.Save();
-                session.AppliedTeamPrefabId = null;
             }
 
             session.SendResponse(new CharacterSwitchSkillResponse(), packet.Id);

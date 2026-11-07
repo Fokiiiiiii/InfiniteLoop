@@ -6,7 +6,7 @@ CX_ROOT="/Applications/CrossOver.app/Contents/SharedSupport/CrossOver"
 ASCNET_PREFIX="/Users/reiserfs/Applications/Sikarugir/Steam-AscNet.app/Contents/SharedSupport/prefix"
 
 export CX_APPLEGPTK_LIBD3DSHARED_PATH="$CX_ROOT/lib64/apple_gptk/external/libd3dshared.dylib"
-export CX_GRAPHICS_BACKEND="d3dmetal"
+export CX_GRAPHICS_BACKEND="${CX_GRAPHICS_BACKEND:-d3dmetal}"
 export CX_ROOT
 export CX_WINELOADER="$CX_ROOT/bin/wineloader"
 export DYLD_FALLBACK_LIBRARY_PATH="$CX_ROOT/lib64:$CX_ROOT/lib${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
@@ -29,4 +29,4 @@ export WINEPREFIX="$ASCNET_PREFIX"
 export WINESERVER="$CX_ROOT/bin/wineserver"
 
 cd "$PGR_DIR"
-exec "$CX_ROOT/bin/wineloader" PGR.exe
+exec "$CX_ROOT/bin/wineloader" PGR.exe "$@"

@@ -73,7 +73,7 @@ namespace AscNet.GameServer.Handlers
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     #endregion
 
-    internal class ShopModule
+    internal partial class ShopModule
     {
         private const string ShopSnapshotPath = "Configs/client_shops.json";
         private static readonly Lazy<ClientShop> GuildProcurementShop = new(BuildGuildProcurementShop);
@@ -299,7 +299,8 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
 
-            bool resetChanged = ReconcileShopResetPeriods(session.player, [goods]);
+            bool resetChanged = ReconcileManualShopRefresh(session.player, request.ShopId, DateTimeOffset.UtcNow);
+            resetChanged |= ReconcileShopResetPeriods(session.player, [goods]);
             if (!TryPreparePurchase(session, goods, request.Count, out RewardGoods rewardGoods))
             {
                 if (resetChanged)
@@ -325,7 +326,7 @@ namespace AscNet.GameServer.Handlers
             session.SendResponse(response, packet.Id);
         }
         
-        // TODO: Dorm shop
+        // Dorm tabs use the same base metadata and curated catalogs as other shops.
         [RequestPacketHandler("GetShopBaseInfoRequest")]
         public static void GetShopBaseInfoRequestHandler(Session session, Packet.Request packet)
         {
@@ -335,9 +336,14 @@ namespace AscNet.GameServer.Handlers
         private static GetShopBaseInfoResponse BuildShopBaseInfoResponse()
         {
             JObject snapshot = JsonSnapshot.LoadObject(ShopBaseInfoSnapshotPath);
+            // Dorm's Type=101 tabs are usable only when their static catalog exists.
+            // Metadata alone is not authority to invent furniture offers.
+            JArray available = new((snapshot["ShopBaseInfoList"] as JArray ?? new JArray())
+                .OfType<JObject>().Where(row => ReadInt(row, "Type") != 101
+                    || ShopCatalog(ReadUInt(row, "Id")) is { GoodsList.Count: > 0 }));
             return new GetShopBaseInfoResponse
             {
-                ShopBaseInfoList = JsonSnapshot.ReadDynamicList(snapshot["ShopBaseInfoList"])
+                ShopBaseInfoList = JsonSnapshot.ReadDynamicList(available)
             };
         }
 
@@ -388,6 +394,9 @@ namespace AscNet.GameServer.Handlers
                     MessagePackSerializer.Serialize(snapshot));
                 if (IsTheatre6Shop(shopId))
                     shop.ClosedTime = checked((int)Theatre6ShopWindow(shopId).EndTime);
+                if (ReconcileManualShopRefresh(player, shopId, DateTimeOffset.UtcNow))
+                    player.Save();
+                shop.ManualRefreshTimes = player.ShopManualRefreshTimes.GetValueOrDefault(shopId);
                 if (shopId is not (4001 or 9998) && ReconcileShopResetPeriods(player, shop.GoodsList))
                     player.Save();
                 player.ShopBuyTimes ??= new();
@@ -410,6 +419,9 @@ namespace AscNet.GameServer.Handlers
                 }
                 shop.TotalBuyTimes = shop.GoodsList.Sum(goods => goods.TotalBuyTimes);
                 shop.RefreshTime = shop.GoodsList.Where(goods => goods.RefreshTime > 0).Select(goods => goods.RefreshTime).DefaultIfEmpty().Min();
+                if (ShopRefreshRules.TryGetValue(shopId, out var refreshRule)
+                    && TryGetAlarmWindow(refreshRule.ClockId, DateTimeOffset.UtcNow, out _, out long shopNext))
+                    shop.RefreshTime = shop.RefreshTime == 0 ? checked((int)shopNext) : Math.Min(shop.RefreshTime, checked((int)shopNext));
                 return shop;
             }
 
@@ -443,6 +455,9 @@ namespace AscNet.GameServer.Handlers
                     continue;
 
                 shops[shopId] = ReadShop(shopObject);
+                if (shopObject["AutoResetClockId"] is not null && shopObject["IsResetManualTimes"] is not null)
+                    ShopRefreshRules[shopId] = (ReadInt(shopObject, "AutoResetClockId"),
+                        ReadBool(shopObject, "IsResetManualTimes"));
             }
 
             return shops;
@@ -507,6 +522,8 @@ namespace AscNet.GameServer.Handlers
                 ActivityConsumeCount = ReadInt(data, "ActivityConsumeCount"),
                 ActivityDiscount = ReadInt(data, "ActivityDiscount")
             };
+            if (ReadBool(data, "IsResetWhenShopReset"))
+                ShopResetGoods.Add(goods.Id);
 
             if (data["ConsumeList"] is JArray consumeList)
             {

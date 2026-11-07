@@ -277,8 +277,7 @@ internal partial class Program
             // config.tab row-for-row; only the AscNet-owned rows (server list, pay callbacks) may differ, and only by origin.
             AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.punishing.grayraven.kr", cdnKey), "kr", "KR",
                 ["PayCallbackUrl", "ServerListStr", "AndroidPayCallbackUrl", "IosPayCallbackUrl", "OneStorePayCallbackUrl", "PcPayCallbackUrl", "ChannelServerListStr"]);
-            AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.punishing.grayraven.jp", cdnKey), "jp", "JP",
-                ["PayCallbackUrl", "ServerListStr", "AndroidPayCallbackUrl", "IosPayCallbackUrl", "GooglePointOrderUrl", "PcPayCallbackUrl", "ChannelServerListStr"]);
+            AssertJpConfigDelegatedToBridge("4.8.0", cdnKey);
 
             AssertRegionTabMatchesRetail(ServeRaw("com.kurogame.haru.kuro", cdnKey), "cn", "CN",
                 ["PayCallbackUrl", "ServerListStr", "ChannelServerListStr"]);
@@ -294,9 +293,61 @@ internal partial class Program
             AssertEqual("2048", enAgain["MemoryLimit"], "EN MemoryLimit after JP/KR requests");
             AssertEqual(false, enAgain.ContainsKey("DisableGuide"), "EN does not inherit KR-only rows");
         }
+        ValidateEn49ConfigTab();
+        ValidateEn49NoticeEndpoints().GetAwaiter().GetResult();
+        ValidateRegions49().GetAwaiter().GetResult();
     }
 
-    private static void AssertRegionTabMatchesRetail(string served, string region, string label, string[] ownedKeys)
+    // 4.9.x clients take the document/launch-module "already current" shortcut (XLaunchUpdateManager._IsSkipUpdate and
+    // XModuleUpdateInfo._IsSkipUpdate) only when DocumentVersion == LaunchModuleVersion == CS.XInfo.Version, so the
+    // served versions follow the requested application version (retail serves 4.9.9, which makes the client download from
+    // Kuro's CDN). Every other en49.tab row is the live Kuro config.tab for EN key clEoudH0zUSDQsQa, byte for byte
+    // (index sha1 7be18b2e.../b069d45a... equal the sha1 of the CDN's 1739029 matrix/launch index).
+    private static void ValidateEn49ConfigTab()
+    {
+        Type controller = Type.GetType("AscNet.SDKServer.Controllers.ConfigController, AscNet.SDKServer", throwOnError: true)!;
+        MethodInfo handle = RequiredMethod(controller, "HandleConfigRequest", BindingFlags.Static | BindingFlags.NonPublic, [typeof(HttpContext)]);
+        string Serve(string package, string version, string? cdnKey)
+        {
+            DefaultHttpContext context = new();
+            context.Request.Scheme = "http";
+            context.Request.Host = new HostString("127.0.0.1:8080");
+            context.Request.RouteValues["package"] = package;
+            context.Request.RouteValues["version"] = version;
+            if (cdnKey is not null)
+                context.Request.RouteValues["cdnKey"] = cdnKey;
+            return (string)handle.Invoke(null, [context])!;
+        }
+
+        string[] owned = ["DocumentVersion", "PayCallbackUrl", "ServerListStr", "AndroidPayCallbackList", "AndroidPayCallbackUrl", "IosPayCallbackUrl", "IosPayCallbackList", "LaunchModuleVersion", "PcPayCallbackList", "ChannelServerListStr"];
+        foreach (string? cdnKey in new[] { null, "clEoudH0zUSDQsQa" })
+        {
+            AssertRegionTabMatchesRetail(Serve("com.kurogame.punishing.grayraven.en", "4.9.0", cdnKey), "en49", "EN 4.9.0", owned,
+                new() { ["DocumentVersion"] = "4.9.0", ["LaunchModuleVersion"] = "4.9.0" });
+            string en491 = Serve("com.kurogame.punishing.grayraven.en", "4.9.1", cdnKey);
+            foreach (string row in new[] { "ApplicationVersion\tstring\t4.9.1", "DocumentVersion\tstring\t4.9.1", "LaunchModuleVersion\tstring\t4.9.1" })
+                if (!en491.Contains(row, StringComparison.Ordinal))
+                    throw new InvalidDataException($"EN 4.9.1 config.tab lost row '{row}'.");
+
+            // Every region at 4.9 must stay in the skip shortcut: Application == Document == LaunchModule.
+            foreach (string package in new[] { "com.kurogame.punishing.grayraven.tw", "com.kurogame.punishing.grayraven.kr", "com.kurogame.punishing.grayraven.jp", "com.kurogame.haru.kuro", "com.kurogame.pc.punishing.grayraven.en" })
+            {
+                if (package == "com.kurogame.punishing.grayraven.jp")
+                {
+                    AssertJpConfigDelegatedToBridge("4.9.0", cdnKey);
+                    continue;
+                }
+
+                Dictionary<string, string> rows = Serve(package, "4.9.0", cdnKey).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.TrimEnd('\r').Split('\t')).Where(cells => cells.Length >= 3).ToDictionary(cells => cells[0], cells => cells[2]);
+                AssertEqual("4.9.0", rows["ApplicationVersion"], $"{package} 4.9 ApplicationVersion");
+                AssertEqual("4.9.0", rows["DocumentVersion"], $"{package} 4.9 DocumentVersion");
+                AssertEqual("4.9.0", rows["LaunchModuleVersion"], $"{package} 4.9 LaunchModuleVersion");
+            }
+        }
+    }
+
+    private static void AssertRegionTabMatchesRetail(string served, string region, string label, string[] ownedKeys, Dictionary<string, string>? policyRows = null)
     {
         string[] retail = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Region", $"{region}.tab")).Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         string[] actual = served.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -305,10 +356,14 @@ internal partial class Program
         for (int i = 0; i < retail.Length; i++)
         {
             // The capture's own login/pay hosts are the only values AscNet replaces.
-            string expected = System.Text.RegularExpressions.Regex.Replace(retail[i], @"http://(prod-pay-(kr|jp)\.pgr-game\.com|101\.33\.70\.36:55556|8\.209\.200\.222:2333)", "http://127.0.0.1:8080");
+            string expected = System.Text.RegularExpressions.Regex.Replace(retail[i], @"http://(prod-pay-(kr|jp|tw)\.pgr-game\.com|prod-pay-en-(na|eu|sea)\.pgr-game\.com|101\.33\.70\.36:55556|175\.97\.184\.50:55556|8\.209\.200\.222:2333|161\.117\.238\.242:(1300|2333)|47\.77\.201\.91:2333|8\.209\.96\.201:2333|47\.245\.98\.102:2333)", "http://127.0.0.1:8080");
             // CN lists the official gate plus raw-IP mirrors per login channel; AscNet serves one isolated Login-cn gate for each.
             expected = System.Text.RegularExpressions.Regex.Replace(expected, @"https://haru-gf-login\.kurogame\.com/api/Login/Login(;http://\d+\.\d+\.\d+\.\d+/api/Login/Login)*", "http://127.0.0.1:8080/api/Login/Login-cn");
             expected = expected.Replace("http://haru-gf-pay.kurogame.com", "http://127.0.0.1:8080");
+            // Policy rows: AscNet deliberately serves a value other than the retail one (documented where the caller passes them).
+            string[] cells = retail[i].Split('\t');
+            if (policyRows is not null && policyRows.TryGetValue(cells[0], out string? policyValue))
+                expected = $"{cells[0]}\t{cells[1]}\t{policyValue}";
             AssertEqual(expected, actual[i], $"{label} config.tab line {i}");
             if (expected != retail[i])
                 owned.Add(retail[i].Split('\t')[0]);
@@ -346,7 +401,9 @@ internal partial class Program
         AssertEqual("5f41e51783a5183a619d14d586638dbdb557a996", current.IndexSha1, "4.7 live IndexSha1");
         AssertEqual("2ea1ce3cc9271c9e75df7a16b5465cfb8922abc7", current.LaunchIndexSha1, "4.7 live LaunchIndexSha1");
         ServerVersionConfig fallback = (ServerVersionConfig)getVersion.Invoke(null, ["99.0.0"])!;
-        AssertEqual(((ServerVersionConfig)getVersion.Invoke(null, ["4.8.0"])!).IndexSha1, fallback.IndexSha1, "unknown future version uses latest live metadata");
+        AssertEqual("7be18b2e546dbf95442e098be024a89c22041a52", fallback.IndexSha1, "unknown future version uses latest live metadata (4.9 matrix index sha1)");
+        AssertEqual("b069d45a6b7d7679e6ab66c82c661ddd85b92ef3", fallback.LaunchIndexSha1, "unknown future version uses latest live metadata (4.9 launch index sha1)");
+        AssertEqual("4.8.12", ((ServerVersionConfig)getVersion.Invoke(null, ["4.8.0"])!).DocumentVersion, "4.8.0 entry kept");
         ServerVersionConfig previous = (ServerVersionConfig)getVersion.Invoke(null, ["4.5.0"])!;
         if (previous.IndexSha1 == live.IndexSha1)
             throw new InvalidDataException("4.6 configuration metadata did not remain distinct from 4.5.");
@@ -499,13 +556,29 @@ internal partial class Program
 
     private static void ValidateVersion46TableDrivenDrawCatalog()
     {
+        // The 4.6 expectations hold inside the 4.6 banner window (1509: 1787115600-1790204400), not at the real clock.
+        System.Reflection.FieldInfo clock = RequiredAscNetGameServerType("AscNet.GameServer.Game.DrawManager")
+            .GetField("UtcNow", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        Func<DateTimeOffset> prior = (Func<DateTimeOffset>)clock.GetValue(null)!;
+        clock.SetValue(null, (Func<DateTimeOffset>)(() => DateTimeOffset.FromUnixTimeSeconds(1788591600)));
+        try { ValidateVersion46TableDrivenDrawCatalogAt46(); }
+        finally { clock.SetValue(null, prior); }
+    }
+
+    private static void PinDrawClock(long unix) => RequiredAscNetGameServerType("AscNet.GameServer.Game.DrawManager")
+        .GetField("UtcNow", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+        .SetValue(null, (Func<DateTimeOffset>)(() => DateTimeOffset.FromUnixTimeSeconds(unix)));
+
+    private static void ValidateVersion46TableDrivenDrawCatalogAt46()
+    {
         const long uid = 46_002;
         AscNet.Common.Database.Player player = CreateDrawCompatibilityPlayer(uid);
         using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(out _, out _, out _);
         using LoopbackSessionHarness harness = new(CreateDrawCompatibilityCharacter(uid), player, CreateDrawCompatibilityInventory(uid, []), "v46-table-draw");
         InvokeRegisteredRequestHandler(nameof(DrawGetDrawGroupListRequest), harness.Session, 46_020, new DrawGetDrawGroupListRequest());
         DrawGetDrawGroupListResponse catalog = ReadResponsePayload<DrawGetDrawGroupListResponse>(harness, 46_020, nameof(DrawGetDrawGroupListResponse), "4.6 table draw catalog");
-        int[] expectedGroups = [1, 2, 4, 12, 16, 22, 11];
+        // No DrawPredict rotation resolves inside the 4.6 window, so the Arrival group 12 is not advertised.
+        int[] expectedGroups = [1, 2, 4, 16, 22, 11];
         AssertEqual(string.Join(',', expectedGroups), string.Join(',', catalog.DrawGroupInfoList.Select(group => group.Id)), "4.6 server-pushed draw groups");
         if (catalog.DrawGroupInfoList.Any(group => group.Id is 13 or 15 or 35 or 36))
             throw new InvalidDataException("4.6 catalog must not advertise groups whose pity law or window is unavailable.");
@@ -555,13 +628,14 @@ internal partial class Program
             BindingFlags.Static | BindingFlags.NonPublic,
             [typeof(AscNet.Common.Database.Player), typeof(DateTimeOffset)]);
         NotifyDrawCanLiverData inactiveCanLiver = (NotifyDrawCanLiverData)canLiverBuilder.Invoke(null, [player, DateTimeOffset.FromUnixTimeSeconds(canLiverSchedule.StartTime - 1)])!;
-        AssertEqual(0, inactiveCanLiver.DrawCanLiverData.ActivityId, "4.6 inactive DrawCanLiver uses the Lua-safe zero activity");
+        if (inactiveCanLiver.DrawCanLiverData.ActivityId is not null)
+            throw new InvalidDataException("4.6 inactive DrawCanLiver must send a nil ActivityId; Lua treats 0 as an activity.");
         AssertEqual(0, inactiveCanLiver.DrawCanLiverData.DrawCount, "4.6 inactive DrawCanLiver has no progress");
         if (inactiveCanLiver.DrawCanLiverData.RewardIndex.Count != 0)
             throw new InvalidDataException("4.6 inactive DrawCanLiver must retain the nested empty reward-index contract.");
 
         NotifyDrawCanLiverData freshCanLiver = (NotifyDrawCanLiverData)canLiverBuilder.Invoke(null, [player, DateTimeOffset.FromUnixTimeSeconds(canLiverSchedule.StartTime)])!;
-        AssertEqual(canLiverActivity.Id, freshCanLiver.DrawCanLiverData.ActivityId, "4.6 DrawCanLiver activity comes from the active table row");
+        AssertEqual<int?>(canLiverActivity.Id, freshCanLiver.DrawCanLiverData.ActivityId, "4.6 DrawCanLiver activity comes from the active table row");
         AssertEqual(0, freshCanLiver.DrawCanLiverData.DrawCount, "4.6 fresh DrawCanLiver progress");
 
         FieldInfo drawsByIdField = RequiredAscNetGameServerType("AscNet.GameServer.Game.DrawManager")
@@ -632,6 +706,9 @@ internal partial class Program
         if (!harness.Session.character.Characters.Any(character => character.Id == 1071005))
             throw new InvalidDataException("4.6 group 11 forced pity draw did not create character 1071005.");
 
+        // Group 12 needs an active DrawPredict rotation, none of which overlaps the 4.6 window: use the 10/29 rotation.
+        PinDrawClock(1793343600);
+        _ = getDrawGroupInfos.Invoke(null, [player]); // creates group 12's pity round, as the group list did at the original clock
         // Pity belongs to the group, not to an individual optional banner.
         player.DrawState.PityRounds[12].Misses = 59;
         player.DrawState.PityRounds[12].GuaranteedTarget = true;
@@ -662,6 +739,7 @@ internal partial class Program
         pityReload = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<AscNet.Common.Database.Player>(player.ToBson());
         AssertEqual(0, pityReload.DrawState.PityRounds[12].Misses, "4.6 group 12 reset pity BSON roundtrip");
 
+        PinDrawClock(1788591600); // back inside the 1509 window
         InvokeRegisteredRequestHandler(nameof(DrawSetUseDrawIdRequest), harness.Session, 46_023, new DrawSetUseDrawIdRequest { DrawId = 1509 });
         DrawSetUseDrawIdResponse selected = ReadResponsePayload<DrawSetUseDrawIdResponse>(harness, 46_023, nameof(DrawSetUseDrawIdResponse), "4.6 group 11 selection");
         AssertEqual(0, selected.Code, "4.6 group 11 selection code");

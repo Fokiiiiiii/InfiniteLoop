@@ -11,8 +11,14 @@ namespace AscNet.GameServer.Game;
 
 internal static partial class CharacterPower
 {
-    private static int GetPowerNpcType(CharacterData character) => AttributeTables.Npcs[
-        AttributeTables.Qualities[((int)character.Id, character.Quality)].NpcId].Type;
+    private static int? GetPowerNpcType(CharacterData character)
+    {
+        if (!AttributeTables.Qualities.TryGetValue(((int)character.Id, character.Quality), out var quality)
+            || !AttributeTables.Npcs.TryGetValue(quality.NpcId, out var npc))
+            return null;
+
+        return npc.Type;
+    }
 
     private static long CalculateAttributePower(CharacterData character, IReadOnlyList<EquipData> equips)
     {

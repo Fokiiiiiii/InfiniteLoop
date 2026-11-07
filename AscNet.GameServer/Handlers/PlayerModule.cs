@@ -225,31 +225,6 @@ namespace AscNet.GameServer.Handlers
         public List<long> DisplayCharIdList;
     }
 
-    [MessagePackObject(true)]
-    public class QueryPlayerDetailRequest
-    {
-        public int PlayerId;
-    }
-
-    [MessagePackObject(true)]
-    public class QueryPlayerDetailResponse
-    {
-        public int Code;
-    }
-
-    [MessagePackObject(true)]
-    public class SetAppearanceRequest
-    {
-        public int CharacterAppearanceType;
-        public dynamic? Characters;
-        public AppearanceSettingInfo AppearanceSettingInfo;
-    }
-
-    [MessagePackObject(true)]
-    public class SetAppearanceResponse
-    {
-        public int Code;
-    }
 
     [MessagePackObject(true)]
     public class XCustomComponentData
@@ -560,15 +535,16 @@ namespace AscNet.GameServer.Handlers
 
                 Player? player = (long)id == session.player.PlayerData.Id
                     ? session.player
-                    : Player.TryFromPlayerId(id);
+                    : Server.Instance.SessionFromUID(id)?.player ?? Player.TryFromPlayerId(id);
 
-                response.PlayerInfoList.Add(player is null ? ToFallbackPlayerInfo(id) : ToPlayerInfo(player));
+                if (player is null) continue;
+                response.PlayerInfoList.Add(ToPlayerInfo(player));
             }
 
             session.SendResponse(response, packet.Id);
         }
 
-        private static GetPlayerInfoListResponse.GetPlayerInfoListResponsePlayerInfo ToPlayerInfo(Player player)
+        internal static GetPlayerInfoListResponse.GetPlayerInfoListResponsePlayerInfo ToPlayerInfo(Player player)
         {
             return new()
             {
@@ -580,38 +556,20 @@ namespace AscNet.GameServer.Handlers
                 CurrHeadPortraitId = (uint)player.PlayerData.CurrHeadPortraitId,
                 CurrHeadFrameId = (int)player.PlayerData.CurrHeadFrameId,
                 LastLoginTime = (uint)player.PlayerData.LastLoginTime,
-                IsOnline = false,
+                IsOnline = Server.Instance.SessionFromUID(player.PlayerData.Id) is not null,
                 CurrMedalId = (int)player.PlayerData.CurrMedalId,
                 IsCancel = false,
                 DlcMultiplayerTitle = 0
             };
         }
 
-        private static GetPlayerInfoListResponse.GetPlayerInfoListResponsePlayerInfo ToFallbackPlayerInfo(uint id)
-        {
-            return new()
-            {
-                Id = id,
-                Name = $"Commandant {id}",
-                Level = 1,
-                FriendExp = 0,
-                Sign = string.Empty,
-                CurrHeadPortraitId = 9000003,
-                CurrHeadFrameId = 0,
-                LastLoginTime = (uint)DateTimeOffset.Now.ToUnixTimeSeconds(),
-                IsOnline = false,
-                CurrMedalId = 0,
-                IsCancel = false,
-                DlcMultiplayerTitle = 0
-            };
-        }
 
         [RequestPacketHandler("ChangePlayerBirthdayRequest")]
         public static void ChangePlayerBirthdayRequestHandler(Session session, Packet.Request packet)
         {
             ChangePlayerBirthdayRequest request = packet.Deserialize<ChangePlayerBirthdayRequest>();
             session.player.PlayerData.Birthday = request;
-            session.SendPush(new NotifyBirthdayPlot() { IsChange = 1 });
+            session.SendPush(new NotifyBirthdayPlot() { IsChange = 1, SingleStoryIds = FavorMemoryModule.BirthdayStoryIds(session.player) });
 
             session.SendResponse(new ChangePlayerBirthdayResponse(), packet.Id);
         }
@@ -707,20 +665,6 @@ namespace AscNet.GameServer.Handlers
             session.player.PlayerData.DisplayCharIdList.Insert(0, request.CharId);
 
             session.SendResponse(new SetDisplayCharIdFirstResponse() { DisplayCharIdList = session.player.PlayerData.DisplayCharIdList }, packet.Id);
-        }
-
-        // TODO: "Display Preview" button in Details section of account info menu
-        [RequestPacketHandler("QueryPlayerDetailRequest")]
-        public static void QueryPlayerDetailRequestHandler(Session session, Packet.Request packet)
-        {
-            session.SendResponse(new QueryPlayerDetailResponse() { Code = 1 }, packet.Id);
-        }
-
-        // TODO: "Save" button in Details section of account info menu
-        [RequestPacketHandler("SetAppearanceRequest")]
-        public static void SetAppearanceRequestHandler(Session session, Packet.Request packet)
-        {
-            session.SendResponse(new SetAppearanceResponse() { Code = 1 }, packet.Id);
         }
 
         [RequestPacketHandler("RecordPlayerPointRequest")]

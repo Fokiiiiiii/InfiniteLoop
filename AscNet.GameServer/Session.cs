@@ -38,7 +38,6 @@ namespace AscNet.GameServer
         public int BigWorldWorldId;
         public DateTime BigWorldFightStartedAt;
         public readonly Dictionary<(uint EquipId, int Slot), ResonanceInfo> PendingEquipResonances = new();
-        public int? AppliedTeamPrefabId;
         public readonly Dictionary<uint, (uint FashionId, int WeaponFashionId)> RandomFashionRolls = new();
         internal Dictionary<int, (int Value, int State)>? TaskSnapshotProgress;
         internal bool GuildIdentityReady;
@@ -170,6 +169,11 @@ namespace AscNet.GameServer
                             && currentPlayer.Theatre.PendingMutation?.ResponseName == nameof(Handlers.BuyResponse)
                             && Handlers.TheatreModule.IsCommonShop(request.Deserialize<Handlers.BuyRequest>().ShopId)))
                         Handlers.TaskModule.EnsureMissionResets(this);
+                    if (character is not null && inventory is not null && stage is not null)
+                    {
+                        try { Handlers.MaintainerActionModule.EnsureResets(this); }
+                        catch (MongoDB.Driver.MongoException exception) { log.Warn("Maintainer Action reset could not be saved; retrying on the next request.", exception); }
+                    }
                     requestPacketHandler.Invoke(this, request);
                     if (Volatile.Read(ref disconnectState) == 0)
                     {

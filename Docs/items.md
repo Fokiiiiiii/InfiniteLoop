@@ -12,6 +12,8 @@ The next login deletes 105 unless this rotation already has a settlement receipt
 
 Item **62738** is also named Simulation Score in `Item.tsv`. That row is a Simulated Battlefield exchange token and one 6★ memory resonance option. It does not move the Simulation Score.
 
+Main Story collectible rewards are not bag items. For example, **13019636 — Stars Ensnared** is a collectible granted by the corresponding MainLine2 achievement reward. All collectible definitions come from `Resources/table/share/scoretitle/ScoreTitle.tsv`; fixed-quality titles use their authored initial quality, and progressive titles use their authored quality conditions. Ownership, score, quality, and acquisition time persist in the character's score-title data.
+
 ## Currencies
 
 | ID | Name | Cap | Spent by |
@@ -36,6 +38,7 @@ Item **62738** is also named Simulation Score in `Item.tsv`. That row is a Simul
 | 63 | Signal Diffuser | 99,999 | Circuit Connect shop 1291 |
 | 102 | Trade Voucher | 999,999,999 | Voucher exchange, including S-Rank Inver-Shard shop 6001 |
 | 103 | Dispatch Certificate | 9,999,999 | Dorm decor sets |
+| 107 | Welcome Back Letter | 99,999 | Regression4 Homecoming Missions letter-record levels. New in 4.9; the server has no Regression4 handler yet (`Docs/closed.md`) |
 | 200 | Phantom Pain Scar | 99,999 | A-Rank Omniframe, S-Rank Omniframe, Weapon Harmony |
 
 Commandant level is `/level`. Item 7 is the Squad EXP counter, and `/item` does not apply it.
@@ -46,7 +49,7 @@ Guild contribution (38), Command Bureau EXP (40), Beacon Amplifier Points (46), 
 
 | ID | Name | Notes |
 | --- | --- | --- |
-| 50000 | Basic Construct R&D Ticket | Standard construct banner. This exact ID. |
+| 50000 | Basic Construct R&D Ticket | Standard construct banner. This exact ID. Also the authored reward of Operation Guardians supply crates and the abandoned warehouse (`BoxRewardIds` 40203/40204). |
 | 50001 | Basic Weapon R&D Ticket | Standard weapon banner. This exact ID. |
 | 50003 | Target Weapon R&D Ticket | Shares a balance with 50020. 50020 is spent first. |
 | 50020 | Target Weapon R&D Ticket | Earned stack of the same banner. |
@@ -58,6 +61,7 @@ Guild contribution (38), Command Bureau EXP (40), Beacon Amplifier Points (46), 
 | 50022 | Date A Live Weapon R&D Ticket | Earned stack of the same banner. |
 | 50019 | Date A Live Armament R&D Ticket | Shares a balance with 50023. 50023 is spent first. |
 | 50023 | Date A Live Armament R&D Ticket | Earned stack of the same banner. |
+| 50179 | Expedition R&D Ticket | Timed event ticket (item rows: starts 2026/11/12 10:00, lasts 2,984,400 s, then recycles by mail into Reward 826). Not part of a banner the server serves yet |
 
 ## Simulation Score and mode currencies
 
@@ -76,6 +80,8 @@ Guild contribution (38), Command Bureau EXP (40), Beacon Amplifier Points (46), 
 | 96200 | Supply Coupon | Supply Coupon | 9,999,999 | Awakening Tundra tech tree |
 | 96002 | Tantalum Ore | Tantalum Ore | 999,999,999 | Norman Ore Shop |
 | 96207 | Expedition Loot X | Expedition Loot X | 999,999 | Guild Expedition Shop X |
+| 97007 | Special "Honey Cake" | Special "Honey Cake" | 999,999 | The Meandering Three — Wanderer Record token; referenced shops 4008/4009 have no catalog and stay closed |
+| 97008 | Movie Film: Cerberus | Movie Film: Cerberus | 999,999 | The Meandering Three — Wild Waste token; referenced shops 4008/4009 have no catalog and stay closed |
 | 97074 | Service Certificate | Service Certificate | 999 | Service Shop 1460 |
 | 97084 | Sealed Writs | Sealed Writs | 999,999 | Shrouded Requiem story rooms |
 | 97086 | Retro Module | Retro Module | 999,999 | Retro Prize Counter 1468 |
@@ -213,11 +219,13 @@ The server opens fixed gifts (subtype 1 or 5) and choice packs (subtype 3). A ch
 | 94033 | Construct Research Surprise Fortune Bag | Event Construct R&D Tickets (50005). 10%×250, 15%×225, 20%×200, 25%×175, 30%×150, from `ConstructResearchFortuneBagPolicy.tsv` keyed on this item. Not Reward 1011 |
 | 40691 | Normal Gift Box | One random normal affection gift, equal chance: 40681 Best-Seller or 40682 Vinyl Record. Not Reward 1003 |
 | 40692 | Fine Gift Box | One random fine affection gift, equal chance: 40683 Ration Chocolate or 40684 1 Day Tour Tickets x2. Not Reward 1004 |
-| 40693 | Precious Gift Box | One random precious affection gift, equal chance among the character favorites below (40601–40645 on this patch). Each new construct adds their own gift; update this row and the Gifts table. Not Reward 1005. Quality 6 gifts 40800–40811 are not in this box |
+| 40693 | Precious Gift Box | One random precious affection gift, equal chance among the character favorites below (40601–40646 on this patch). Each new construct adds their own gift; update this row and the Gifts table. Not Reward 1005. Quality 6 gifts 40800–40811 are not in this box |
 | 40904 | Character Upgrade Material Pack | 6★ shards, overclock mats, enhancers, EXP Pod (XL), Skill Points, Cogs |
 | 40909 | Memory Upgrade Material Pack | Memory upgrade set |
 | 40910 | Weapon Upgrade Material Pack | Weapon upgrade set |
 | 94008 | S-Rank Omniframe Choice | One of Luminance, Entropy, Ember, Tenebrion, Pulse |
+| 94076 | S-Rank Omniframe Choice Pack | Choose 1 of 33 S-rank omniframes from reward 1485 (subtype `3 1485 1`). New in 4.9 |
+| 94077 | S-Rank CUB Choice | Choose 1 of 23 S-rank CUBs from reward 1488 (subtype `3 1488 1`). New in 4.9 |
 | 94030 | S-Rank Omniframe Pick | One of nine S-rank omniframes |
 | 40901 | S-Rank Character Inver-Shard Pick | One S-rank inver-shard from the pack's list |
 
@@ -239,7 +247,7 @@ These packs stay closed. Subtype 2 names a drop group, and those drop tables are
 
 ## Gifts
 
-Everyone accepts 40681 Best-Seller, 40682 Vinyl Record, 40683 Ration Chocolate, and 40684 1 Day Tour Tickets x2. Each construct has their own favorite in `CharacterTrustItem`. A client patch that adds a construct adds a row here and to Precious Gift Box 40693. The current ids are 40601–40645:
+Everyone accepts 40681 Best-Seller, 40682 Vinyl Record, 40683 Ration Chocolate, and 40684 1 Day Tour Tickets x2. Each construct has their own favorite in `CharacterTrustItem`. A client patch that adds a construct adds a row here and to Precious Gift Box 40693. The current ids are 40601–40646:
 
 | ID | Gift | For |
 | --- | --- | --- |
@@ -288,6 +296,7 @@ Everyone accepts 40681 Best-Seller, 40682 Vinyl Record, 40683 Ration Chocolate, 
 | 40643 | Vintage Notebook | Helentine |
 | 40644 | Black Forest Cake | Kurumi Tokisaki |
 | 40645 | A Testament to Triumph | Adelyde |
+| 40646 | Pearl Hairpin | Leia |
 
 ## Construct shards
 
@@ -367,3 +376,11 @@ Booster Structural Parts cap at 9,999.
 | 220 | Huiyu | 242 | Zafkiel |
 | 221 | Guardrake | 243 | Kelpie |
 | 222 | Dreamwing | | |
+
+## Dreamhouse Tycoon items (38000001-38000003)
+
+Not bag items: the client reads them from the SkyTower activity data (reward type 39), so `RewardHandler` credits `Player.SkyTower` and pushes `NotifySkyTowerData`. 38000001 Dream Funds (building upgrades; every credit counts for the "Obtain Dream Funds" task, only sales feed the promotion-merit conversion), 38000002 Promotion Merit (staff upgrades; converted from sales at `GoldTransCharaLvUpItemNum` per `GoldTransCharaLvUpItemBase` produced gold), 38000003 Dispatch Order (speed-up, cap 999999; 3 at first entry, `AccelerateDailyNum` per daily reset).
+
+## Manual shop refresh costs
+
+`RefreshShopRequest` spends the selected catalog's `RefreshCostId` and `RefreshCostCount`, using the same inventory spend path (including Black Card balance handling) as purchases. It grants no item. Existing curated shops do not enable manual refresh; no currency or price has been invented to enable them.

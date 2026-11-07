@@ -3,6 +3,7 @@ using AscNet.Common.MsgPack;
 using AscNet.Common.Util;
 using AscNet.GameServer;
 using AscNet.GameServer.Handlers;
+using AscNet.Table.V2.share.attrib;
 using AscNet.Table.V2.share.equip;
 using AscNet.Table.V2.share.fashion;
 using AscNet.Table.V2.share.headportrait;
@@ -45,7 +46,7 @@ internal static partial class Program
         using MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(
             out _, out RecordingMongoCollectionProxy<Character> characters, out _);
         Inventory inventory = CreateDrawCompatibilityInventory(uid,
-            [new Item { Id = 62738, Count = 1691 }]);
+            [new Item { Id = 62738, Count = 2230 }]);
         using LoopbackSessionHarness harness = new(character, player, inventory);
         foreach (EquipData equip in character.Equips)
         {
@@ -70,10 +71,10 @@ internal static partial class Program
 
         EquipConfigTable[] discounts = TableReaderV2.Parse<EquipConfigTable>()
             .Where(row => row.ItemId == 62738).ToArray();
-        AssertEqual(2, discounts.Length, "two authored resonance discounts");
+        AssertEqual(3, discounts.Length, "three authored resonance discounts (4.8 suits 1665/1613 plus 4.9 suit 1666)");
         AssertEqual(true, discounts.All(row => row.DiscountCount == 539), "authored discounted material count");
-        int[] suitIds = [discounts[0].SuitId, discounts[1].SuitId, 1664];
-        int[] costs = [discounts[0].DiscountCount, discounts[1].DiscountCount, 613];
+        int[] suitIds = [..discounts.Select(row => row.SuitId), 1664];
+        int[] costs = [..discounts.Select(row => row.DiscountCount), 613];
         for (int index = 0; index < suitIds.Length; index++)
         {
             EquipTable memory = TableReaderV2.Parse<EquipTable>()
@@ -83,10 +84,12 @@ internal static partial class Program
             int materialIndex = recipe.ItemId.IndexOf(62738);
             AssertEqual(true, materialIndex >= 0, "memory has authored resonance material");
             AssertEqual(613, recipe.ItemCount[materialIndex], "unmodified recipe cost");
-            EquipData owned = new() { Id = (uint)(84810 + index), TemplateId = (uint)memory.Id };
+            int packetId = 84810 + index;
+            uint equipId = character.Equips.Count == 0 ? 1 : checked(character.Equips.Max(equip => equip.Id) + 1);
+            EquipData owned = new() { Id = equipId, TemplateId = (uint)memory.Id };
             character.Equips.Add(owned);
             long balance = inventory.Items.Single(item => item.Id == 62738).Count;
-            InvokeRequestHandler(harness, nameof(EquipResonanceRequest), 84810 + index,
+            InvokeRequestHandler(harness, nameof(EquipResonanceRequest), packetId,
                 new EquipResonanceRequest
                 {
                     EquipId = (int)owned.Id, Slots = [1], CharacterId = characterId,
@@ -94,7 +97,7 @@ internal static partial class Program
                 });
             EquipResonanceResponse resonance = ReadResponsePayload<EquipResonanceResponse>(
                 harness, 84810 + index, nameof(EquipResonanceResponse), $"memory {memory.Name} resonance", maxPacketsToRead: 8);
-            AssertEqual(0, resonance.Code, $"memory {memory.Name} resonance succeeds");
+            AssertEqual(0, resonance.Code, $"memory {memory.Name} ({memory.Id}, suit {memory.SuitId}) resonance succeeds");
             AssertEqual(balance - costs[index], inventory.Items.Single(item => item.Id == 62738).Count,
                 $"memory {memory.Name} pays configured cost");
             AssertEqual(1, owned.ResonanceInfo.Count, $"memory {memory.Name} commits resonance");

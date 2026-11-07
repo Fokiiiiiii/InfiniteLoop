@@ -193,7 +193,7 @@ namespace AscNet.GameServer.Handlers
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     #endregion
 
-    internal class PartnerModule
+    internal partial class PartnerModule
     {
         private const int ErrorCode = 1;
         private static readonly Lazy<Dictionary<int, ArchiveCondition>> ArchiveConditions = new(() =>

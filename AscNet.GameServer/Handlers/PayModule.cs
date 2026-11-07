@@ -96,10 +96,11 @@ namespace AscNet.GameServer.Handlers
         {
             GetPurchaseListResponse response = new()
             {
-                PurchaseInfoList = Catalog.Value.List(uiTypes, DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                PurchaseInfoList = Catalog.Value.List(uiTypes, DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                PurchaseComboInfoList = Catalog.Value.ListCombos(uiTypes, DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             };
             ApplyPurchaseState(response.PurchaseInfoList, player);
-            ApplyPurchaseState(response.PurchaseComboInfoList, player);
+            ApplyComboState(response.PurchaseComboInfoList, player);
             return response;
         }
 
@@ -127,7 +128,9 @@ namespace AscNet.GameServer.Handlers
                         ["SignRound"] = 1, ["RewardIndexList"] = pass?.RewardIndexList ?? new List<int>()
                     };
                 }
-                data["DailyRewardSupplementGetData"] = null!;
+                // The client treats an absent key like nil ("no missed days"): XUiSignCard.lua:224.
+                if (SupplementData(player, id, data) is { } supplement) data["DailyRewardSupplementGetData"] = supplement;
+                else data.Remove("DailyRewardSupplementGetData");
             }
         }
 
@@ -237,7 +240,7 @@ namespace AscNet.GameServer.Handlers
         }
 
         private static int ValidatePurchase(Session session, PurchaseRequest request,
-            out Dictionary<dynamic, dynamic>? info, out List<RewardGoods> goods, out int cost)
+            out Dictionary<dynamic, dynamic>? info, out List<RewardGoods> goods, out int cost, int? fixedUnitCost = null)
         {
             goods = []; cost = 0; info = null;
             if (request.Count <= 0 || request.Id > int.MaxValue
@@ -274,11 +277,12 @@ namespace AscNet.GameServer.Handlers
                 && discountRaw is Dictionary<dynamic, dynamic> discounts
                 && discounts.Keys.Any(tier => Convert.ToInt64((object)tier) > (long)previous + 1
                     && Convert.ToInt64((object)tier) <= (long)previous + request.Count)) return 20053031;
-            int consumeId = ReadDynamicInt(info, "ConsumeId"), unitCost = PurchaseCatalog.UnitPrice(info, previous);
+            int consumeId = ReadDynamicInt(info, "ConsumeId"), unitCost = fixedUnitCost ?? PurchaseCatalog.UnitPrice(info, previous);
             if (consumeId < 0 || unitCost < 0 || (unitCost > 0 && !Inventory.IsValidClientItemId(consumeId))
                 || (long)unitCost * request.Count > int.MaxValue) return 20053031;
             cost = checked(unitCost * request.Count);
-            if (cost > session.inventory.SpendableCount(consumeId)) return 20012004;
+            // A bundle member is priced by its bundle discount; the bundle checks the combined balance.
+            if (fixedUnitCost is null && cost > session.inventory.SpendableCount(consumeId)) return 20012004;
             try
             {
                 goods = ReadPurchaseRewards(info, request.Count);
@@ -409,7 +413,8 @@ namespace AscNet.GameServer.Handlers
         [RequestPacketHandler("PayInitiatedRequest")]
         public static void PayInitiatedRequestHandler(Session session, Packet.Request packet)
         {
-            CompleteLocalRecharge(session, packet);
+            var request = packet.Deserialize<PayInitiatedRequest>();
+            session.SendResponse(CompleteLocalRecharge(session, request.Key, request.TargetParam), packet.Id);
         }
     }
 }

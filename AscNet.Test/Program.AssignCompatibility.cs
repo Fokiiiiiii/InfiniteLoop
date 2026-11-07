@@ -41,10 +41,11 @@ internal partial class Program
         Inventory inventory = CreateDrawCompatibilityInventory(playerId, []);
         Player player = CreateDrawCompatibilityPlayer(playerId);
 
-        using (MongoCollectionOverride mongo = MongoCollectionOverride.InstallForDailySignInCompatibility(
+        using (MongoCollectionOverride mongo = MongoCollectionOverride.InstallForBiancaCompatibility(
             out RecordingMongoCollectionProxy<Player> playerSaves,
             out RecordingMongoCollectionProxy<Character> characterSaves,
-            out RecordingMongoCollectionProxy<Inventory> inventorySaves))
+            out RecordingMongoCollectionProxy<Inventory> inventorySaves,
+            out _))
         using (LoopbackSessionHarness harness = new(character, player, inventory, "assign-compat-test"))
         {
             harness.Session.stage = CreateLoginAccountCompatibilityStage(playerId);
@@ -165,6 +166,7 @@ internal partial class Program
             List<dynamic> loginRecords = InvokeAssignLoginRecords(harness.Session);
             AssertEqual(1, loginRecords.Count, "NotifyLogin includes only completed Border Pact chapters");
             AssertEqual(2_001, Convert.ToInt32(loginRecords[0].ChapterId), "NotifyLogin completed Border Pact chapter id");
+            AssertEqual(1_531_005L, Convert.ToInt64(loginRecords[0].CharacterId), "NotifyLogin keeps the garrisoned construct across logins");
             int inventorySavesBeforeReward = inventorySaves.ReplaceOneCalls;
             int characterSavesBeforeReward = characterSaves.ReplaceOneCalls;
             InvokeRegisteredRequestHandler("AssignGetRewardRequest", harness.Session, 88_113,
@@ -207,9 +209,10 @@ internal partial class Program
 
     private static List<dynamic> InvokeAssignLoginRecords(Session session)
     {
-        Type module = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AssignModule");
-        return (List<dynamic>)(RequiredMethod(module, "BuildLoginChapterRecords", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic, [typeof(Session)]).Invoke(null, [session])
-            ?? throw new InvalidDataException("AssignModule.BuildLoginChapterRecords returned nil."));
+        Type module = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.AccountModule");
+        NotifyLogin login = (NotifyLogin)(RequiredMethod(module, "BuildNotifyLogin", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic, [typeof(Session)]).Invoke(null, [session])
+            ?? throw new InvalidDataException("AccountModule.BuildNotifyLogin returned nil."));
+        return login.AssignChapterRecord;
     }
 
     private static FightSettleResponse ReadAssignSettle(LoopbackSessionHarness harness, int packetId)

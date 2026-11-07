@@ -375,7 +375,7 @@ namespace AscNet.GameServer.Handlers
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     #endregion
 
-    internal class EquipModule
+    internal partial class EquipModule
     {
         private const int EquipFeedOperationTypeLevelUp = 1;
         private const int EquipFeedOperationTypeBreakthrough = 2;
@@ -448,6 +448,7 @@ namespace AscNet.GameServer.Handlers
             {
                 rsp.Level = upEquip.Level;
                 rsp.Exp = upEquip.Exp;
+                upEquip.IsRecycle = false;
 
                 notifyEquipDataList.EquipDataList.Add(upEquip);
             }
@@ -1142,6 +1143,7 @@ namespace AscNet.GameServer.Handlers
                     equip.Breakthrough += 1;
                     equip.Level = 1;
                     equip.Exp = 0;
+                    equip.IsRecycle = false;
                     NotifyEquipDataList notifyEquipDataList = new();
                     notifyEquipDataList.EquipDataList.Add(equip);
                     session.SendPush(notifyEquipDataList);
@@ -1177,9 +1179,11 @@ namespace AscNet.GameServer.Handlers
                 // EquipManagerGetCharEquipBySiteNotFound
                 response.Code = 20021012;
             }
-            else if (equip.IsLock != request.IsLock)
+            else if (equip.IsLock != request.IsLock || equip.IsRecycle)
             {
+                // XEquip:SetLock clears the recycle mark on the client.
                 equip.IsLock = request.IsLock;
+                equip.IsRecycle = false;
                 session.character.Save();
             }
 
@@ -1256,9 +1260,11 @@ namespace AscNet.GameServer.Handlers
             }
 
             toEquip.CharacterId = request.CharacterId;
+            // XEquip:PutOn clears the recycle mark on the client.
+            changed |= toEquip.IsRecycle;
+            toEquip.IsRecycle = false;
             if (changed)
                 session.character.Save();
-            session.AppliedTeamPrefabId = null;
 
 
             // The client rebuilds each affected slot solely from this push, before the response callback.
@@ -1294,7 +1300,6 @@ namespace AscNet.GameServer.Handlers
             if (changed)
             {
                 session.character.Save();
-                session.AppliedTeamPrefabId = null;
             }
             session.SendPush(new NotifyEquipDataList { EquipDataList = affectedEquips });
 
@@ -1396,7 +1401,6 @@ namespace AscNet.GameServer.Handlers
                     equip.CharacterId = request.CharacterId;
             }
             session.character.Save();
-            session.AppliedTeamPrefabId = null;
             session.SendPush(new NotifyEquipDataList { EquipDataList = affectedEquips });
 
             session.SendResponse(new EquipPutOnChipGroupResponse(), packet.Id);
@@ -1712,7 +1716,6 @@ namespace AscNet.GameServer.Handlers
                 if (commitsWeaponResonance)
                 {
                     session.PendingEquipResonances.Remove((equip.Id, resonance.Slot));
-                    session.AppliedTeamPrefabId = null;
                     TaskModule.RecordEquipmentProgress(session, 12205, [equip]);
                 }
                 else
@@ -1738,7 +1741,6 @@ namespace AscNet.GameServer.Handlers
                 equip.ResonanceInfo.Add(resonance);
                 session.PendingEquipResonances.Remove((equip.Id, resonance.Slot));
                 session.character.Save();
-                session.AppliedTeamPrefabId = null;
 
             }
             else
@@ -1926,7 +1928,6 @@ namespace AscNet.GameServer.Handlers
             session.inventory.Save();
             TaskModule.RecordTableDrivenProgress(session, [(11202, (int?)request.UseItemId, totalMaterialCost)]);
             TaskModule.RecordEquipmentProgress(session, 12205, equips);
-            session.AppliedTeamPrefabId = null;
             if (request.SelectType == EquipResonanceType.CharacterSkill)
                 SyncCharacterAfterResonance(session, request.CharacterId);
 
@@ -2260,7 +2261,6 @@ namespace AscNet.GameServer.Handlers
             {
                 session.character.Save();
                 TaskModule.RecordEquipmentProgress(session, 12205, [equip]);
-                session.AppliedTeamPrefabId = null;
             }
 
             session.SendResponse(new EquipResonanceConfirmResponse(), packet.Id);
@@ -2369,7 +2369,6 @@ namespace AscNet.GameServer.Handlers
 
             equip.WeaponOverrunData.ChoseSuit = request.SuitId;
             session.character.Save();
-            session.AppliedTeamPrefabId = null;
             session.SendResponse(new EquipWeaponChoseOverrunSuitResponse
             {
                 WeaponOverrunData = equip.WeaponOverrunData
@@ -2506,20 +2505,7 @@ namespace AscNet.GameServer.Handlers
                 EquipTable? template = chip is null
                     ? null
                     : equipTables.FirstOrDefault(row => row.Id == chip.TemplateId);
-                if (chip is null
-                    || template is null
-                    || template.Site <= 0
-                    || template.Star > 5
-                    || !Character.IsOwnableEquipTemplate(template)
-                    || chip.CharacterId != 0
-                    || chip.Level != 1
-                    || chip.Exp != 0
-                    || chip.Breakthrough != 0
-                    || chip.IsLock
-                    || chip.ResonanceInfo is { Count: > 0 }
-                    || chip.UnconfirmedResonanceInfo is { Count: > 0 }
-                    || chip.AwakeSlotList is { Count: > 0 }
-                    || session.player.IsEquipInTeamPrefab(chip.Id))
+                if (chip is null || template is null || !IsRecyclableChip(session, chip, template))
                 {
                     return false;
                 }

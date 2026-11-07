@@ -40,6 +40,24 @@ internal partial class Program
         Call<ResetStrongholdGroupResponse>("ResetStrongholdGroupRequest", 48_813, new ResetStrongholdGroupRequest { Id = -1 });
         Call<ResetStrongholdStageResponse>("ResetStrongholdStageRequest", 48_814, new ResetStrongholdStageRequest { GroupId = -1, StageId = -1 });
         Call<SetStrongholdTeamResponse>("SetStrongholdTeamRequest", 48_815, new SetStrongholdTeamRequest { Own = true, TeamInfos = [new StrongholdTeamInfo { Id = 1, CharacterInfos = [new StrongholdCharacterInfo { Id = 1_021_001, Pos = 1 }] }] });
+        // The client always sends three slots: empty ones are Id 0, trial robots carry RobotId plus its CharacterId.
+        int SetTeam(int id, params StrongholdCharacterInfo[] members)
+        {
+            InvokeRegisteredRequestHandler("SetStrongholdTeamRequest", h.Session, id, new SetStrongholdTeamRequest
+            { TeamInfos = [new StrongholdTeamInfo { Id = 1, CharacterInfos = [.. members] }] });
+            return ReadStrongholdResponse<SetStrongholdTeamResponse>(h, id, out _).Code;
+        }
+        StrongholdCharacterInfo Empty(int pos) => new() { Pos = pos };
+        int trialRobot = TableReaderV2.Parse<AscNet.Table.V2.share.fuben.stronghold.StrongholdRobotGroupTable>()
+            .SelectMany(row => row.RobotId).First(robotId => robotId > 0);
+        int trialCharacter = TableReaderV2.Parse<AscNet.Table.V2.share.robot.RobotTable>().Single(row => row.Id == trialRobot).CharacterId;
+        AssertEqual(0, SetTeam(48_840, new() { Id = 1_021_001, Pos = 1 }, Empty(2), Empty(3)), "team with two empty slots is accepted");
+        AssertEqual(0, SetTeam(48_841, Empty(1), Empty(2), Empty(3)), "an all-empty preset team is accepted");
+        AssertEqual(0, SetTeam(48_842, new() { Id = 1_021_001, Pos = 1 }, new() { Id = trialCharacter, RobotId = trialRobot, Pos = 2 }, Empty(3)), "Stronghold trial robot is accepted");
+        AssertEqual(20113023, SetTeam(48_843, new() { Id = 1_021_001, Pos = 1 }, new() { Id = 1_021_001, Pos = 2 }, Empty(3)), "duplicate character rejected");
+        AssertEqual(20113023, SetTeam(48_844, new() { Id = 1_099_001, Pos = 1 }, Empty(2), Empty(3)), "unowned character rejected");
+        AssertEqual(20113023, SetTeam(48_845, new() { Id = trialCharacter + 1, RobotId = trialRobot, Pos = 1 }, Empty(2), Empty(3)), "robot with the wrong character rejected");
+        AssertEqual(20113023, SetTeam(48_846, new() { Id = 1_021_001, PlayerId = uid + 1, Pos = 1 }, Empty(2), Empty(3)), "another player's character rejected");
         Call<SetStrongholdFightTeamResponse>("SetStrongholdFightTeamRequest", 48_816, new SetStrongholdFightTeamRequest { Id = -1 });
         Call<GetStrongholdAssistCharacterListResponse>("GetStrongholdAssistCharacterListRequest", 48_817, new GetStrongholdAssistCharacterListRequest());
         Call<SetStrongholdAssistCharacterResponse>("SetStrongholdAssistCharacterRequest", 48_818, new SetStrongholdAssistCharacterRequest { CharacterId = 1_021_001 });
@@ -241,7 +259,7 @@ internal partial class Program
             "Stronghold eligible reward batch persists claimed IDs");
         int claimedRewardId = missingEnergy.reward.Id;
         int claimCount = h.Session.inventory.AppliedRewardClaims.Count(key =>
-            key == $"stronghold:{uid}:achievement:{claimedRewardId}");
+            key.StartsWith($"stronghold:{uid}:") && key.EndsWith($":achievement:{claimedRewardId}"));
         byte[] beforeDuplicateClaim = player.ToBson();
         InvokeRegisteredRequestHandler(nameof(GetStrongholdRewardRequest), h.Session, rewardPacketId,
             new GetStrongholdRewardRequest { Ids = [claimedRewardId] });
@@ -249,7 +267,7 @@ internal partial class Program
             h, rewardPacketId++, out _).Code,
             "Stronghold duplicate reward claim uses retail rejection code");
         AssertEqual(claimCount, h.Session.inventory.AppliedRewardClaims.Count(key =>
-            key == $"stronghold:{uid}:achievement:{claimedRewardId}"),
+            key.StartsWith($"stronghold:{uid}:") && key.EndsWith($":achievement:{claimedRewardId}")),
             "Stronghold duplicate reward claim does not grant twice");
         AssertEqual(Convert.ToHexString(beforeDuplicateClaim), Convert.ToHexString(player.ToBson()),
             "Stronghold duplicate reward claim does not mutate player state");
@@ -452,7 +470,7 @@ internal partial class Program
 
         byte[] beforeClaimedOnlyRetry = player.ToBson();
         int claimedOnlyClaimCount = h.Session.inventory.AppliedRewardClaims.Count(key =>
-            key == $"stronghold:{uid}:achievement:{claimedOnlyRewardId}");
+            key.StartsWith($"stronghold:{uid}:") && key.EndsWith($":achievement:{claimedOnlyRewardId}"));
         int claimedOnlyRetryPacketId = rewardPacketId++;
         InvokeRegisteredRequestHandler(nameof(GetStrongholdRewardRequest), h.Session, claimedOnlyRetryPacketId,
             new GetStrongholdRewardRequest { Ids = [claimedOnlyRewardId] });
@@ -460,7 +478,7 @@ internal partial class Program
             h, claimedOnlyRetryPacketId, out _).Code,
             "claimed-only legacy reward retry uses retail rejection code");
         AssertEqual(claimedOnlyClaimCount, h.Session.inventory.AppliedRewardClaims.Count(key =>
-            key == $"stronghold:{uid}:achievement:{claimedOnlyRewardId}"),
+            key.StartsWith($"stronghold:{uid}:") && key.EndsWith($":achievement:{claimedOnlyRewardId}")),
             "claimed-only legacy reward retry does not grant twice");
         AssertEqual(Convert.ToHexString(beforeClaimedOnlyRetry), Convert.ToHexString(player.ToBson()),
             "claimed-only legacy reward retry does not mutate state");

@@ -80,6 +80,27 @@ namespace AscNet.Test
             try
             {
                 UseResourceWorkingDirectory();
+                keepGoing = args.Contains("--keep-going");
+                if (args.Contains("--profile-compat-only"))
+                {
+                    ValidateProfileCompatibility();
+                    return;
+                }
+                if (args.Contains("--cerberus-game-compat-only"))
+                {
+                    ValidateCerberusGameCompatibility();
+                    return;
+                }
+                if (args.Contains("--maintainer-action-compat-only"))
+                {
+                    ValidateMaintainerActionCompatibility();
+                    return;
+                }
+                if (args.Contains("--sky-tower-only"))
+                {
+                    ValidateSkyTowerCompatibility();
+                    return;
+                }
                 if (args.Contains("--cn-sdk-config-only"))
                 {
                     ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
@@ -137,9 +158,34 @@ namespace AscNet.Test
                     ValidateBigWorldTask();
                     return;
                 }
+                if (args.Contains("--big-world-49-only"))
+                {
+                    ValidateBigWorld49Scenes();
+                    return;
+                }
+                if (args.Contains("--anniversary-preheating-only"))
+                {
+                    ValidateAnniversaryPreHeatingCompatibility();
+                    return;
+                }
+                if (args.Contains("--version49-events-only"))
+                {
+                    ValidateVersion49EventAvailability();
+                    return;
+                }
+                if (args.Contains("--version49-memory-shop-only"))
+                {
+                    ValidateVersion49MemoryShop();
+                    return;
+                }
                 if (args.Contains("--draw-rules-only"))
                 {
                     ValidateDrawRules();
+                    return;
+                }
+                if (args.Contains("--draw-canliver-only"))
+                {
+                    ValidateDrawCanLiverActivityId();
                     return;
                 }
                 if (args.Contains("--guild-compat-only"))
@@ -169,7 +215,7 @@ namespace AscNet.Test
                     ValidateGuildWarCompatibility();
                     return;
                 }
-                if (args.Contains("--guild-dorm-compat-only"))
+                if (args.Contains("--guild-dorm-compat-only") || args.Contains("--guild-dorm-rooms-compat-only"))
                 {
                     ValidateGuildDormCompatibility();
                     return;
@@ -177,6 +223,11 @@ namespace AscNet.Test
                 if (args.Contains("--loading-option-compat-only"))
                 {
                     ValidateLoadingOptionCompatibility();
+                    return;
+                }
+                if (args.Contains("--purchases-compat-only"))
+                {
+                    ValidatePurchasesCompatibility();
                     return;
                 }
                 if (args.Contains("--store-purchases-only"))
@@ -327,9 +378,15 @@ namespace AscNet.Test
                     ValidateEquipGuideGoalCompatibility();
                     return;
                 }
+                if (args.Contains("--stronghold-cycle-only"))
+                {
+                    ValidateStrongholdCycle();
+                    return;
+                }
                 if (args.Contains("--stronghold-sweep-only"))
                 {
                     ValidateStrongholdSweepCompatibility();
+                    ValidateStrongholdRelatedFightCompatibility();
                     return;
                 }
                 if (args.Contains("--stronghold-compat-only"))
@@ -346,6 +403,36 @@ namespace AscNet.Test
                 if (args.Contains("--simulate-train-compat-only"))
                 {
                     ValidateSimulateTrainCompatibility();
+                    return;
+                }
+                if (args.Contains("--reward-quantity-only"))
+                {
+                    ValidateRewardQuantities();
+                    return;
+                }
+                if (args.Contains("--passport-tasks-only"))
+                {
+                    ValidatePassportTasks();
+                    return;
+                }
+                if (args.Contains("--passport-weekly-only"))
+                {
+                    ValidatePassportWeekly();
+                    return;
+                }
+                if (args.Contains("--reset-boundary-only"))
+                {
+                    ValidateResetBoundary();
+                    return;
+                }
+                if (args.Contains("--transfinite-anchor-achievement-only"))
+                {
+                    ValidateTransfiniteAnchorAchievementCompatibility();
+                    return;
+                }
+                if (args.Contains("--transfinite-anchor-repair-only"))
+                {
+                    ValidateTransfiniteAnchorRepair();
                     return;
                 }
                 if (args.Contains("--transfinite-compat-only"))
@@ -583,6 +670,16 @@ namespace AscNet.Test
                     ValidateVersion47ConcertStartCompatibility();
                     return;
                 }
+                if (args.Contains("--reform-only"))
+                {
+                    ValidateReformCompatibility();
+                    return;
+                }
+                if (args.Contains("--pacman2-only"))
+                {
+                    ValidatePacMan2Compatibility();
+                    return;
+                }
                 if (args.Contains("--same-color-game-compat-only"))
                 {
                     ValidateSameColorGameCompatibility();
@@ -799,6 +896,12 @@ namespace AscNet.Test
                     return;
                 }
 
+                if (args.Contains("--stage-reward-claims-compat-only"))
+                {
+                    ValidateStageRewardClaimsCompatibility();
+                    return;
+                }
+
                 if (args.Contains("--mainline2-exhibition-compat-only"))
                 {
                     ValidateMainLine2UpdateExhibitionChapterCompatibility();
@@ -849,6 +952,18 @@ namespace AscNet.Test
                 if (args.Contains("--boss-activity-compat-only"))
                 {
                     ValidateBossActivityCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--boss-score-rate-only"))
+                {
+                    ValidateBossSingleChallengeScoreRate();
+                    return;
+                }
+
+                if (args.Contains("--arena-effect-zone-score-only"))
+                {
+                    ValidateArenaEffectZoneScore();
                     return;
                 }
 
@@ -1113,6 +1228,82 @@ namespace AscNet.Test
                     return;
                 }
 
+                if (args.Contains("--archive-compat-only"))
+                {
+                    ValidateArchiveCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--favor-memory-compat-only"))
+                {
+                    ValidateFavorMemoryCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--partial-modes-compat-only"))
+                {
+                    ValidatePartialModesCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--misc-player-compat-only"))
+                {
+                    ValidateMiscPlayerCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--small-rewards-compat-only"))
+                {
+                    ValidateSmallRewardsCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--misc-system-compat-only"))
+                {
+                    ValidateMiscSystemCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--equip-partner-compat-only"))
+                {
+                    ValidateEquipPartnerCompatibility();
+                    return;
+                }
+                if (args.Contains("--shop-refresh-compat-only"))
+                {
+                    ValidateShopRefreshCompatibility();
+                    return;
+                }
+                if (args.Contains("--wardrobe-photo-compat-only"))
+                {
+                    ValidateWardrobePhotoCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--collection-misc-compat-only"))
+                {
+                    ValidateCollectionMiscCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--chat-social-compat-only"))
+                {
+                    ValidateChatSocialCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--friends-compat-only"))
+                {
+                    ValidateFriendsCompatibility();
+                    return;
+                }
+
+                if (args.Contains("--weekly-activeness-compat-only"))
+                {
+                    ValidateWeeklyActivenessCompatibility();
+                    return;
+                }
+
                 if (args.Contains("--shop-compat-only"))
                 {
                     ValidateShopCompatibility();
@@ -1202,144 +1393,206 @@ namespace AscNet.Test
                     return;
                 }
 
-                ValidateUltimaAwakenCompatibility();
-                ValidateLoadingOptionCompatibility();
-                ValidateDormDispatchAllCompatibility();
-                ValidatePacketInputSafety();
-                ValidateReportBanChatCompatibility();
-                ValidateSdkInputSafety().GetAwaiter().GetResult();
-                ValidateTablePerformanceCompatibility();
+                Step("ValidateCerberusGameCompatibility", () => ValidateCerberusGameCompatibility());
+                Step("ValidateProfileCompatibility", () => ValidateProfileCompatibility());
+                Step("ValidateMaintainerActionCompatibility", () => ValidateMaintainerActionCompatibility());
+                Step("ValidateSkyTowerCompatibility", () => ValidateSkyTowerCompatibility());
+                Step("ValidateUltimaAwakenCompatibility", () => ValidateUltimaAwakenCompatibility());
+                Step("ValidateLoadingOptionCompatibility", () => ValidateLoadingOptionCompatibility());
+                Step("ValidateDormDispatchAllCompatibility", () => ValidateDormDispatchAllCompatibility());
+                Step("ValidatePacketInputSafety", () => ValidatePacketInputSafety());
+                Step("ValidateReportBanChatCompatibility", () => ValidateReportBanChatCompatibility());
+                Step("ValidateSdkInputSafety", () => ValidateSdkInputSafety().GetAwaiter().GetResult());
+                Step("ValidateTablePerformanceCompatibility", () => ValidateTablePerformanceCompatibility());
                 _ = JsonConvert.DeserializeObject<NotifyLogin>(File.ReadAllText(ResourcePath("Data", "NotifyLogin.json")))!;
                 _ = JsonConvert.DeserializeObject<NotifyTaskData>(File.ReadAllText(ResourcePath("Data", "NotifyTaskData.json")))!;
-                ValidateNotifyLoginCurrentClientCompatibilityShape();
-                ValidateLoginAccountCompatibility();
-                ValidateSessionClientLoopFramingCompatibility();
-                ValidateStageBookmarkCompatibility();
-                ValidateMainLine2UpdateExhibitionChapterCompatibility();
-                ValidateMainLine2LoginDataBsonCompatibility();
-                ValidateMainLine2ReceiveMainTreasureCompatibility();
-                ValidateMainLine2MessageStateUpdateCompatibility();
-                ValidateMainLineLuosaitaEnterCompatibility();
-                ValidateMainLineTreasureRewardCompatibility();
-                ValidateGatherAwakenRewardCompatibility();
-                ValidateTaskProgressCompatibility();
-                ValidateCharacterTaskProgressCompatibility();
-                ValidateEquipTaskProgressCompatibility();
-                ValidateSweepTaskProgressCompatibility();
-                ValidateShopTaskProgressCompatibility();
-                ValidateDrawTaskProgressCompatibility();
-                ValidatePartnerStoryCompatibility();
-                ValidateCourseCompatibility();
-                ValidateEquipGuideGoalCompatibility();
-                ValidateStrongholdSweepCompatibility();
-                ValidateStrongholdRolloverCompatibility();
-                ValidateBossSingleLoginCompatibilityShape();
-                ValidateBossSingleLoginRollover();
-                ValidateBossSingleSharedTimestampBoundary();
-                ValidateBossSingleReconnectStageSnapshot();
-                ValidateBossActivityCompatibility();
-                ValidateBossSingleCompatibility();
-                ValidateBossSectionScoreProgress();
-                ValidateBossSingleIntensiveStageHydration();
-                ValidateBossSingleCycleStageScoreSync();
-                ValidateSimulatedBattlefieldCompatibility();
-                ValidateCurrentClientGuideTableCompatibility();
-                ValidateWheelchairManualFullCompatibility();
-                ValidatePlayerCostTimeUploadCompatibility();
-                ValidateRecordPlayerPointCompatibility();
-                ValidateBoardMutualClientPushCompatibility();
-                ValidatePlayerGenderCompatibility();
-                ValidateCharacterSwitchLiberateMagicCompatibility();
-                ValidateCharacterSwitchSkillCompatibility();
-                ValidateCharacterSendGiftCompatibility();
-                ValidateTeamPrefabCompatibility();
-                ValidatePreFightPositionCompatibility();
-                ValidateRobotDeploymentFashionCompatibility();
-                ValidateSegmentCheckFightCompatibility();
-                ValidateFightRestartCompatibility();
-                ValidatePartnerDecomposeCompatibilitySuite();
+                Step("ValidateNotifyLoginCurrentClientCompatibilityShape", () => ValidateNotifyLoginCurrentClientCompatibilityShape());
+                Step("ValidateLoginAccountCompatibility", () => ValidateLoginAccountCompatibility());
+                Step("ValidateSessionClientLoopFramingCompatibility", () => ValidateSessionClientLoopFramingCompatibility());
+                Step("ValidateStageBookmarkCompatibility", () => ValidateStageBookmarkCompatibility());
+                Step("ValidateStageRewardClaimsCompatibility", () => ValidateStageRewardClaimsCompatibility());
+                Step("ValidateMainLine2UpdateExhibitionChapterCompatibility", () => ValidateMainLine2UpdateExhibitionChapterCompatibility());
+                Step("ValidateMainLine2LoginDataBsonCompatibility", () => ValidateMainLine2LoginDataBsonCompatibility());
+                Step("ValidateMainLine2ReceiveMainTreasureCompatibility", () => ValidateMainLine2ReceiveMainTreasureCompatibility());
+                Step("ValidateMainLine2MessageStateUpdateCompatibility", () => ValidateMainLine2MessageStateUpdateCompatibility());
+                Step("ValidateMainLineLuosaitaEnterCompatibility", () => ValidateMainLineLuosaitaEnterCompatibility());
+                Step("ValidateMainLineTreasureRewardCompatibility", () => ValidateMainLineTreasureRewardCompatibility());
+                Step("ValidateGatherAwakenRewardCompatibility", () => ValidateGatherAwakenRewardCompatibility());
+                Step("ValidateTaskProgressCompatibility", () => ValidateTaskProgressCompatibility());
+                Step("ValidateCharacterTaskProgressCompatibility", () => ValidateCharacterTaskProgressCompatibility());
+                Step("ValidateEquipTaskProgressCompatibility", () => ValidateEquipTaskProgressCompatibility());
+                Step("ValidateSweepTaskProgressCompatibility", () => ValidateSweepTaskProgressCompatibility());
+                Step("ValidateShopTaskProgressCompatibility", () => ValidateShopTaskProgressCompatibility());
+                Step("ValidateDrawTaskProgressCompatibility", () => ValidateDrawTaskProgressCompatibility());
+                Step("ValidatePartnerStoryCompatibility", () => ValidatePartnerStoryCompatibility());
+                Step("ValidateCourseCompatibility", () => ValidateCourseCompatibility());
+                Step("ValidateEquipGuideGoalCompatibility", () => ValidateEquipGuideGoalCompatibility());
+                Step("ValidateStrongholdSweepCompatibility", () => ValidateStrongholdSweepCompatibility());
+                Step("ValidateStrongholdRelatedFightCompatibility", () => ValidateStrongholdRelatedFightCompatibility());
+                Step("ValidateTransfiniteAnchorAchievementCompatibility", () => ValidateTransfiniteAnchorAchievementCompatibility());
+                Step("ValidateStrongholdCycle", () => ValidateStrongholdCycle());
+                Step("ValidateResetBoundary", () => ValidateResetBoundary());
+                Step("ValidateRewardQuantities", () => ValidateRewardQuantities());
+                Step("ValidateBossSingleChallengeScoreRate", () => ValidateBossSingleChallengeScoreRate());
+                Step("ValidateArenaEffectZoneScore", () => ValidateArenaEffectZoneScore());
+                Step("ValidateTransfiniteAnchorRepair", () => ValidateTransfiniteAnchorRepair());
+                Step("ValidatePassportTasks", () => ValidatePassportTasks());
+                Step("ValidatePassportWeekly", () => ValidatePassportWeekly());
+                Step("ValidateStrongholdRolloverCompatibility", () => ValidateStrongholdRolloverCompatibility());
+                Step("ValidateBossSingleLoginCompatibilityShape", () => ValidateBossSingleLoginCompatibilityShape());
+                Step("ValidateBossSingleLoginRollover", () => ValidateBossSingleLoginRollover());
+                Step("ValidateBossSingleSharedTimestampBoundary", () => ValidateBossSingleSharedTimestampBoundary());
+                Step("ValidateBossSingleReconnectStageSnapshot", () => ValidateBossSingleReconnectStageSnapshot());
+                Step("ValidateBossActivityCompatibility", () => ValidateBossActivityCompatibility());
+                Step("ValidateBossSingleCompatibility", () => ValidateBossSingleCompatibility());
+                Step("ValidateBossSectionScoreProgress", () => ValidateBossSectionScoreProgress());
+                Step("ValidateBossSingleIntensiveStageHydration", () => ValidateBossSingleIntensiveStageHydration());
+                Step("ValidateBossSingleCycleStageScoreSync", () => ValidateBossSingleCycleStageScoreSync());
+                Step("ValidateSimulatedBattlefieldCompatibility", () => ValidateSimulatedBattlefieldCompatibility());
+                Step("ValidateCurrentClientGuideTableCompatibility", () => ValidateCurrentClientGuideTableCompatibility());
+                Step("ValidateWheelchairManualFullCompatibility", () => ValidateWheelchairManualFullCompatibility());
+                Step("ValidatePlayerCostTimeUploadCompatibility", () => ValidatePlayerCostTimeUploadCompatibility());
+                Step("ValidateRecordPlayerPointCompatibility", () => ValidateRecordPlayerPointCompatibility());
+                Step("ValidateBoardMutualClientPushCompatibility", () => ValidateBoardMutualClientPushCompatibility());
+                Step("ValidatePlayerGenderCompatibility", () => ValidatePlayerGenderCompatibility());
+                Step("ValidateCharacterSwitchLiberateMagicCompatibility", () => ValidateCharacterSwitchLiberateMagicCompatibility());
+                Step("ValidateCharacterSwitchSkillCompatibility", () => ValidateCharacterSwitchSkillCompatibility());
+                Step("ValidateCharacterSendGiftCompatibility", () => ValidateCharacterSendGiftCompatibility());
+                Step("ValidateTeamPrefabCompatibility", () => ValidateTeamPrefabCompatibility());
+                Step("ValidatePreFightPositionCompatibility", () => ValidatePreFightPositionCompatibility());
+                Step("ValidateRobotDeploymentFashionCompatibility", () => ValidateRobotDeploymentFashionCompatibility());
+                Step("ValidateSegmentCheckFightCompatibility", () => ValidateSegmentCheckFightCompatibility());
+                Step("ValidateFightRestartCompatibility", () => ValidateFightRestartCompatibility());
+                Step("ValidatePartnerDecomposeCompatibilitySuite", () => ValidatePartnerDecomposeCompatibilitySuite());
 
-                ValidateCharacterProgressionPersistenceCompatibility();
-                ValidateCharacterSkillGroupTableBackedCompatibility();
-                ValidateCharacterEnhanceSkillTableBackedCompatibility();
-                ValidateExpLevelCompatibility();
-                ValidateStoryCourseRewardCompatibility();
-                ValidatePrequelRewardCompatibility();
-                ValidateHiddenStageCompatibility();
-                ValidateStoryDeployVersionGapCompatibility();
-                ValidateStudyCharacterCompatibility();
-                ValidateStudyProgressionCompatibility();
-                ValidateFightSettleRetreatCompatibility();
-                ValidateFightSettleAchievementCompatibility();
-                ValidatePr2QualityCompatibility();
-                ValidateInventoryEquipCompatibility();
-                ValidateEquipDecomposeCompatibility();
-                ValidateEquipChipRecycleCompatibility();
-                ValidateDrawCompatibility();
-                ValidateDrawRules();
-                ValidateItemUseCompatibility();
-                ValidateItemBuyAssetCompatibility();
-                ValidateAutoUseGiftCompatibility();
-                ValidateItemSellCompatibility();
-                ValidateInventoryMaxCountCompatibility();
-                ValidateChatCompatibility();
-                ValidateCommandCompatibility();
-                ValidateSceneCommandCompatibility();
-                ValidateMissingFeatureCompatibility();
-                ValidateFashionSuitRewardCompatibility();
-                ValidateBiancaTheatreCompatibility();
-                ValidateTheatreCompatibility();
-                ValidateTheatre4Compatibility();
-                ValidateTheatre5Compatibility();
-                ValidateTheatre6Compatibility();
-                ValidateCharacterTowerCompatibility();
-                ValidateShopCompatibility();
-                ValidateWheelchairManualPurchaseCompatibility();
-                ValidateCurrentClientNoticeFixtures();
-                ValidateCurrentClientNoticeEndpoints().GetAwaiter().GetResult();
-                ValidateLifeTreeFinishProcessRequestCompatibility();
-                ValidateSteamClientConfig();
-                RunAudioPlayerCompatibility();
-                RunAudioPlayerUpgradeCompatibility();
-                ValidateVersion48Frames();
-                ValidateVersion48DrawCubCompatibility();
-                ValidateDateALiveTaskProgressCompatibility();
-                ValidateVersion48EquipmentCosmetics();
-                ValidatePassportCompatibility();
-                ValidateStageGeneralSkillBanCompatibility();
-                ValidateTeamRecommendCompatibility();
-                ValidateTeamRecommendGlobalStandings();
-                ValidateEnvelopeCatchUpAndReissue();
-                ValidateMissingCalendarAscNetPolicy();
-                ValidateCosmicDailyTasks();
-                RunMineSweepingCompatibility();
-                ValidateEquipmentSlotNotifications();
-                RunFangKuaiCompatibility();
-                RunPunishaarCompatibility();
-                ValidateTransfiniteTowerBoundary();
-                ValidateTransfiniteTowerRanking();
-                ValidateTransfiniteTowerProgression();
-                ValidateChatBoardRewardGrants();
-                ValidateVersion48MainLine43();
-                ValidateVersion48BossTrialWindows();
-                ValidateRosterLife48Compatibility();
-                ValidateVersion48GuideCompletion();
-                ValidateVersion48EventPanelTasks();
-                ValidateVersion48AffectionStoryTask();
-                ValidateFestivalExperimentClearRelogin();
-                ValidateVersion48TeachingTreasureClaims();
-                ValidateCoatingGacha48Compatibility();
-                ValidateBackgroundRewardGrants();
-                ValidateGuildWarPopupActionCompatibility();
-                ValidateVersion47ConcertStartCompatibility();
-                ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult();
-                ValidateCnSdkConfiguration().GetAwaiter().GetResult();
-                ValidateCnSdkLogin().GetAwaiter().GetResult();
+                Step("ValidateCharacterProgressionPersistenceCompatibility", () => ValidateCharacterProgressionPersistenceCompatibility());
+                Step("ValidateCharacterSkillGroupTableBackedCompatibility", () => ValidateCharacterSkillGroupTableBackedCompatibility());
+                Step("ValidateCharacterEnhanceSkillTableBackedCompatibility", () => ValidateCharacterEnhanceSkillTableBackedCompatibility());
+                Step("ValidateExpLevelCompatibility", () => ValidateExpLevelCompatibility());
+                Step("ValidateStoryCourseRewardCompatibility", () => ValidateStoryCourseRewardCompatibility());
+                Step("ValidatePrequelRewardCompatibility", () => ValidatePrequelRewardCompatibility());
+                Step("ValidateHiddenStageCompatibility", () => ValidateHiddenStageCompatibility());
+                Step("ValidateStoryDeployVersionGapCompatibility", () => ValidateStoryDeployVersionGapCompatibility());
+                Step("ValidateStudyCharacterCompatibility", () => ValidateStudyCharacterCompatibility());
+                Step("ValidateStudyProgressionCompatibility", () => ValidateStudyProgressionCompatibility());
+                Step("ValidateFightSettleRetreatCompatibility", () => ValidateFightSettleRetreatCompatibility());
+                Step("ValidateFightSettleAchievementCompatibility", () => ValidateFightSettleAchievementCompatibility());
+                Step("ValidatePr2QualityCompatibility", () => ValidatePr2QualityCompatibility());
+                Step("ValidateInventoryEquipCompatibility", () => ValidateInventoryEquipCompatibility());
+                Step("ValidateEquipDecomposeCompatibility", () => ValidateEquipDecomposeCompatibility());
+                Step("ValidateEquipChipRecycleCompatibility", () => ValidateEquipChipRecycleCompatibility());
+                Step("ValidateDrawCompatibility", () => ValidateDrawCompatibility());
+                Step("ValidateDrawRules", () => ValidateDrawRules());
+                Step("ValidateDrawCanLiverActivityId", () => ValidateDrawCanLiverActivityId());
+                Step("ValidateItemUseCompatibility", () => ValidateItemUseCompatibility());
+                Step("ValidateItemBuyAssetCompatibility", () => ValidateItemBuyAssetCompatibility());
+                Step("ValidateAutoUseGiftCompatibility", () => ValidateAutoUseGiftCompatibility());
+                Step("ValidateItemSellCompatibility", () => ValidateItemSellCompatibility());
+                Step("ValidateInventoryMaxCountCompatibility", () => ValidateInventoryMaxCountCompatibility());
+                Step("ValidateChatCompatibility", () => ValidateChatCompatibility());
+                Step("ValidateCommandCompatibility", () => ValidateCommandCompatibility());
+                Step("ValidateSceneCommandCompatibility", () => ValidateSceneCommandCompatibility());
+                Step("ValidateMissingFeatureCompatibility", () => ValidateMissingFeatureCompatibility());
+                Step("ValidateFashionSuitRewardCompatibility", () => ValidateFashionSuitRewardCompatibility());
+                Step("ValidateBiancaTheatreCompatibility", () => ValidateBiancaTheatreCompatibility());
+                Step("ValidateTheatreCompatibility", () => ValidateTheatreCompatibility());
+                Step("ValidateTheatre4Compatibility", () => ValidateTheatre4Compatibility());
+                Step("ValidateTheatre5Compatibility", () => ValidateTheatre5Compatibility());
+                Step("ValidateTheatre6Compatibility", () => ValidateTheatre6Compatibility());
+                Step("ValidateCharacterTowerCompatibility", () => ValidateCharacterTowerCompatibility());
+                Step("ValidateShopCompatibility", () => ValidateShopCompatibility());
+                Step("ValidateShopRefreshCompatibility", () => ValidateShopRefreshCompatibility());
+                Step("ValidatePurchasesCompatibility", () => ValidatePurchasesCompatibility());
+                Step("ValidateChatSocialCompatibility", () => ValidateChatSocialCompatibility());
+                Step("ValidateEquipPartnerCompatibility", () => ValidateEquipPartnerCompatibility());
+                Step("ValidateCollectionMiscCompatibility", () => ValidateCollectionMiscCompatibility());
+                Step("ValidateWardrobePhotoCompatibility", () => ValidateWardrobePhotoCompatibility());
+                Step("ValidateMiscSystemCompatibility", () => ValidateMiscSystemCompatibility());
+                Step("ValidateMiscPlayerCompatibility", () => ValidateMiscPlayerCompatibility());
+                Step("ValidatePartialModesCompatibility", () => ValidatePartialModesCompatibility());
+                Step("ValidateSmallRewardsCompatibility", () => ValidateSmallRewardsCompatibility());
+                Step("ValidateFavorMemoryCompatibility", () => ValidateFavorMemoryCompatibility());
+                Step("ValidateFriendsCompatibility", () => ValidateFriendsCompatibility());
+                Step("ValidateWeeklyActivenessCompatibility", () => ValidateWeeklyActivenessCompatibility());
+                Step("ValidateArchiveCompatibility", () => ValidateArchiveCompatibility());
+                Step("ValidateWheelchairManualPurchaseCompatibility", () => ValidateWheelchairManualPurchaseCompatibility());
+                Step("ValidateCurrentClientNoticeFixtures", () => ValidateCurrentClientNoticeFixtures());
+                Step("ValidateCurrentClientNoticeEndpoints", () => ValidateCurrentClientNoticeEndpoints().GetAwaiter().GetResult());
+                Step("ValidateLifeTreeFinishProcessRequestCompatibility", () => ValidateLifeTreeFinishProcessRequestCompatibility());
+                Step("ValidateSteamClientConfig", () => ValidateSteamClientConfig());
+                Step("RunAudioPlayerCompatibility", () => RunAudioPlayerCompatibility());
+                Step("RunAudioPlayerUpgradeCompatibility", () => RunAudioPlayerUpgradeCompatibility());
+                Step("ValidateVersion48Frames", () => ValidateVersion48Frames());
+                Step("ValidateVersion48DrawCubCompatibility", () => ValidateVersion48DrawCubCompatibility());
+                Step("ValidateDateALiveTaskProgressCompatibility", () => ValidateDateALiveTaskProgressCompatibility());
+                Step("ValidateVersion48EquipmentCosmetics", () => ValidateVersion48EquipmentCosmetics());
+                Step("ValidatePassportCompatibility", () => ValidatePassportCompatibility());
+                Step("ValidateStageGeneralSkillBanCompatibility", () => ValidateStageGeneralSkillBanCompatibility());
+                Step("ValidateTeamRecommendCompatibility", () => ValidateTeamRecommendCompatibility());
+                Step("ValidateTeamRecommendGlobalStandings", () => ValidateTeamRecommendGlobalStandings());
+                Step("ValidateEnvelopeCatchUpAndReissue", () => ValidateEnvelopeCatchUpAndReissue());
+                Step("ValidateMissingCalendarAscNetPolicy", () => ValidateMissingCalendarAscNetPolicy());
+                Step("ValidateVersion49EventAvailability", () => ValidateVersion49EventAvailability());
+                Step("ValidateVersion49MemoryShop", () => ValidateVersion49MemoryShop());
+                Step("ValidateAnniversaryPreHeatingCompatibility", () => ValidateAnniversaryPreHeatingCompatibility());
+                Step("ValidateCosmicDailyTasks", () => ValidateCosmicDailyTasks());
+                Step("RunMineSweepingCompatibility", () => RunMineSweepingCompatibility());
+                Step("ValidatePacMan2Compatibility", () => ValidatePacMan2Compatibility());
+                Step("ValidateReformCompatibility", () => ValidateReformCompatibility());
+                Step("ValidateEquipmentSlotNotifications", () => ValidateEquipmentSlotNotifications());
+                Step("RunFangKuaiCompatibility", () => RunFangKuaiCompatibility());
+                Step("RunPunishaarCompatibility", () => RunPunishaarCompatibility());
+                Step("ValidateTransfiniteTowerBoundary", () => ValidateTransfiniteTowerBoundary());
+                Step("ValidateTransfiniteTowerRanking", () => ValidateTransfiniteTowerRanking());
+                Step("ValidateTransfiniteTowerProgression", () => ValidateTransfiniteTowerProgression());
+                Step("ValidateChatBoardRewardGrants", () => ValidateChatBoardRewardGrants());
+                Step("ValidateVersion48MainLine43", () => ValidateVersion48MainLine43());
+                Step("ValidateVersion48BossTrialWindows", () => ValidateVersion48BossTrialWindows());
+                Step("ValidateRosterLife48Compatibility", () => ValidateRosterLife48Compatibility());
+                Step("ValidateVersion48GuideCompletion", () => ValidateVersion48GuideCompletion());
+                Step("ValidateVersion48EventPanelTasks", () => ValidateVersion48EventPanelTasks());
+                Step("ValidateVersion48AffectionStoryTask", () => ValidateVersion48AffectionStoryTask());
+                Step("ValidateFestivalExperimentClearRelogin", () => ValidateFestivalExperimentClearRelogin());
+                Step("ValidateVersion48TeachingTreasureClaims", () => ValidateVersion48TeachingTreasureClaims());
+                Step("ValidateCoatingGacha48Compatibility", () => ValidateCoatingGacha48Compatibility());
+                Step("ValidateBackgroundRewardGrants", () => ValidateBackgroundRewardGrants());
+                Step("ValidateGuildWarPopupActionCompatibility", () => ValidateGuildWarPopupActionCompatibility());
+                Step("ValidateVersion47ConcertStartCompatibility", () => ValidateVersion47ConcertStartCompatibility());
+                Step("ValidateKuroSdkCompatibilityEndpoints", () => ValidateKuroSdkCompatibilityEndpoints().GetAwaiter().GetResult());
+                Step("ValidateCnSdkConfiguration", () => ValidateCnSdkConfiguration().GetAwaiter().GetResult());
+                Step("ValidateCnSdkLogin", () => ValidateCnSdkLogin().GetAwaiter().GetResult());
+                if (keepGoingFailures > 0)
+                    Environment.ExitCode = 1;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine(ex);
                 Environment.ExitCode = 1;
+            }
+        }
+
+        // `--keep-going` runs every full-sequence test, printing @@PASS/@@FAIL per test, instead of stopping at the
+        // first failure; the process still exits non-zero if any test failed.
+        private static bool keepGoing;
+        private static int keepGoingFailures;
+
+        private static void Step(string name, Action test)
+        {
+            if (!keepGoing)
+            {
+                test();
+                return;
+            }
+            try
+            {
+                test();
+                Console.WriteLine($"@@PASS {name}");
+            }
+            catch (Exception ex)
+            {
+                keepGoingFailures++;
+                Exception inner = ex is System.Reflection.TargetInvocationException { InnerException: { } cause } ? cause : ex;
+                Console.WriteLine($"@@FAIL {name} {inner.GetType().Name}: {inner.Message.Split('\n')[0]}");
             }
         }
 
@@ -4570,6 +4823,24 @@ namespace AscNet.Test
                 throw new InvalidDataException($"{name}: expected a positive server UTC timestamp.");
         }
 
+        private static Packet.Push ReadStartupPush(LoopbackSessionHarness harness, string name)
+        {
+            Packet packet = harness.ReadPacket(name);
+            AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} packet type");
+            return MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
+        }
+
+        private static TPayload DeserializeStartupPush<TPayload>(
+            IReadOnlyDictionary<string, Packet.Push> startupPushesByName,
+            string pushName,
+            string name)
+        {
+            if (!startupPushesByName.TryGetValue(pushName, out Packet.Push? push))
+                throw new InvalidDataException($"{name}: expected {pushName} during login startup.");
+
+            return MessagePackSerializer.Deserialize<TPayload>(push.Content);
+        }
+
         private static void ValidateLoginAccountCompatibility()
         {
             ValidateLoginAccountNotifyLoginShape();
@@ -5398,8 +5669,14 @@ namespace AscNet.Test
                 startupPushes,
                 retailCriticalStartupOrderThroughPassport,
                 "AccountModule.DoLogin retail-critical startup order");
-            AssertEqual(false, startupPushes.Contains(nameof(NotifyMaintainerActionData)),
-                "AccountModule.DoLogin omits inactive Maintainer Action data");
+            // The fixture player (level 80) satisfies FunctionalOpen 1302, so login pushes the persisted board.
+            AssertEqual(true, startupPushesByName.TryGetValue(nameof(NotifyMaintainerActionData), out Packet.Push? maintainerPush),
+                "AccountModule.DoLogin pushes Maintainer Action data for an eligible player");
+            NotifyMaintainerActionData maintainerBoard = MessagePackSerializer.Deserialize<NotifyMaintainerActionData>(maintainerPush!.Content);
+            AssertEqual(TableReaderV2.Parse<AscNet.Table.V2.share.fuben.maintaineraction.MaintainerActionConfigTable>().Single().NodeCount + 1,
+                maintainerBoard.Nodes.Count, "AccountModule.DoLogin Maintainer Action board shape");
+            AssertEqual(true, startupPushes.IndexOf(nameof(NotifyMaintainerActionData)) > startupPushes.IndexOf(nameof(NotifyCerberusGameData)),
+                "AccountModule.DoLogin Maintainer Action data follows Cerberus data");
             int guildDormPlayerDataIndex = RequiredPushIndex(
                 startupPushes,
                 "NotifyGuildDormPlayerData",
@@ -5418,7 +5695,9 @@ namespace AscNet.Test
                     startupPushesByName,
                     nameof(NotifyLoginMailCollectionBoxData),
                     "AccountModule.DoLogin NotifyLoginMailCollectionBoxData startup payload");
-            AssertEqual(0, startupMailCollection.OpenActivityIds.Count,
+            AssertEqual(TableReaderV2.Parse<AscNet.Table.V2.share.mailcollectionbox.MailCollectionBoxActivityTable>()
+                .Count(activity => CollectionMiscModule.IsFavoriteMailActivityOpen(activity, DateTimeOffset.UtcNow)),
+                startupMailCollection.OpenActivityIds.Count,
                 "AccountModule.DoLogin mail collection-box open activities");
             AssertEqual(0, startupMailCollection.MailCollectionBoxDataDb.ReceivedFavoriteMailIds.Count,
                 "AccountModule.DoLogin mail collection-box favorite state");
@@ -5479,8 +5758,10 @@ namespace AscNet.Test
                 startupPushesByName,
                 nameof(NotifyFunctionalEntranceData),
                 "AccountModule.DoLogin NotifyFunctionalEntranceData startup payload");
+            // Acknowledged entrance red points are persisted per player (FunctionalEntranceRedPointNumUpdateRequest);
+            // this fresh fixture has acknowledged none, so the entrance still shows its red point.
             AssertIntegerDictionary(
-                new Dictionary<int, int> { [20000] = 45 },
+                new Dictionary<int, int>(),
                 startupFunctionalEntranceData.RedPointDatas,
                 "AccountModule.DoLogin NotifyFunctionalEntranceData.RedPointDatas functional entrance redpoint");
 
@@ -5881,24 +6162,6 @@ namespace AscNet.Test
                     throw new InvalidDataException($"{name}: expected {requiredPushName}; observed {DescribePushes(pushNames)}.");
 
                 return pushesByName;
-            }
-
-            static Packet.Push ReadStartupPush(LoopbackSessionHarness harness, string name)
-            {
-                Packet packet = harness.ReadPacket(name);
-                AssertEqual(Packet.ContentType.Push, packet.Type, $"{name} packet type");
-                return MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
-            }
-
-            static TPayload DeserializeStartupPush<TPayload>(
-                IReadOnlyDictionary<string, Packet.Push> startupPushesByName,
-                string pushName,
-                string name)
-            {
-                if (!startupPushesByName.TryGetValue(pushName, out Packet.Push? push))
-                    throw new InvalidDataException($"{name}: expected {pushName} during login startup.");
-
-                return MessagePackSerializer.Deserialize<TPayload>(push.Content);
             }
 
             static JObject DeserializeStartupPushMap(
@@ -7110,7 +7373,8 @@ namespace AscNet.Test
                 nameof(LottoInfoResponse),
                 "LottoInfoRequest response");
             AssertEqual(0, lottoInfoResponse.Code, "LottoInfoResponse table-driven Code");
-            AssertEqual(1, lottoInfoResponse.LottoInfos.Count, "LottoInfoResponse table-driven LottoInfos");
+            // Open lotto windows: 49501 (3.7 choice coating lottery) and 51401 (4.9, missing-calendar policy).
+            AssertEqual(2, lottoInfoResponse.LottoInfos.Count, "LottoInfoResponse table-driven LottoInfos");
 
             const int gachaInfoPacketId = 13_006;
             InvokeRegisteredRequestHandler(nameof(GetGachaInfoRequest), harness.Session, gachaInfoPacketId, new GetGachaInfoRequest { Id = 49 });
@@ -10796,10 +11060,16 @@ namespace AscNet.Test
                 getPlayerInfoPacketId,
                 nameof(GetPlayerInfoListResponse),
                 "GetPlayerInfoListRequest response");
+            AssertEqual(0, playerInfoListResponse.Code, "GetPlayerInfoListResponse allows deleted ids without suppressing callback");
+            AssertEqual(1, playerInfoListResponse.PlayerInfoList.Count, "GetPlayerInfoListResponse omits unknown players");
+            InvokeRegisteredRequestHandler(nameof(GetPlayerInfoListRequest), harness.Session,
+                getPlayerInfoPacketId + 1000, new GetPlayerInfoListRequest { Ids = [currentPlayerId, currentPlayerId] });
+            playerInfoListResponse = ReadResponsePayload<GetPlayerInfoListResponse>(
+                harness, getPlayerInfoPacketId + 1000, nameof(GetPlayerInfoListResponse), "real player info");
             AssertEqual(0, playerInfoListResponse.Code, "GetPlayerInfoListResponse Code");
-            AssertEqual(3, playerInfoListResponse.PlayerInfoList.Count, "GetPlayerInfoListResponse distinct requested player count");
+            AssertEqual(1, playerInfoListResponse.PlayerInfoList.Count, "GetPlayerInfoListResponse distinct requested player count");
             AssertIntegerList(
-                [currentPlayerId, unknownPlayerIdA, unknownPlayerIdB],
+                [currentPlayerId],
                 playerInfoListResponse.PlayerInfoList.Select(info => (long)info.Id).ToArray(),
                 "GetPlayerInfoListResponse distinct player ids in request order");
             GetPlayerInfoListResponse.GetPlayerInfoListResponsePlayerInfo playerInfo = playerInfoListResponse.PlayerInfoList[0];
@@ -10813,12 +11083,6 @@ namespace AscNet.Test
             AssertEqual((int)medalId, playerInfo.CurrMedalId, "GetPlayerInfoListResponse current PlayerInfo CurrMedalId");
             AssertEqual(false, playerInfo.IsCancel, "GetPlayerInfoListResponse current PlayerInfo IsCancel");
             AssertEqual(0, playerInfo.DlcMultiplayerTitle, "GetPlayerInfoListResponse current PlayerInfo DlcMultiplayerTitle");
-            for (int infoIndex = 1; infoIndex < playerInfoListResponse.PlayerInfoList.Count; infoIndex++)
-            {
-                GetPlayerInfoListResponse.GetPlayerInfoListResponsePlayerInfo unknownPlayerInfo = playerInfoListResponse.PlayerInfoList[infoIndex];
-                if (string.IsNullOrWhiteSpace(unknownPlayerInfo.Name))
-                    throw new InvalidDataException($"GetPlayerInfoListResponse unknown PlayerInfo {unknownPlayerInfo.Id} Name: expected non-empty fallback display name.");
-            }
 
             const int guildRecommendPacketId = 11_106;
             InvokeRegisteredRequestHandler(nameof(GuildListRecommendRequest), harness.Session,
@@ -10931,7 +11195,8 @@ namespace AscNet.Test
                 nameof(LottoInfoResponse),
                 "LottoInfoRequest response");
             AssertEqual(0, lottoInfoResponse.Code, "LottoInfoResponse table-driven Code");
-            AssertEqual(1, lottoInfoResponse.LottoInfos.Count, "LottoInfoResponse table-driven LottoInfos");
+            // Open lotto windows: 49501 (3.7 choice coating lottery) and 51401 (4.9, missing-calendar policy).
+            AssertEqual(2, lottoInfoResponse.LottoInfos.Count, "LottoInfoResponse table-driven LottoInfos");
 
             const int enterWorldChatPacketId = 11_013;
             InvokeRegisteredRequestHandler(nameof(EnterWorldChatRequest), harness.Session, enterWorldChatPacketId, new EnterWorldChatRequest());
@@ -12307,11 +12572,6 @@ namespace AscNet.Test
             foreach (ResonanceInfo resonance in weaponEquip.ResonanceInfo)
                 resonance.TemplateId = alternateResonanceSkill;
             weaponEquip.WeaponOverrunData.ChoseSuit = 0;
-            int[] canonicalResonanceSkills = weaponEquip.ResonanceInfo
-                .OrderBy(resonance => resonance.Slot)
-                .Select(resonance => resonance.TemplateId)
-                .ToArray();
-            int canonicalOverrunSuitId = weaponEquip.WeaponOverrunData.ChoseSuit;
             character.Equips.AddRange([previousWeapon, previousAwareness, untouchedAwareness]);
 
             PartnerData secondPartner = character.Partners.Single(partner => partner.Id == 802);
@@ -12328,7 +12588,6 @@ namespace AscNet.Test
                 "apply with equipment and partner conflicts");
             AssertAppliedState(character, "first apply");
             AssertBattlePresetEffects(71_037, resonanceSkills, overrunSuitId, "first preset battle");
-            harness.Session.AppliedTeamPrefabId = 3;
             InvokeRegisteredRequestHandler(
                 nameof(EquipResonanceRequest),
                 harness.Session,
@@ -12347,13 +12606,10 @@ namespace AscNet.Test
                 nameof(EquipResonanceResponse),
                 "regular resonance after preset", maxPacketsToRead: 8).Code,
                 "regular resonance after preset Code");
-            AssertEqual(true, harness.Session.AppliedTeamPrefabId is null,
-                "regular resonance clears applied preset");
-            canonicalResonanceSkills[0] = resonanceSkills[0];
             AssertBattlePresetEffects(
                 71_043,
-                canonicalResonanceSkills,
-                canonicalOverrunSuitId,
+                resonanceSkills,
+                overrunSuitId,
                 "regular resonance battle after preset");
 
             AssertEqual(0, displacedPartner.CharacterId, "first apply clears displaced partner");
@@ -12387,18 +12643,18 @@ namespace AscNet.Test
             });
             player.TeamPrefabs.Add(alternatePreset);
             DispatchApplyAndAssert(4, 71_038, [801, 802], [2], "alternate preset apply");
-            AssertAppliedState(character, "alternate preset apply");
+            AssertAppliedState(character, "alternate preset apply", [alternateResonanceSkill, resonanceSkills[1]]);
             AssertBattlePresetEffects(
                 71_039,
                 [alternateResonanceSkill, resonanceSkills[1]],
-                0,
-                "alternate preset battle");
+                overrunSuitId,
+                "alternate preset (suit 0 keeps the weapon's suit) battle");
             RejectApply(int.MaxValue, 71_040, "failed apply retains selected preset");
             AssertBattlePresetEffects(
                 71_041,
                 [alternateResonanceSkill, resonanceSkills[1]],
-                0,
-                "failed apply retained battle preset");
+                overrunSuitId,
+                "failed apply retained weapon");
             player.TeamPrefabs.Remove(alternatePreset);
             int chipGroupPlayerSaves = playerCollection.ReplaceOneCalls;
             EquipData recycledAwareness = character.Equips.Single(equip => equip.Id == 7_002);
@@ -12546,6 +12802,14 @@ namespace AscNet.Test
                             $"{name} client receives preset equipment ownership before acknowledgement");
                 }
 
+                EquipData pushedWeapon = equipPush.EquipDataList.Single(equip => equip.Id == weaponEquip.Id);
+                AssertIntegerList(
+                    weaponEquip.ResonanceInfo.OrderBy(value => value.Slot).Select(value => (long)value.TemplateId).ToArray(),
+                    pushedWeapon.ResonanceInfo.OrderBy(value => value.Slot).Select(value => (long)value.TemplateId).ToArray(),
+                    $"{name} equipment push carries the written resonance");
+                AssertEqual(weaponEquip.WeaponOverrunData.ChoseSuit, pushedWeapon.WeaponOverrunData.ChoseSuit,
+                    $"{name} equipment push carries the written overrun suit");
+
                 JObject response = ReadResponseMapPayload(
                     harness,
                     packetId,
@@ -12631,16 +12895,16 @@ namespace AscNet.Test
                     RequiredDynamicInteger(overrun, "ChoseSuit", $"{name} overrun"),
                     $"{name} overrun selection");
                 AssertIntegerList(
-                    canonicalResonanceSkills.Select(value => (long)value).ToArray(),
+                    expectedResonanceSkills.Select(value => (long)value).ToArray(),
                     weaponEquip.ResonanceInfo
                         .OrderBy(resonance => resonance.Slot)
                         .Select(resonance => (long)resonance.TemplateId)
                         .ToArray(),
-                    $"{name} preserves global resonance");
+                    $"{name} writes preset resonance to the real weapon");
                 AssertEqual(
-                    canonicalOverrunSuitId,
+                    expectedOverrunSuitId,
                     weaponEquip.WeaponOverrunData.ChoseSuit,
-                    $"{name} preserves global overrun");
+                    $"{name} real weapon overrun selection");
                 AssertNoExtraPacket(name);
             }
 
@@ -12686,7 +12950,7 @@ namespace AscNet.Test
                 AssertNoExtraPacket(name);
             }
 
-            void AssertAppliedState(AscNet.Common.Database.Character actual, string name)
+            void AssertAppliedState(AscNet.Common.Database.Character actual, string name, IReadOnlyList<int>? expectedSkills = null)
             {
                 AssertEqual(firstCharacterId,
                     actual.Equips.Single(equip => equip.Id == 7_001).CharacterId,
@@ -12704,16 +12968,16 @@ namespace AscNet.Test
                     actual.Equips.Single(equip => equip.Id == 7_005).CharacterId,
                     $"{name} untouched awareness carrier");
                 AssertIntegerList(
-                    canonicalResonanceSkills.Select(value => (long)value).ToArray(),
+                    (expectedSkills ?? resonanceSkills).Select(value => (long)value).ToArray(),
                     actual.Equips.Single(equip => equip.Id == 7_001).ResonanceInfo
                         .OrderBy(value => value.Slot)
                         .Select(value => (long)value.TemplateId)
                         .ToArray(),
-                    $"{name} preserves global weapon resonance");
+                    $"{name} weapon resonance follows the applied preset");
                 AssertEqual(
-                    canonicalOverrunSuitId,
+                    overrunSuitId,
                     actual.Equips.Single(equip => equip.Id == 7_001).WeaponOverrunData.ChoseSuit,
-                    $"{name} preserves global weapon overrun");
+                    $"{name} weapon overrun follows the applied preset");
 
                 PartnerData appliedFirstPartner = actual.Partners.Single(partner => partner.Id == 801);
                 PartnerData appliedSecondPartner = actual.Partners.Single(partner => partner.Id == 802);
@@ -14751,7 +15015,7 @@ namespace AscNet.Test
                 "slash item help feedback");
             AssertEqual(AscNet.GameServer.Handlers.ChatMsgType.Normal, itemHelpFeedback.MsgType, "slash item help feedback message type");
             AssertEqual("System - Lucia", itemHelpFeedback.NickName, "slash item help feedback sender name");
-            AssertEqual(true, itemHelpFeedback.Content?.StartsWith("/item <Op> [Target] [Amount]\n", StringComparison.Ordinal) == true, "slash item help usage");
+            AssertEqual(true, itemHelpFeedback.Content?.StartsWith("/item <Op> [Target] [Amount]" + Environment.NewLine, StringComparison.Ordinal) == true, "slash item help usage");
             AssertEqual(true, itemHelpFeedback.Content?.Contains("Op: The operation selected (add, clear, reset)", StringComparison.Ordinal) == true, "slash item help argument description");
             AssertEqual(false, itemHelpFeedback.Content?.Contains("^add$", StringComparison.Ordinal) == true, "slash item help omits validation regexes");
             AscNet.GameServer.Handlers.NotifyWorldChat itemHelpTrailingWorldChat = ReadPushPayload<AscNet.GameServer.Handlers.NotifyWorldChat>(
@@ -24321,6 +24585,27 @@ namespace AscNet.Test
             if (selectedAreaIds.Distinct().Count() != selectedAreaIds.Length
                 || selectedAreaIds.Any(id => !areaStages.ContainsKey(id)))
                 throw new InvalidDataException("War Zone selected areas must be distinct valid table AreaStage IDs.");
+            // Each zone tab gets one support buff of its element (retail: Laser Alloy -> 4174 Thunderstrike, both
+            // LeiDian affixes); an effect zone's two tabs get two. A Chaos tab has no Chaos support buff.
+            Dictionary<int, string> supportAffix = TableReaderV2.Parse<ArenaAreaBuffDetailsTable>().ToDictionary(row => row.Id,
+                row => Path.GetFileNameWithoutExtension(row.Icon ?? "").Replace("IconAffix", "").Replace("Up", ""));
+            string[] elementAffix = ["", "Wuli", "Bingshuang", "Huoyan", "LeiDian", "Anneng", "Nihility", "Dianshu", "Zhanji", "Fubing", "Fenshao", "Anyan"];
+            bool TabMatches(int type, long eventId) => type >= elementAffix.Length
+                || (supportAffix.TryGetValue((int)eventId, out string? affix) && affix == elementAffix[type]);
+            for (int index = 0; index < selectedAreaIds.Length; index++)
+            {
+                int[] tabs = areaStages[selectedAreaIds[index]].DistributeTypes.Where(type => type > 0).ToArray();
+                int[] support = arenaGroupFightEvents[selectedGroupIds[index]].FightEvents.Where(id => id > 0).ToArray();
+                AssertEqual(tabs.Length, support.Length, $"War Zone area {selectedAreaIds[index]} has one support buff per tab");
+                AssertEqual(true, tabs.Length switch
+                    {
+                        1 => TabMatches(tabs[0], support[0]),
+                        2 => (TabMatches(tabs[0], support[0]) && TabMatches(tabs[1], support[1]))
+                            || (TabMatches(tabs[0], support[1]) && TabMatches(tabs[1], support[0])),
+                        _ => true
+                    },
+                    $"War Zone area {selectedAreaIds[index]} support buffs match its elements");
+            }
             if (availableAreaGroups.Count > 0 && selectedAreaIds.Any(id => availableAreaGroups.Count(group => group.Areas.Contains(id)) != 1))
                 throw new InvalidDataException("War Zone selected areas must each originate from one distinct ChallengeArea.AreaIdGroup.");
             foreach (JObject area in selectedAreas)
@@ -24438,9 +24723,9 @@ namespace AscNet.Test
                 || Directory.EnumerateFiles(Path.GetDirectoryName(arenaDatasetPath)!, "*PreFightResponse*", SearchOption.AllDirectories).Any())
                 throw new InvalidDataException("War Zone resources must not contain a copied PreFightResponse snapshot.");
             AssertIntegerList(
-                selectedAreaStage.BuffIds.Select(Convert.ToInt64).Append(selectedFightEvent).ToList(),
+                new List<long> { selectedAreaStage.BuffIds[arenaSelectIndex] }.Concat(selectedGroup.FightEvents.Where(id => id > 0).Take(1).Select(Convert.ToInt64)).ToList(),
                 arenaPreFight.FightData.EventIds.Select(Convert.ToInt64).ToList(),
-                "War Zone preflight AreaStage buffs and selected group event");
+                "War Zone preflight selected zone buff and its support buff");
 
             FightSettleResult arenaSettle = new()
             {
@@ -24539,6 +24824,81 @@ namespace AscNet.Test
             AssertEqual(0, scored.OldPoint, "War Zone captured OldPoint");
             AssertEqual(0, scored.OldArenaMaxPoint, "War Zone captured OldArenaMaxPoint");
             AssertEqual(3_779_317, scored.ArenaMaxPoint, "War Zone captured ArenaMaxPoint");
+
+            // Bug regressions: zone buff keyed by ArenaSelectIndex (not all BuffIds), distinct zones/tabs, tier-scaled NPC levels.
+            int savedWzLevel = player.SimulatedBattlefield.ArenaLevel;
+            int savedWzChallengeId = player.SimulatedBattlefield.ArenaChallengeId;
+            int wzPacketId = 81_300;
+            List<int> WzSelectTier(int tier)
+            {
+                ChallengeAreaTable tierChallenge = challenges
+                    .Where(row => row.ArenaLv == tier && player.PlayerData.Level >= row.MinLv && player.PlayerData.Level <= row.MaxLv)
+                    .OrderBy(row => row.ChallengeId).First();
+                player.SimulatedBattlefield.ArenaLevel = tier;
+                player.SimulatedBattlefield.ArenaChallengeId = tierChallenge.ChallengeId;
+                int id = wzPacketId++;
+                InvokeRegisteredRequestHandler("AreaDataRequest", harness.Session, id, new Dictionary<string, object>());
+                AreaDataResponse tierAreas = ReadResponsePayload<AreaDataResponse>(harness, id, nameof(AreaDataResponse), $"War Zone tier {tier} AreaDataResponse");
+                return JArray.FromObject(tierAreas.AreaList!).Select(area => area.Value<int>("AreaId")).ToList();
+            }
+            PreFightResponse WzPreFight(int areaId, int index)
+            {
+                int id = wzPacketId++;
+                InvokeRegisteredRequestHandler(nameof(PreFightRequest), harness.Session, id, new PreFightRequest
+                {
+                    PreFightData = new PreFightRequest.PreFightRequestPreFightData
+                    {
+                        ChallengeCount = 1, StageId = checked((uint)areaStages[areaId].StageId[0]), SelectAreaId = areaId,
+                        ArenaSelectIndex = index, CardIds = [], RobotIds = []
+                    }
+                });
+                return ReadResponsePayload<PreFightResponse>(harness, id, nameof(PreFightResponse), $"War Zone area {areaId} index {index} PreFightResponse");
+            }
+            long[] WzEvents(PreFightResponse response) => response.FightData.EventIds.Select(Convert.ToInt64).ToArray();
+            int WzFirstNpcLevel(PreFightResponse response) =>
+                JArray.FromObject(response.FightData.NpcGroupList)[0]!["NpcList"]![0]!.Value<int>("Level");
+
+            List<int> legendAreas = WzSelectTier(7);
+            AreaStageTable zoneA = areaStages[legendAreas[0]];
+            AreaStageTable zoneB = areaStages[legendAreas[1]];
+            AreaStageTable entropic = areaStages[legendAreas[^1]];
+            AssertEqual(2, entropic.BuffIds.Count, "War Zone Entropic Distortion offers two zone tabs");
+            player.SimulatedBattlefield.ArenaDistributeMaxPoints[entropic.DistributeTypes[0]] = 1_111;
+            player.SimulatedBattlefield.ArenaDistributeMaxPoints[entropic.DistributeTypes[1]] = 2_222;
+            PreFightResponse zoneAFight = WzPreFight(zoneA.Id, 0);
+            PreFightResponse zoneBFight = WzPreFight(zoneB.Id, 0);
+            PreFightResponse entropicTab0 = WzPreFight(entropic.Id, 0);
+            PreFightResponse entropicTab1 = WzPreFight(entropic.Id, 1);
+            AssertEqual(zoneA.BuffIds[0], (int)WzEvents(zoneAFight)[0], "War Zone first zone buff is its own element buff");
+            AssertEqual(zoneB.BuffIds[0], (int)WzEvents(zoneBFight)[0], "War Zone second zone buff is its own element buff");
+            AssertEqual(true, WzEvents(zoneAFight)[0] != WzEvents(zoneBFight)[0], "War Zone two zones get different buffs");
+            AssertEqual(true, WzEvents(zoneAFight).Length >= 1, "War Zone zone buff present");
+            AssertEqual(entropic.BuffIds[0], (int)WzEvents(entropicTab0)[0], "War Zone Entropic tab 1 buff");
+            AssertEqual(entropic.BuffIds[1], (int)WzEvents(entropicTab1)[0], "War Zone Entropic tab 2 buff");
+            AssertEqual(false, WzEvents(entropicTab0).Take(1).Concat(WzEvents(entropicTab1).Take(1)).Distinct().Count() == 1, "War Zone Entropic tabs differ");
+            AssertEqual(false, WzEvents(entropicTab0).Skip(1).Any(eventId => entropic.BuffIds.Contains((int)eventId)), "War Zone Entropic tab 1 excludes the other tab's buff");
+            AssertEqual(2, WzEvents(entropicTab0).Length, "War Zone Entropic tab 1 carries one support buff");
+            AssertEqual(2, WzEvents(entropicTab1).Length, "War Zone Entropic tab 2 carries one support buff");
+            AssertEqual(true, WzEvents(entropicTab0)[1] != WzEvents(entropicTab1)[1], "War Zone Entropic tabs get different support buffs");
+            AssertEqual("1111", JObject.FromObject(entropicTab0.FightData.StageParams).Value<string>("DistributeMaxScore"), "War Zone Entropic tab 1 distribution maximum");
+            AssertEqual("2222", JObject.FromObject(entropicTab1.FightData.StageParams).Value<string>("DistributeMaxScore"), "War Zone Entropic tab 2 distribution maximum");
+            AssertEqual(20044029, WzPreFight(zoneA.Id, zoneA.BuffIds.Count).Code, "War Zone out-of-range zone tab is rejected");
+
+            ChallengeAreaTable legendChallenge = challenges.Single(row => row.ChallengeId == player.SimulatedBattlefield.ArenaChallengeId);
+            int legendLevel = WzFirstNpcLevel(zoneAFight);
+            int vanguardLevel = WzFirstNpcLevel(WzPreFight(WzSelectTier(3)[0], 0));
+            ChallengeAreaTable vanguardChallenge = challenges.Single(row => row.ChallengeId == player.SimulatedBattlefield.ArenaChallengeId);
+            int leaderLevel = WzFirstNpcLevel(WzPreFight(WzSelectTier(5)[0], 0));
+            ChallengeAreaTable leaderChallenge = challenges.Single(row => row.ChallengeId == 14);
+            AssertEqual(14, player.SimulatedBattlefield.ArenaChallengeId, "War Zone captured tier probe uses the captured challenge");
+            AssertEqual(520, leaderLevel, "War Zone captured tier keeps the captured NPC level");
+            AssertEqual((int)Math.Round(520d * legendChallenge.AvgScore / leaderChallenge.AvgScore), legendLevel, "War Zone Legend NPC level scales with the tier's AvgScore");
+            AssertEqual((int)Math.Round(520d * vanguardChallenge.AvgScore / leaderChallenge.AvgScore), vanguardLevel, "War Zone Vanguard NPC level scales with the tier's AvgScore");
+            AssertEqual(true, legendLevel > vanguardLevel, "War Zone Legend monsters are stronger than Vanguard");
+            player.SimulatedBattlefield.ArenaLevel = savedWzLevel;
+            player.SimulatedBattlefield.ArenaChallengeId = savedWzChallengeId;
+            player.SimulatedBattlefield.ArenaDistributeMaxPoints.Remove(entropic.DistributeTypes[0]);
+            player.SimulatedBattlefield.ArenaDistributeMaxPoints.Remove(entropic.DistributeTypes[1]);
             foreach (CurrentConditionTable scoreCondition in arenaTaskConditions.Values.Where(condition => condition.Type is 28003 or 28006))
             {
                 AssertEqual(scored.Point, player.MissionProgress.ConditionCounters.GetValueOrDefault(scoreCondition.Id),
@@ -26620,7 +26980,6 @@ namespace AscNet.Test
                     out _);
 
             using LoopbackSessionHarness harness = new(character);
-            harness.Session.AppliedTeamPrefabId = 3;
 
             EquipPutOnRequest request = new()
             {
@@ -26648,8 +27007,6 @@ namespace AscNet.Test
             AssertEqual(0, firstPreviousEquip.CharacterId, "EquipPutOnRequestHandler behavior unequipped first previous Type 1 weapon");
             AssertEqual(0, secondPreviousEquip.CharacterId, "EquipPutOnRequestHandler behavior unequipped second previous Type 1 weapon");
             AssertEqual(characterId + 1, otherCharacterWeapon.CharacterId, "EquipPutOnRequestHandler behavior does not unequip another character's Type 1 weapon");
-            AssertEqual(true, harness.Session.AppliedTeamPrefabId is null,
-                "EquipPutOnRequestHandler clears applied preset");
             AssertEqual(1, characterCollection.ReplaceOneCalls,
                 "EquipPutOnRequestHandler persists equipment assignments");
             AssertEqual(characterId,

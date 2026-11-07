@@ -264,7 +264,6 @@ namespace AscNet.GameServer.Handlers
                 if (CharacterPower.ClampCharacterSkillLevelsForClient(session).Count > 0)
                     session.character.Save();
 
-                session.AppliedTeamPrefabId = null;
                 session.GuildIdentityReady = false;
                 GuildModule.BeginLogin(session);
 
@@ -575,26 +574,8 @@ namespace AscNet.GameServer.Handlers
                     && ActivityScheduleService.TryGet(activity.TimeId.Value, out ActivityScheduleEntry schedule)
                     && schedule.IsOpen(now)))
             {
-                ActivityScheduleService.TryGet(passport.TimeId!.Value, out ActivityScheduleEntry schedule);
-                PassportTaskGroupTable[] rounds = TableReaderV2.Parse<PassportTaskGroupTable>()
-                    .Where(group => group.Group == passport.WeekTaskGroup
-                        && group.Type == 2
-                        && group.TimeId is > 0)
-                    .OrderBy(group => group.TimeId)
-                    .ToArray();
-                long firstWeeklyReset = checked(schedule.StartTime
-                    + TaskModule.RemainingSecondsInWeeklyResetPeriod(schedule.StartTime));
-                for (int index = 0; index < rounds.Length; index++)
-                {
-                    long start = index == 0
-                        ? schedule.StartTime
-                        : checked(firstWeeklyReset + (index - 1) * 604_800L);
-                    long nextStart = checked(firstWeeklyReset + index * 604_800L);
-                    long end = index == rounds.Length - 1 && schedule.EndTime != 0
-                        ? schedule.EndTime - 60
-                        : nextStart - 60;
-                    AddDerived(rounds[index].TimeId!.Value, start, end);
-                }
+                foreach ((long timeId, long start, long end) in ActivityScheduleService.PassportRoundWindows(passport))
+                    AddDerived(timeId, start, end);
             }
 
 
@@ -684,7 +665,11 @@ namespace AscNet.GameServer.Handlers
                 controls[control.Id] = control;
             foreach (TimeLimitCtrlConfigList control in GuildBossModule.BuildTimeLimits(now))
                 controls[control.Id] = control;
-            return controls.Values.OrderBy(control => control.Id).ToList();
+            return controls.Values.OrderBy(control => control.Id).Select(control =>
+            {
+                (long start, long end) = ActivityScheduleService.ClientWindow(control.StartTime, control.EndTime, now);
+                return start == control.StartTime && end == control.EndTime ? control : MakeTimeLimitControl(control.Id, start, end);
+            }).ToList();
         }
 
         private static List<FunctionOpenTimeConfig> BuildFunctionOpenTimeConfigList(
@@ -775,6 +760,8 @@ namespace AscNet.GameServer.Handlers
                 ItemList = Inventory.FilterClientItems(session.inventory.Items),
                 CharacterList = session.character.Characters.Select(ToLoginCharacter).ToList(),
                 EquipList = session.character.Equips,
+                // The client computes construct power from these garrisons before any Border Pact request.
+                AssignChapterRecord = AssignModule.BuildLoginChapterRecords(session),
                 FashionList = session.character.Fashions,
                 WeaponFashionList = session.character.WeaponFashions
                     .Select(fashion => new WeaponFashionData
@@ -804,13 +791,14 @@ namespace AscNet.GameServer.Handlers
                 FubenEventData = new(),
                 FubenMainLine2Data = MainLine2Module.BuildLoginData(session),
                 FubenMainLineLuosaitaData = MainLineLuosaitaPayloadFactory.BuildLoginData(session.stage),
-                FubenChapterExtraLoginData = new(),
+                FubenChapterExtraLoginData = new() { TreasureData = session.player.ExtraChapterTreasures.Select(id => (object)id).ToList() },
                 FubenUrgentEventData = new(),
-                FubenShortStoryLoginData = new(),
+                AutoFightRecords = MiscPlayerModule.BuildLoginRecords(session.player).Cast<dynamic>().ToList(),
+                FubenShortStoryLoginData = new() { TreasureData = session.player.ShortStoryTreasures.Select(id => (object)id).ToList() },
                 SignInfos = SignInModule.BuildLoginSignInfos(session.player),
                 UseBackgroundId = session.player.UseBackgroundId,
                 HaveBackgroundIds = BuildHaveBackgroundIds(session.player),
-                RandomBackgroundLoginData = new(),
+                RandomBackgroundLoginData = WardrobePhotoModule.BuildRandomBackgroundLoginData(session.player),
                 PurchaseClientInfoLoginData = BuildPurchaseClientInfoLoginData(session.player),
                 FunctionOpenTimeConfigList = BuildFunctionOpenTimeConfigList(timeLimitControls),
                 DlcPlayerData = new(),
@@ -868,7 +856,7 @@ namespace AscNet.GameServer.Handlers
             }
         }
 
-        private static List<int> BuildHaveBackgroundIds(Player player)
+        internal static List<int> BuildHaveBackgroundIds(Player player)
         {
             HashSet<int> backgroundIds = TableReaderV2.Parse<BackgroundTable>()
                 .Where(background => background.Id > 0 && background.IsFree > 0)
@@ -973,24 +961,9 @@ namespace AscNet.GameServer.Handlers
             };
         }
 
-        private static NotifyPayInfo BuildNotifyPayInfo()
+        private static NotifyFunctionalEntranceData BuildFunctionalEntranceData(Player player)
         {
-            return new()
-            {
-                TotalPayMoney = 0,
-                FirstRewardReceivedList = []
-            };
-        }
-
-        private static NotifyFunctionalEntranceData BuildFunctionalEntranceData()
-        {
-            return new()
-            {
-                RedPointDatas = new()
-                {
-                    { 20000, 45 }
-                }
-            };
+            return new() { RedPointDatas = new(player.FunctionalEntranceRedPoints) };
         }
 
         private static PurchaseDailyNotify BuildPurchaseDailyNotify()
@@ -1128,7 +1101,6 @@ namespace AscNet.GameServer.Handlers
                 ["ChatMessages"] = Array.Empty<object>()
             }),
             ["NotifyGame2048DataDb"] = SerializeStartupPayload(BuildGame2048Payload()),
-            ["NotifyGameCollectionData"] = SerializeStartupPayload(BuildGameCollectionPayload()),
             ["NotifyGoldenMinerGameInfo"] = SerializeStartupPayload(BuildGoldenMinerPayload()),
             ["NotifyTaikoMasterData"] = SerializeStartupPayload(BuildTaikoMasterPayload()),
             ["NotifyTurntableData"] = SerializeStartupPayload(BuildTurntablePayload())
@@ -1255,9 +1227,21 @@ namespace AscNet.GameServer.Handlers
                     .ToList(),
                 MonsterUnlockIds = simulateTrainBosses
                     .Select(row => (uint)row.Id)
+                    .Concat(player.ArchiveUnlocks.Where(row => row.Kind == "Monster").Select(row => checked((uint)row.Id)))
                     .Distinct()
                     .Order()
                     .ToList(),
+                WeaponUnlockIds = ArchiveModule.UnlockedIds(player, "Weapon"),
+                AwarenessUnlockIds = ArchiveModule.UnlockedIds(player, "Awareness"),
+                MonsterInfos = ArchiveModule.UnlockedIds(player, "MonsterInfo"),
+                MonsterSkills = ArchiveModule.UnlockedIds(player, "MonsterSkill"),
+                MonsterSettings = ArchiveModule.UnlockedIds(player, "MonsterSetting"),
+                WeaponSettings = ArchiveModule.UnlockedIds(player, "WeaponSetting"),
+                AwarenessSettings = ArchiveModule.UnlockedIds(player, "AwarenessSetting"),
+                Equips = player.ArchiveEquipment.Select(row => new NotifyArchiveLoginData.NotifyArchiveLoginDataEquip
+                {
+                    Id = checked((uint)row.Id), Level = row.Level, Breakthrough = row.Breakthrough, ResonanceCount = row.ResonanceCount
+                }).ToList(),
                 UnlockComics = unlockComics,
                 UnlockCgs = player.ArchiveUnlockedCgs.Order().Select(id => checked((uint)id)).ToList(),
                 PartnerUnlockIds = player.ArchivePartnerUnlockIds.ToList(),
@@ -1300,10 +1284,14 @@ namespace AscNet.GameServer.Handlers
             session.player.NormalizeTeamPrefabs();
             session.ClampPlayerLevelToConfiguredMaximum();
             (ActivityResultNotify? arenaResult, NotifyArenaActivity arenaActivity) = ArenaModule.ReconcileLogin(session);
+            // The login payload below carries the settled state, so no ChangeDay push here.
+            StrongholdModule.Reconcile(session, DateTimeOffset.UtcNow, push: false);
             StrongholdModule.PrepareLogin(session.player);
             if (PartnerModule.RefreshArchive(session.player, session.character))
                 session.player.SaveChecked();
             ArchiveCgModule.Reconcile(session, notify: false);
+            if (ArchiveModule.ReconcileEquipment(session))
+                session.player.Save();
 
 
             // Reconcile before NotifyLogin so repaired equipped head ids are present in the login
@@ -1342,9 +1330,10 @@ namespace AscNet.GameServer.Handlers
                     NewbieHonorReward = session.player.MissionProgress.NewbieHonorReward,
                     NewbieUnlockPeriod = 7,
                     Course = session.stage.Course,
-                    FinishedTasks = session.stage.FinishedTasks,
+                    FinishedTasks = TaskModule.BuildFinishedTaskIds(session),
                     NewPlayerRewardRecord = session.player.MissionProgress.NewPlayerRewardRecords,
                     NewbieRecvProgress = session.player.MissionProgress.NewbieRewardRecords,
+                    WeeklyTaskActivenessProgress = session.player.MissionProgress.WeeklyTaskActivenessProgress,
                     Tasks = TaskModule.BuildTaskData(session),
                 }
             };
@@ -1355,14 +1344,16 @@ namespace AscNet.GameServer.Handlers
 
             NotifyBirthdayPlot notifyBirthdayPlot = new()
             {
-                IsChange = session.player.PlayerData.Birthday is null ? 0 : 1
+                IsChange = session.player.PlayerData.Birthday is null ? 0 : 1,
+                SingleStoryIds = FavorMemoryModule.BirthdayStoryIds(session.player)
             };
 
             NotifyNewPlayerTaskStatus notifyNewPlayerTaskStatus = new()
             {
-                NewPlayerTaskActiveDay = session.player.PlayerData.NewPlayerTaskActiveDay
+                NewPlayerTaskActiveDay = session.player.PlayerData.NewPlayerTaskActiveDay,
+                NewPlayerTaskActiveUi = session.player.PlayerData.NewPlayerTaskActiveUi
             };
-            NotifyPayInfo notifyPayInfo = BuildNotifyPayInfo();
+            NotifyPayInfo notifyPayInfo = PayModule.BuildNotifyPayInfo(session.player);
             PayModule.GrantMailDailyRewards(session, sendPush: false);
             long mailNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             bool mailStateChanged = MailModule.EnsureSystemMails(session.player, mailNow)
@@ -1370,7 +1361,7 @@ namespace AscNet.GameServer.Handlers
             NotifyMails notifyMails = MailModule.BuildNotifyMails(session.player, mailNow);
             if (mailStateChanged)
                 session.player.SaveChecked();
-            NotifyFunctionalEntranceData notifyFunctionalEntranceData = BuildFunctionalEntranceData();
+            NotifyFunctionalEntranceData notifyFunctionalEntranceData = BuildFunctionalEntranceData(session.player);
             PurchaseDailyNotify purchaseDailyNotify = BuildPurchaseDailyNotify();
             PayModule.AddSignInNotifications(purchaseDailyNotify, session.player);
             foreach (uint id in session.player.PurchaseDailyPasses.Keys)
@@ -1397,7 +1388,7 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(BuildNotifyArchiveLoginData(session.player));
             session.SendPush(AwarenessModule.BuildLoginData(session.player));
             session.SendPush(notifyChatLoginData);
-            session.SendPush(new NotifySocialData());
+            session.SendPush(SocialModule.BuildLoginData(session.player));
             session.SendPush(notifyTaskData);
             session.SendPush(TaskModule.BuildActivenessStatus(session));
             session.SendPush(notifyNewPlayerTaskStatus);
@@ -1406,7 +1397,7 @@ namespace AscNet.GameServer.Handlers
             TaskModule.SendTaskSync(session);
             session.SendPush(BuildRegressionLoginData());
             session.SendPush(new NotifyAllRedEnvelope());
-            session.SendPush(new NotifyScoreTitleData { TitleInfos = session.character.ScoreTitles });
+            session.SendPush(ProfileShowcaseModule.LoginData(session));
             session.SendPush(BuildBfrtLoginData(session.player));
             session.SendPush(BiancaTheatreModule.BuildLoginData(session, DateTimeOffset.UtcNow));
             BiancaTheatreModule.SendRecoveredSettlement(session);
@@ -1463,15 +1454,20 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(new NotifyPrequelChallengeRefreshTime() { NextRefreshTime = NextDailyRefreshTime() });
             session.SendPush(new NotifyDailyFubenLoginData() { RefreshTime = NextDailyRefreshTime() });
             session.SendPush(notifyBirthdayPlot);
+            FavorMemoryModule.SendLoginPushes(session);
             SendEmptyStartupPush(session, "NotifyBountyChallengeMonsterDifficultyState");
             session.SendPush(BuildNotifyBriefStoryData(session.player));
-            SendEmptyStartupPush(session, "NotifyCerberusGameData");
+            session.SendPush(CerberusGameModule.BuildNotify(session));
+            if (MaintainerActionModule.BuildNotify(session) is { } maintainerAction)
+                session.SendPush(maintainerAction);
+            SkyTowerModule.SendLoginPushes(session);
             TowerModule.PrepareLogin(session);
             SendEmptyStartupPush(session, "NotifyClickClearData");
             SendEmptyStartupPush(session, "NotifyClientVersion");
             SendEmptyStartupPush(session, "NotifyColorTableActivityData");
             SendEmptyStartupPush(session, "NotifyCommunityData");
             Version47EventModule.SendLoginPushes(session, Version47EventModule.Clock());
+            AnniversaryPreHeatingModule.SendLoginPush(session, AnniversaryPreHeatingModule.Clock());
             SendEmptyStartupPush(session, "NotifyCoupletData");
             session.SendPush(CourseModule.BuildLoginData(session.player));
             SendEmptyStartupPush(session, "NotifyDoomsdayDbChange");
@@ -1483,6 +1479,12 @@ namespace AscNet.GameServer.Handlers
             if (fashionStoryData.ActivityId > 0)
                 session.SendPush(fashionStoryData);
             session.SendPush(HitMouseModule.BuildNotifyHitMouseData(session.player));
+            session.SendPush(PacMan2Module.BuildLoginData(session.player, DateTimeOffset.UtcNow));
+            if (ReformModule.BuildLoginData(session.player, DateTimeOffset.UtcNow) is { } reformData)
+                session.SendPush(reformData);
+            if (SmallRewardsModule.BuildVersionGiftNotify(session.player, DateTimeOffset.UtcNow) is { } versionGiftData)
+                session.SendPush(versionGiftData);
+            session.SendPush(SmallRewardsModule.BuildShopNotify(session, DateTimeOffset.UtcNow));
             DyeMergeStagesRecordNotify dyeMergeData = DyeMergeModule.BuildNotify(session.player);
             if (dyeMergeData.ActivityId > 0)
                 session.SendPush(dyeMergeData);
@@ -1502,7 +1504,7 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(DrawModule.BuildNotifyDrawCanLiverData(session.player));
             session.SendPush(DrawModule.BuildNotifyDateALiveDraw());
             SendEmptyStartupPush(session, "NotifyGame2048DataDb");
-            SendEmptyStartupPush(session, "NotifyGameCollectionData");
+            session.SendPush(SmallRewardsModule.BuildGameCollectionNotify());
             SendCurrentEventTaskBatch(session, RetroArcadeTaskBatchEntry);
             SendEmptyStartupPush(session, "NotifyGoldenMinerGameInfo");
             SendEmptyStartupPush(session, "NotifyGuildSignPlayerData");
@@ -1510,12 +1512,12 @@ namespace AscNet.GameServer.Handlers
             session.SendPush(LifeTreeModule.BuildNotifyLifeTreeData(session.player));
             session.SendPush(GachaManager.BuildSelfChoicePayload(session.player));
             SendEmptyStartupPush(session, "NotifySelfChoiceLottoData");
-            session.SendPush(new NotifyLoginMailCollectionBoxData());
+            session.SendPush(CollectionMiscModule.BuildLoginData(session.player, DateTimeOffset.UtcNow));
             SendEmptyStartupPush(session, "NotifyNonogramData");
             SendEmptyStartupPush(session, "NotifyPivotCombatData");
             session.SendPush(LoadingModule.BuildLoginData(session.player));
             session.SendPush(RepeatChallengeModule.BuildLoginData(session.player));
-            SendEmptyStartupPush(session, "NotifyPlayerReportData");
+            session.SendPush(ChatSocialModule.BuildReportData(session.player));
             session.SendPush(SameColorGameModule.BuildLoginData(session.player));
             session.SendPush(StrongholdModule.BuildLoginData(session.player));
             SendEmptyStartupPush(session, "NotifySucceedBossData");

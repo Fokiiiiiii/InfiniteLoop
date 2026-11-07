@@ -1,0 +1,71 @@
+--- XGmTestManager.lua
++++ XGmTestManager.lua
+@@ -1,7 +1,14 @@
+ XGmTestManager = XGmTestManager or {}
+-local Panel
++local Panel = require("XAscNet/XAscNetGmPanel")
+ 
+-local ReLogin = CS.XDebugManager.ReLogin
++local function ReLogin()
++    local nativeReLogin = CS.XDebugManager.ReLogin
++    if type(nativeReLogin) == "function" then
++        nativeReLogin()
++    else
++        XLoginManager.BackToLogin()
++    end
++end
+ 
+ -- Lua 单元测试菜单配色（直接设 Text.color，无需富文本）：默认黄、通过转绿、失败转红
+ local GM_TEST_COLOR_DEFAULT = CS.UnityEngine.Color(1, 0.92, 0, 1)
+@@ -1016,8 +1023,7 @@
+         end
+     , true)
+ 
+-    local btnPlay1 =
+-        Panel:AddButton(
++    Panel:AddButton(
+         "播放音频",
+         function()
+             if not cueId then
+@@ -1030,13 +1036,9 @@
+             XLuaAudioManager.PlayAudioByType(typeId, cueId)
+         end
+     )
+-    if btnPlay1 then
+-        btnPlay1.transform:GetComponent("XAudioCustomComponentBase").enabled = false
+-    end
+ 
+     local force3dSource = nil
+-    local btnPlay2 =
+-        Panel:AddButton(
++    Panel:AddButton(
+         "播放3D音频",
+         function()
+             if not cueId then
+@@ -1055,9 +1057,6 @@
+             XLuaAudioManager.PlayAudioByType(typeId, cueId, force3dSource.gameObject)
+         end
+     )
+-    if btnPlay2 then
+-        btnPlay2.transform:GetComponent("XAudioCustomComponentBase").enabled = false
+-    end
+ 
+     Panel:AddButton(
+         "关闭音频",
+@@ -1845,7 +1844,6 @@
+ end
+ 
+ function XGmTestManager.Init()
+-    Panel = CS.XDebugManager.DebuggerGm
+     Panel:AddSubMenu("本地测试", XGmTestManager.TestFunc)
+     Panel:AddSubMenu("当前信息", AddInfo, true)
+     Panel:AddSubMenu("服务器", AddServerFunction, true)
+@@ -2030,3 +2028,8 @@
+     return dataList
+ end
+ --endregion
++
++-- XScheduleManager is loaded before RequireManager; defer until its remaining managers are ready.
++Panel.StartWatcher(function()
++    XGmTestManager.Init()
++end)

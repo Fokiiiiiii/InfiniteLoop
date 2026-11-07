@@ -1,7 +1,12 @@
+using AscNet.Table.V2.share.passport;
+using AscNet.Table.V2.share.skytower;
+using TaskTimeLimitTable = AscNet.Table.V2.share.task.TaskTimeLimitTable;
 using AscNet.Common.Util;
 using AscNet.Table.V2.share.activity;
 using AscNet.Table.V2.share.condition;
 using AscNet.Table.V2.share.fuben.simulatetrain;
+using AscNet.Table.V2.share.fuben.cerberusgame;
+using AscNet.Table.V2.share.fuben.maintaineraction;
 using AscNet.Table.V2.share.miniactivity.dyemerge;
 using AscNet.Table.V2.share.samecolorgame;
 using AscNet.Table.V2.share.theatre;
@@ -9,7 +14,14 @@ using AscNet.Table.V2.share.theatre3;
 using AscNet.Table.V2.share.theatre4;
 using AscNet.Table.V2.share.miniactivity.fangkuai;
 using AscNet.Table.V2.share.fuben.transfinitetower;
+using AscNet.Table.V2.client.activitybrief;
+using AscNet.Table.V2.client.functional;
+using AscNet.Table.V2.client.fuben;
+using AscNet.Table.V2.share.fuben;
 using AscNet.Table.V2.share.punishaar;
+using AscNet.Table.V2.share.miniactivity.pacman2;
+using AscNet.Table.V2.share.miniactivity.anniversarypreheating;
+using AscNet.Table.V2.share.fuben.reform;
 
 namespace AscNet.GameServer.Game;
 
@@ -26,7 +38,7 @@ public readonly record struct ActivityScheduleEntry(long Id, long StartTime, lon
 /// <summary>Event availability derived from version tables, public notices, and documented local mode policies.</summary>
 public static class ActivityScheduleService
 {
-    private const long UnboundedEnd = 32503680000; // 3000-01-01 UTC; see the Theatre5 note below.
+    internal const long UnboundedEnd = 32503680000; // 3000-01-01 UTC; see the Theatre5 note below.
 
     private static readonly Lazy<IReadOnlyList<ActivityScheduleEntry>> Entries = new(() =>
         TableReaderV2.Parse<Theatre3ActivityTable>()
@@ -61,23 +73,199 @@ public static class ActivityScheduleService
             .Concat(FangKuaiChapterEntries())
             .Concat(PunishaarStageEntries())
             .Concat(TransfiniteTowerEntries())
+            .Concat(CerberusGameEntries())
+            .Concat(MaintainerActionEntries())
             // AscNet policy (user-approved, not retail parity): the separate self-choice lottery
             // has no authoritative calendar. Its client requires a positive end time.
             .Concat(new[] { new ActivityScheduleEntry(49501, 0, UnboundedEnd,
                 "local-policy:missing-calendar:unbounded-calendar:"
                 + "LottoPrimary:Id=5(3.7 Choice self-choice coating lottery):TimeId=49501:user-approved") })
+            .Concat(PassportSeasonEntries())
+            .Concat(MissingCalendar49Entries())
+            .Concat(SkyTowerEntries())
+            .Concat(ClientCalendarEntries())
+            // After the derived/4.9 lists: 51101/51102 are also referenced there and keep that label; only 51103 is new.
+            .Concat(PacMan2Entries())
             .DistinctBy(row => row.Id)
             .OrderBy(row => row.Id)
             .ToArray());
+
+    /// <summary>
+    /// AscNet policy (user-approved missing-calendar availability, AGENTS.md; not retail parity): the 4.9
+    /// client tables reference these TimeIds and no authoritative window exists yet. Each opens unbounded
+    /// (positive end keeps client countdowns valid) and any official or derived window for the same TimeId
+    /// wins because DistinctBy keeps the earlier entry. Fate draws and client-only gates (ActivityBriefGroup,
+    /// ActivityBtn, SkipFunctional, Draw*) are not opened. Listed in Docs/closed.md.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> MissingCalendar49Entries() =>
+        MissingCalendar49.Select(row => new ActivityScheduleEntry(row.TimeId, 0, UnboundedEnd,
+            $"local-policy:missing-calendar:unbounded-calendar:{row.Source}:TimeId={row.TimeId}:4.9:user-approved"));
+
+    /// <summary>
+    /// AscNet policy (missing-calendar, user-approved, not retail parity): a Passport season whose TimeId has no authored window
+    /// starts when the previous season (PassportActivity.Id - 1) ends, and stays open-ended like the other 4.9 policy windows.
+    /// A dated start is what lets the weekly rounds (PassportRoundWindows) unlock one after another; an official window wins.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> PassportSeasonEntries()
+    {
+        Dictionary<int, ActivityScheduleTable> authored = TableReaderV2.Parse<ActivityScheduleTable>().ToDictionary(row => row.Id);
+        Dictionary<int, PassportActivityTable> seasons = TableReaderV2.Parse<PassportActivityTable>().ToDictionary(row => row.Id);
+        foreach (PassportActivityTable season in seasons.Values.Where(row => row.TimeId is > 0 && !authored.ContainsKey(row.TimeId.Value)))
+            if (seasons.TryGetValue(season.Id - 1, out PassportActivityTable? previous)
+                && previous.TimeId is > 0 && authored.TryGetValue(previous.TimeId.Value, out ActivityScheduleTable? previousWindow)
+                && previousWindow.EndTime > 0)
+                yield return new ActivityScheduleEntry(season.TimeId!.Value, previousWindow.EndTime, UnboundedEnd,
+                    $"local-policy:missing-calendar:season-after-previous:PassportActivity:Id={season.Id}:TimeId={season.TimeId}:"
+                    + $"start=end of PassportActivity Id={previous.Id} TimeId={previous.TimeId}:unbounded-end:user-approved");
+    }
+
+    /// <summary>
+    /// Window of every weekly round (PassportTaskGroup Type 2 of WeekTaskGroup, ordered by TimeId). Retail defines no dates, so this is
+    /// AscNet policy derived from the season window: week 1 opens at the season start and runs to the first weekly task reset,
+    /// week N opens N-2 weeks after that reset (N-1 weeks after the season start when it starts on a reset), and the last round runs to
+    /// the season end. Rounds must change on the weekly reset because that reset clears the per-week Passport task claims and counters
+    /// (TaskModule.EnsureMissionResets). The client gates each round by CheckInTimeByTimeId. Empty when the season has no dated start.
+    /// </summary>
+    internal static List<(long TimeId, long Start, long End)> PassportRoundWindows(PassportActivityTable season)
+    {
+        List<(long, long, long)> windows = [];
+        if (season.TimeId is not > 0 || !TryGet(season.TimeId.Value, out ActivityScheduleEntry schedule) || schedule.StartTime <= 0)
+            return windows;
+        long[] rounds = TableReaderV2.Parse<PassportTaskGroupTable>()
+            .Where(group => group.Group == season.WeekTaskGroup && group.Type == 2 && group.TimeId is > 0)
+            .Select(group => (long)group.TimeId!.Value).OrderBy(id => id).ToArray();
+        long firstReset = schedule.StartTime + Handlers.TaskModule.RemainingSecondsInWeeklyResetPeriod(schedule.StartTime);
+        for (int index = 0; index < rounds.Length; index++)
+            windows.Add((rounds[index], index == 0 ? schedule.StartTime : firstReset + (index - 1) * 604_800L,
+                index == rounds.Length - 1 ? schedule.EndTime : firstReset + index * 604_800L));
+        return windows;
+    }
+
+    /// <summary>
+    /// AscNet policy (user-approved missing-calendar availability, AGENTS.md; not retail parity): Dreamhouse Tycoon has no
+    /// authoritative calendar. Every TimeId its own tables reference opens unbounded: SkyTowerActivity.TimeId (which is also
+    /// the client's ActivityBrief entry), the TaskTimeLimit rows listed in SkyTowerActivity.TimeLimitTaskIds, and any
+    /// SkyTowerPerform.TimeId. Any official or derived window for the same TimeId wins (DistinctBy keeps the earlier entry).
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> SkyTowerEntries()
+    {
+        SkyTowerActivityTable[] activities = TableReaderV2.Parse<SkyTowerActivityTable>().ToArray();
+        HashSet<int> limitIds = activities.SelectMany(row => row.TimeLimitTaskIds).ToHashSet();
+        return activities.Select(row => ("SkyTowerActivity.TimeId", row.TimeId))
+            .Concat(TableReaderV2.Parse<TaskTimeLimitTable>().Where(row => limitIds.Contains(row.Id)).Select(row => ("TaskTimeLimit.TimeId", row.TimeId ?? 0)))
+            .Concat(TableReaderV2.Parse<SkyTowerPerformTable>().Select(row => ("SkyTowerPerform.TimeId", row.TimeId)))
+            .Where(row => row.Item2 > 0).DistinctBy(row => row.Item2)
+            .Select(row => new ActivityScheduleEntry(row.Item2, 0, UnboundedEnd,
+                $"local-policy:missing-calendar:unbounded-calendar:{row.Item1}:TimeId={row.Item2}:user-approved"));
+    }
+
+    /// <summary>
+    /// AscNet policy (user-approved missing-calendar availability, AGENTS.md; not retail parity): every TimeId the
+    /// client's own entry tables reference gets an unbounded window unless an official or derived window exists
+    /// (DistinctBy keeps the earlier entry). Derived from the tables, not a per-version list, so a re-import is the
+    /// only step a new version needs: FubenClientConfig.MainPanelTimeId and FubenActivityTimeTips.TimeId drive the
+    /// Battle Screen "Limited Event" button/caption, FubenActivity.TimeId the timed Battle Screen entries, and
+    /// ActivityBriefGroup.TimeId the Events page entries listed by ActivityBrief.GroupIdList. An entry whose skip
+    /// the server cannot serve stays closed: ActivityUrl skips (Origin 9) hand the player token to a retail web page.
+    /// Fate draws are not here.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> ClientCalendarEntries()
+    {
+        Dictionary<int, SkipFunctionalTable> skips = TableReaderV2.Parse<SkipFunctionalTable>()
+            .GroupBy(skip => skip.SkipId).ToDictionary(group => group.Key, group => group.First());
+        bool Served(int? skipId) => skipId is not int id || !skips.TryGetValue(id, out SkipFunctionalTable? skip) || skip.Origin != 9;
+        Dictionary<int, ActivityBriefGroupTable> groups = TableReaderV2.Parse<ActivityBriefGroupTable>()
+            .ToDictionary(group => group.Id);
+
+        IEnumerable<(string Source, int TimeId)> references =
+            TableReaderV2.Parse<FubenClientConfigTable>()
+                .Where(row => row.Key == "MainPanelTimeId")
+                .Select(row => ("FubenClientConfig.MainPanelTimeId", int.Parse(row.Values[0])))
+            .Concat(TableReaderV2.Parse<FubenActivityTimeTipsTable>()
+                .Select(row => ("FubenActivityTimeTips.TimeId", row.TimeId)))
+            .Concat(TableReaderV2.Parse<FubenActivityTable>()
+                .Where(row => Served(row.SkipId))
+                .Select(row => ("FubenActivity.TimeId", row.TimeId)))
+            .Concat(TableReaderV2.Parse<ActivityBriefTable>()
+                .SelectMany(brief => brief.GroupIdList)
+                .Where(groupId => groups.ContainsKey(groupId) && Served(groups[groupId].SkipId))
+                .Select(groupId => ("ActivityBriefGroup.TimeId", groups[groupId].TimeId ?? 0)))
+            // Dreamscape Disequilibrium: the activity, its chapters and their staggered stage windows (51301-51304).
+            .Concat(TableReaderV2.Parse<ReformCfgTable>().Select(row => ("ReformCfg.OpenTimeId", row.OpenTimeId)))
+            .Concat(TableReaderV2.Parse<ReformChapterTable>().Select(row => ("ReformChapter.OpenTime", row.OpenTime)))
+            .Concat(TableReaderV2.Parse<ReformStageTable>().Select(row => ("ReformStage.OpenTimeId", row.OpenTimeId)));
+        // Time Trace stays closed (Docs/closed.md): its Events entry (ActivityBriefGroup 159) must not re-open the activity.
+        HashSet<int> closed = TableReaderV2.Parse<AnniversaryPreHeatingActivityTable>().Select(row => row.TimeId)
+            .Concat(TableReaderV2.Parse<AnniversaryPreHeatingGroupTable>().Select(row => row.TimeId)).ToHashSet();
+        return references.Where(row => row.TimeId > 0 && !closed.Contains(row.TimeId)).DistinctBy(row => row.TimeId)
+            .Select(row => new ActivityScheduleEntry(row.TimeId, 0, UnboundedEnd,
+                $"local-policy:missing-calendar:unbounded-calendar:{row.Source}:TimeId={row.TimeId}:user-approved"));
+    }
+
+    /// <summary>
+    /// The window the client is told for a missing-calendar (x, UnboundedEnd) entry. The client has no "permanent"
+    /// convention for window-driven entries (<c>RefreshAcitivityTime</c> needs end &gt; now; <c>MM.dd</c> and the
+    /// "Remaining Time" banner format the raw bounds), so 0 / 3000-01-01 rendered as "01.01-01.01, 355436 days".
+    /// The push instead carries the current UTC month and the next three, recomputed at every login (a dated start, such as the
+    /// policy Passport season start, is kept); the server's own checks keep the unbounded entry.
+    /// ponytail: a session left running over ~2 months expires client timers.
+    /// </summary>
+    public static (long Start, long End) ClientWindow(long startTime, long endTime, DateTimeOffset now)
+    {
+        if (endTime != UnboundedEnd)
+            return (startTime, endTime);
+        DateTime utc = now.UtcDateTime;
+        DateTimeOffset month = new(utc.Year, utc.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        return (startTime != 0 ? startTime : month.ToUnixTimeSeconds(), month.AddMonths(3).ToUnixTimeSeconds());
+    }
+
+    private static readonly (int TimeId, string Source)[] MissingCalendar49 =
+    [
+        (730, "TransfiniteActivity.TimeId"),
+        (731, "TransfiniteActivity.TimeId"),
+        (1282, "MailCollectionBoxActivity.TimeId"),
+        (1283, "MailCollectionBoxActivity.TimeId"),
+        (1284, "MailCollectionBoxActivity.TimeId"),
+        (1285, "MailCollectionBoxActivity.TimeId"),
+        (1286, "MailCollectionBoxActivity.TimeId"),
+        (1287, "MailCollectionBoxActivity.TimeId"),
+        (1288, "MailCollectionBoxActivity.TimeId"),
+        (1289, "MailCollectionBoxActivity.TimeId"),
+        (1290, "MailCollectionBoxActivity.TimeId"),
+        (1291, "MailCollectionBoxActivity.TimeId"),
+        (14103, "TaskTimeLimit.TimeId"),
+        (50200, "PunishaarActivity.TimeId"),
+        (51101, "NewActivityCalendarActivity.MainTimeId"),
+        (51102, "NewActivityCalendarPeriod.TimeId"),
+        (51201, "BossActivity.ActivityTimeId+BossActivity.FightTimeId+NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId"),
+        (51202, "ExperimentLevel.TimeId+NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId+TaskTimeLimit.TimeId"),
+        (51203, "ExperimentLevel.TimeId+NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId+TaskTimeLimit.TimeId"),
+        (51204, "TaskTimeLimit.TimeId"),
+        (51205, "NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId+TaskTimeLimit.TimeId"),
+        (51206, "ExperimentLevel.TimeId"),
+        (51207, "ExperimentLevel.TimeId"),
+        (51301, "NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId+TaskTimeLimit.TimeId"),
+        (51401, "Lotto.TimeId+LottoPrimary.TimeId"),
+        (51502, "TaskTimeLimit.TimeId"),
+        (51701, "MainLine2Chapter.ActivityTimeId"),
+        (51903, "TaskTimeLimit.TimeId"),
+        (51909, "ActivityBrief.TimeId"),
+        (51910, "SignIn.TimeId"),
+        (51920, "PassportTimeLimitTaskReward.ExTimeId"),
+        (51942, "NewActivityCalendarActivity.MainTimeId+NewActivityCalendarPeriod.TimeId"),
+    ];
 
     public static IReadOnlyList<ActivityScheduleEntry> All => Entries.Value;
 
     public static bool IsOpen(long timeId, DateTimeOffset now) =>
         TryGet(timeId, out ActivityScheduleEntry entry) && entry.IsOpen(now);
 
+    /// <summary>Test-only schedule override consulted before the real entries; tests restore it in finally.</summary>
+    internal static IReadOnlyList<ActivityScheduleEntry> TestEntries = [];
+
     public static bool TryGet(long timeId, out ActivityScheduleEntry entry)
     {
-        entry = Entries.Value.FirstOrDefault(row => row.Id == timeId);
+        entry = TestEntries.Concat(Entries.Value).FirstOrDefault(row => row.Id == timeId);
         return entry.Id != 0;
     }
 
@@ -109,6 +297,77 @@ public static class ActivityScheduleService
                 yield return new ActivityScheduleEntry(timeId, 0, 0,
                     $"feature-window:Theatre:permanent-decoration-release:user-approved:"
                     + $"TheatreDecoration:DecorationId=20003,20004,20005:Condition:Id={conditionId}:TimeId={timeId}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// AscNet policy (missing-retail policy): Operation Guardians' MaintainerActionConfig.TimeId has no authored
+    /// calendar row, so the mode is permanently available. A positive end keeps the client's countdown valid.
+    /// An official ActivitySchedule row for the same TimeId precedes this one and wins.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> MaintainerActionEntries() =>
+        TableReaderV2.Parse<MaintainerActionConfigTable>().Where(row => row.TimeId > 0)
+            .Select(row => new ActivityScheduleEntry(row.TimeId, 0, UnboundedEnd,
+                $"local-policy:MaintainerAction:missing-calendar:permanent-mode:MaintainerActionConfig:Id={row.Id}:TimeId={row.TimeId}"));
+
+    /// <summary>
+    /// AscNet policy (missing-retail policy): Munchy Pixels' PacMan2Activity.TimeId and PacMan2Stage.TimeId have no
+    /// authored calendar row, so the mode is permanently available. A positive end keeps the client's countdown
+    /// valid; an official ActivitySchedule row for the same TimeId precedes this one and wins.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> PacMan2Entries() =>
+        TableReaderV2.Parse<PacMan2ActivityTable>().Select(row => (row.TimeId, Source: $"PacMan2Activity:Id={row.Id}"))
+            .Concat(TableReaderV2.Parse<PacMan2StageTable>().Select(row => (row.TimeId, Source: $"PacMan2Stage:Id={row.Id}")))
+            .Where(row => row.TimeId > 0).DistinctBy(row => row.TimeId)
+            .Select(row => new ActivityScheduleEntry(row.TimeId, 0, UnboundedEnd,
+                $"local-policy:PacMan2:missing-calendar:permanent-mode:{row.Source}:TimeId={row.TimeId}"));
+
+    /// <summary>
+    /// AscNet policy (user-approved): missing Cerberus activity, chapter, and reachable condition
+    /// calendars are permanent. Official entries precede these rows and win by TimeId.
+    /// A positive end keeps the client's countdown valid; progression conditions remain intact.
+    /// </summary>
+    private static IEnumerable<ActivityScheduleEntry> CerberusGameEntries()
+    {
+        foreach (CerberusGameActivityTable activity in TableReaderV2.Parse<CerberusGameActivityTable>()
+            .Where(row => row.TimeId is > 0))
+            yield return new ActivityScheduleEntry(activity.TimeId!.Value, 0, UnboundedEnd,
+                $"local-policy:CerberusGame:missing-calendar:permanent-mode:"
+                + $"CerberusGameActivity:Id={activity.Id}:TimeId={activity.TimeId}:user-approved");
+
+        CerberusGameChapterTable[] chapters = TableReaderV2.Parse<CerberusGameChapterTable>().ToArray();
+        foreach (CerberusGameChapterTable chapter in chapters.Where(row => row.TimeId > 0))
+            yield return new ActivityScheduleEntry(chapter.TimeId, 0, UnboundedEnd,
+                $"local-policy:CerberusGame:missing-calendar:permanent-mode:"
+                + $"CerberusGameChapter:Id={chapter.Id}:TimeId={chapter.TimeId}:user-approved");
+
+        Dictionary<int, ConditionTable> conditions = TableReaderV2.Parse<ConditionTable>()
+            .ToDictionary(row => row.Id);
+        // Communication rows have no OpenCondition; their owning story points supply the gates.
+        Stack<int> pending = new(chapters.Select(row => row.OpenCondition)
+            .Concat(TableReaderV2.Parse<CerberusGameStoryLineTable>().Select(row => row.OpenCondition))
+            .Concat(TableReaderV2.Parse<CerberusGameStoryPointTable>().Select(row => row.OpenCondition))
+            .Select(conditionId => conditionId.GetValueOrDefault())
+            .Where(conditionId => conditionId > 0));
+        HashSet<int> seen = [];
+        while (pending.TryPop(out int conditionId))
+        {
+            if (!seen.Add(conditionId))
+                continue;
+            ConditionTable condition = conditions[conditionId];
+            if (!string.IsNullOrWhiteSpace(condition.Formula))
+            {
+                foreach (System.Text.RegularExpressions.Match reference in
+                    System.Text.RegularExpressions.Regex.Matches(condition.Formula, @"\d+"))
+                    pending.Push(int.Parse(reference.Value));
+            }
+            else if (condition.Type == 23001 && condition.Params.Count > 0 && condition.Params[0] > 0)
+            {
+                int timeId = condition.Params[0];
+                yield return new ActivityScheduleEntry(timeId, 0, UnboundedEnd,
+                    $"local-policy:CerberusGame:missing-calendar:permanent-mode:"
+                    + $"Condition:Id={conditionId}:TimeId={timeId}:user-approved");
             }
         }
     }

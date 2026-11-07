@@ -230,8 +230,11 @@ namespace AscNet.Common.Database
 
             foreach (EquipData equip in Equips)
             {
-                if (equip.TemplateId == 0 || equip.IsRecycle
-                    || !ownableEquipTemplates.ContainsKey(equip.TemplateId))
+                // IsRecycle persists only as the client's EquipUpdateRecycleRequest mark on an unworn
+                // permanent chip; worn or Type 99 recycled rows are transient grants and are dropped.
+                if (equip.TemplateId == 0
+                    || !ownableEquipTemplates.TryGetValue(equip.TemplateId, out EquipTable? ownedTemplate)
+                    || (equip.IsRecycle && (equip.CharacterId != 0 || ownedTemplate.Type == 99)))
                 {
                     changed = true;
                     continue;

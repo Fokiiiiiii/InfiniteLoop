@@ -424,7 +424,7 @@ internal partial class Program
                 int coefficientIndex = (stageType == 4 ? 8 : 4) - 1;
                 double timeCoefficient = scoreRule.LeftTimeScore[coefficientIndex];
                 int expectedTimeScore = Math.Min(stage.LeftTimeScore, checked((int)Math.Floor(
-                    (stage.PassTimeLimit - fightSeconds) * timeCoefficient * stage.PassTimeLimit)));
+                    (stage.PassTimeLimit - fightSeconds) * (double)(stage.PassTimeLimit - fightSeconds) * timeCoefficient)));
                 AssertEqual(expectedTimeScore, result.TimeScore,
                     $"Pain Cage {(bestiary ? "bestiary" : "trial")} table-derived remaining-time score");
                 auxiliaryTimeScores.Add((result.TimeLeft, result.TimeScore, stage.LeftTimeScore));
@@ -1359,7 +1359,7 @@ internal partial class Program
                     * normalRule.BossLoseHpScore[coefficientIndex])));
             double timeCoefficient = normalRule.LeftTimeScore[coefficientIndex];
             int expectedTimeScore = Math.Min(normalStage.LeftTimeScore,
-                checked((int)Math.Floor((normalStage.PassTimeLimit - normalFightSeconds) * timeCoefficient * normalStage.PassTimeLimit)));
+                checked((int)Math.Floor((normalStage.PassTimeLimit - normalFightSeconds) * (double)(normalStage.PassTimeLimit - normalFightSeconds) * timeCoefficient)));
             double hpCoefficient = normalRule.CharLeftHpSocre[coefficientIndex];
             int expectedHpScore = normalRule.BaseScore
                 + Math.Min(normalStage.LeftHpScore, checked((int)Math.Floor(100 * hpCoefficient)));
@@ -1913,14 +1913,13 @@ internal partial class Program
             int expectedUltimateTimeLeft = ultimateStage.PassTimeLimit - ultimateFightSeconds;
             AssertEqual(expectedUltimateTimeLeft, ultimateResult.TimeLeft,
                 "Pain Cage Ultimate Zone remaining time from fight input");
-            int expectedUltimateTimeScore = Math.Min(
-                ultimateStage.LeftTimeScore,
-                checked((int)Math.Floor(
-                    expectedUltimateTimeLeft * ultimateTimeCoefficient * ultimateStage.PassTimeLimit)));
+            // Retail Chiko Chaos (coefficient 1.0): 4:48 left (288 s) scored +82944/90000 = 288² × 1.0, so the
+            // remaining-time score is seconds left squared times the rule coefficient (cap = limit² × coefficient).
+            const int expectedUltimateTimeScore = 281 * 281 * 2;
             AssertEqual(true, expectedUltimateTimeScore < ultimateStage.LeftTimeScore,
                 "Pain Cage Ultimate Zone 19-second fight remains below table time-score cap");
             AssertEqual(expectedUltimateTimeScore, ultimateResult.TimeScore,
-                "Pain Cage Ultimate Zone table-derived remaining-time score");
+                "Pain Cage Ultimate Zone remaining-time score follows seconds left squared");
 
             player.SimulatedBattlefield.BossStageRecords.Add(new AscNet.Common.Database.BossSingleStageRecordState
             {
@@ -2036,12 +2035,6 @@ internal partial class Program
                 row.MinPlayerLevel > previousGrade.MaxPlayerLevel);
             state.BossOldLevelType = previousGrade.LevelType;
             player.PlayerData.Level = checked((uint)previousGrade.MaxPlayerLevel);
-            Dictionary<int, List<int>> previousRotationOptions =
-                (Dictionary<int, List<int>>?)buildBossListOptions.Invoke(null, [
-                    state,
-                    checked((int)player.PlayerData.Level),
-                    currentActivity - 1
-                ]) ?? throw new InvalidDataException("Previous Pain Cage rotation options were not generated.");
             player.PlayerData.Level = checked((uint)currentGrade.MinPlayerLevel);
             Dictionary<int, List<int>> currentRotationOptions =
                 (Dictionary<int, List<int>>?)buildBossListOptions.Invoke(null, [
@@ -2049,12 +2042,34 @@ internal partial class Program
                     checked((int)player.PlayerData.Level),
                     currentActivity
                 ]) ?? throw new InvalidDataException("Current Pain Cage rotation options were not generated.");
-            AssertEqual(true, previousRotationOptions.ContainsKey(previousGrade.LevelType),
-                "Pain Cage prior grade was selectable before the level-band change");
             AssertEqual(true, currentRotationOptions.ContainsKey(currentGrade.LevelType),
                 "Pain Cage new grade is selectable after the level-band change");
-            int previousRotationSectionId = previousRotationOptions[previousGrade.LevelType][0];
             int currentRotationSectionId = currentRotationOptions[currentGrade.LevelType][0];
+            // Section choice is a hash of activity:grade:group and the grades' groups share sections, so the
+            // week-dependent "previous week" can legitimately repeat the current pick. The fixture models some
+            // earlier epoch whose first previous-grade section differs from the current one: scan back from
+            // currentActivity - 1 (production reads the Stage's own ownership epoch, so any epoch is valid).
+            player.PlayerData.Level = checked((uint)previousGrade.MaxPlayerLevel);
+            int priorEpoch = currentActivity - 1;
+            Dictionary<int, List<int>> previousRotationOptions;
+            while (true)
+            {
+                previousRotationOptions =
+                    (Dictionary<int, List<int>>?)buildBossListOptions.Invoke(null, [
+                        state,
+                        checked((int)player.PlayerData.Level),
+                        priorEpoch
+                    ]) ?? throw new InvalidDataException("Previous Pain Cage rotation options were not generated.");
+                AssertEqual(true, previousRotationOptions.ContainsKey(previousGrade.LevelType),
+                    "Pain Cage prior grade was selectable before the level-band change");
+                if (previousRotationOptions[previousGrade.LevelType][0] != currentRotationSectionId)
+                    break;
+                priorEpoch--;
+                if (priorEpoch < currentActivity - 64)
+                    throw new InvalidDataException("No earlier Pain Cage epoch selects a different first section.");
+            }
+            player.PlayerData.Level = checked((uint)currentGrade.MinPlayerLevel);
+            int previousRotationSectionId = previousRotationOptions[previousGrade.LevelType][0];
             AssertEqual(true, previousRotationSectionId != currentRotationSectionId,
                 "Pain Cage previous and current grades select different normal sections");
             int previousRotationStageId = sections.Single(row =>
@@ -2078,7 +2093,7 @@ internal partial class Program
             previousRotationDatum.Passed = true;
             AssertEqual(currentActivity, state.BossActivityNo,
                 "Pain Cage prior-epoch Stage fixture keeps Player already current");
-            harness.Session.stage.BossSingleActivityNo = currentActivity - 1;
+            harness.Session.stage.BossSingleActivityNo = priorEpoch;
             MethodInfo persistStageOwnership = RequiredMethod(
                 module,
                 "PersistStageOwnershipReconciliation",
@@ -2550,8 +2565,10 @@ internal partial class Program
             player = persisted;
             harness.Session.player = player;
             bool taskSynced = false;
-            while (harness.TryReadAvailablePacket("Normal PPC achievement sync", out Packet packet))
+            // RecordStageClear queues the push on the session writer; DataAvailable can be false while it is in flight.
+            for (int read = 0; read < 32 && !taskSynced; read++)
             {
+                Packet packet = harness.ReadPacket("Normal PPC achievement sync");
                 if (packet.Type != Packet.ContentType.Push) continue;
                 Packet.Push push = MessagePackSerializer.Deserialize<Packet.Push>(packet.Content);
                 if (push.Name != nameof(NotifyTask)) continue;
@@ -2565,15 +2582,8 @@ internal partial class Program
                 harness.Session,
                 99_703,
                 new BossSingleResetStageRequest { StageId = firstStageId });
-            BossSingleResetStageResponse resetResponse = default!;
-            while (harness.TryReadAvailablePacket("Normal PPC reset", out Packet resetPacket))
-            {
-                if (resetPacket.Type != Packet.ContentType.Response) continue;
-                Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(resetPacket.Content);
-                if (response.Id != 99_703) continue;
-                resetResponse = MessagePackSerializer.Deserialize<BossSingleResetStageResponse>(response.Content);
-                break;
-            }
+            BossSingleResetStageResponse resetResponse = ReadResponsePayload<BossSingleResetStageResponse>(
+                harness, 99_703, nameof(BossSingleResetStageResponse), "Normal PPC reset", maxPacketsToRead: 32);
             AssertEqual(0, resetResponse.Code, "Normal PPC Reset Challenge succeeds");
             foreach (int conditionId in qualifyingConditions)
                 AssertEqual(candidate, player.MissionProgress.ConditionCounters.GetValueOrDefault(conditionId),
@@ -2706,8 +2716,8 @@ internal partial class Program
                 out RecordingMongoCollectionProxy<Player> playerCollection,
                 out RecordingMongoCollectionProxy<Stage> stageCollection);
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            long WeeklyPeriod(long timestamp) => (timestamp / 86_400 + 3) / 7;
-            long boundary = checked((WeeklyPeriod(now) + 1) * 7 - 3) * 86_400;
+            long WeeklyPeriod(long timestamp) => TaskModule.CurrentWeeklyResetPeriod(timestamp);
+            long boundary = now + TaskModule.RemainingSecondsInWeeklyResetPeriod(now);
             long beforeBoundary = boundary - 1;
             long atBoundary = boundary;
             int beforeActivity = checked((int)WeeklyPeriod(beforeBoundary));

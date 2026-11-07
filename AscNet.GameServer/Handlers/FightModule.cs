@@ -45,7 +45,8 @@ namespace AscNet.GameServer.Handlers
         Medal = 21,
         DrawTicket = 22,
         ChatBoard = 26,
-        FashionColor = 34
+        FashionColor = 34,
+        SkyTower = 39
     }
 
     [MessagePackObject(true)]
@@ -319,7 +320,7 @@ namespace AscNet.GameServer.Handlers
     {
         private const int TeamManagerSetTeamParaError = 20004003;
         private const int FightAuthorizationError = 1033;
-        private enum TeamPrefabValidationFailure
+        internal enum TeamPrefabValidationFailure
         {
             None,
             MissingPayload,
@@ -465,6 +466,7 @@ namespace AscNet.GameServer.Handlers
                 return;
             }
             BossModule.CancelFight(session);
+            CerberusGameModule.CancelFight(session);
             session.PendingBossInshotFight = null;
             session.fight = null;
             session.SendResponse(new LeaveFightResponse(), packet.Id);
@@ -474,6 +476,12 @@ namespace AscNet.GameServer.Handlers
         public static void PreFightRequestHandler(Session session, Packet.Request packet)
         {
             PreFightRequest req = packet.Deserialize<PreFightRequest>();
+            int cerberusRecoveryCode = CerberusGameModule.RecoverPendingFight(session);
+            if (cerberusRecoveryCode != 0)
+            {
+                session.SendResponse(new PreFightResponse { Code = cerberusRecoveryCode }, packet.Id);
+                return;
+            }
             if (TheatreModule.TryPreFight(session, req, out PreFightResponse originalTheatreResponse))
             {
                 session.SendResponse(originalTheatreResponse, packet.Id);
@@ -508,12 +516,26 @@ namespace AscNet.GameServer.Handlers
                 session.SendResponse(new PreFightResponse { Code = courseCode }, packet.Id);
                 return;
             }
+            int cerberusCode = CerberusGameModule.IsStage(req.PreFightData.StageId)
+                ? CerberusGameModule.ValidatePreFight(session, req.PreFightData) : 0;
+            if (cerberusCode != 0)
+            {
+                session.SendResponse(new PreFightResponse { Code = cerberusCode }, packet.Id);
+                return;
+            }
+            int maintainerActionCode = MaintainerActionModule.ValidatePreFight(session, req.PreFightData);
+            if (maintainerActionCode != 0)
+            {
+                session.SendResponse(new PreFightResponse { Code = maintainerActionCode }, packet.Id);
+                return;
+            }
             int explorePreFightCode = ExploreModule.ValidatePreFight(session, req.PreFightData);
             if (explorePreFightCode != 0)
             {
                 session.SendResponse(new PreFightResponse { Code = explorePreFightCode }, packet.Id);
                 return;
             }
+            StrongholdModule.Reconcile(session);
             if (StrongholdModule.TryAuthorizePreFight(session.player, req.PreFightData.StageId, out int strongholdCode))
             {
                 if (strongholdCode != 0)
@@ -597,6 +619,13 @@ namespace AscNet.GameServer.Handlers
                 && !ActivityScheduleService.IsOpen(stageTimeId, DateTimeOffset.UtcNow))
             {
                 rsp.Code = FashionStoryModule.StageLocked; // FubenManagerStageLocked
+                session.SendResponse(rsp, packet.Id);
+                return;
+            }
+
+            if (ReformModule.TryApplyPreFight(session, req.PreFightData, rsp.FightData, out int reformCode) && reformCode != 0)
+            {
+                rsp.Code = reformCode;
                 session.SendResponse(rsp, packet.Id);
                 return;
             }
@@ -699,7 +728,9 @@ namespace AscNet.GameServer.Handlers
                     : configuredStudyRobotIds.ToList();
             }
             else if (BossInshotModule.IsStage(req.PreFightData.StageId)
-                || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId))
+                || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId)
+                || CerberusGameModule.IsStage(req.PreFightData.StageId)
+                || ReformModule.IsBalanceStage(req.PreFightData.StageId))
             {
                 robotIds = requestedRobotIds;
             }
@@ -752,7 +783,9 @@ namespace AscNet.GameServer.Handlers
                 bool isOwnedCharacter = characterData is not null;
                 if (characterData is null)
                     continue;
-                List<EquipData> equips = BuildTeamPrefabFightEquips(session, cardId).ToList();
+                IEnumerable<EquipData> equips = session.character.Equips
+                    .Where(equip => equip.CharacterId == cardId)
+                    .ToList();
                 if (CharacterPower.ClampCharacterSkillLevelsForClient(session, characterData, equips))
                     session.character.Save();
                 int weaponFashionId = session.character.WeaponFashions
@@ -784,7 +817,9 @@ namespace AscNet.GameServer.Handlers
             if (robotIds.Count > 0
                 && (stageTable is null || req.PreFightData.CardIds is null || deployedCharacterCount == 0
                     || deployedCharacterCount + robotIds.Count == 3
-                    || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId)))
+                    || TransfiniteTowerModule.IsBattleStage(req.PreFightData.StageId)
+                    || CerberusGameModule.IsStage(req.PreFightData.StageId)
+                    || ReformModule.IsBalanceStage(req.PreFightData.StageId)))
             {
                 int npcKey = 0;
                 foreach (var robotId in robotIds)
@@ -796,6 +831,15 @@ namespace AscNet.GameServer.Handlers
                         continue;
                     }
 
+                    if (CerberusGameModule.IsStage(req.PreFightData.StageId))
+                    {
+                        // RobotIds and CardIds are parallel positional arrays in XCerberusGameTeam.
+                        var positionalRobots = req.PreFightData.RobotIds
+                            ?? throw new InvalidOperationException("Validated Cerberus deployment has no robot slots.");
+                        npcKey = positionalRobots.IndexOf(robotId);
+                        if (playerNpcData.ContainsKey(npcKey))
+                            throw new InvalidOperationException("Cerberus deployment overlaps an owned character.");
+                    }
                     while (playerNpcData.ContainsKey(npcKey))
                         npcKey++;
 
@@ -876,6 +920,7 @@ namespace AscNet.GameServer.Handlers
                 CourseModule.CancelPendingResult(session);
             // Retain the resolved deployment, including a server-selected default team.
             req.PreFightData.CardIds = cardIdsToDeploy.ToList();
+            rsp.FightData.FightId = CerberusGameModule.RecordFightStarted(session, req, rsp.FightData.FightId);
             session.fight = new(req, rsp.FightData.FightId);
             session.SendResponse(rsp, packet.Id);
         }
@@ -1219,6 +1264,11 @@ namespace AscNet.GameServer.Handlers
             EnterStoryRequest req = packet.Deserialize<EnterStoryRequest>();
             EnterStoryResponse response = new();
 
+            if (CerberusGameModule.TryEnterStory(session, req, out EnterStoryResponse cerberusResponse))
+            {
+                session.SendResponse(cerberusResponse, packet.Id);
+                return;
+            }
             if (TowerModule.TryEnterStory(session, req, out EnterStoryResponse towerResponse))
             {
                 session.SendResponse(towerResponse, packet.Id);
@@ -1289,8 +1339,6 @@ namespace AscNet.GameServer.Handlers
                 TeamName = req.TeamData.TeamName,
                 TeamData = req.TeamData.TeamData
             };
-            session.AppliedTeamPrefabId = null;
-
 
             session.SendResponse(new TeamSetTeamResponse(), packet.Id);
         }
@@ -1771,8 +1819,21 @@ namespace AscNet.GameServer.Handlers
                 }
             }
 
+            foreach ((int characterId, EquipData equip, TeamPrefabEquipEntry preset) in equipPlan)
+            {
+                if (EquipRowsById.Value[equip.TemplateId].Site != 0)
+                    continue;
+                foreach ((int slot, int skillId) in preset.ResonanceDict ?? [])
+                {
+                    ResonanceInfo? resonance = equip.ResonanceInfo.LastOrDefault(value => value.Slot == slot);
+                    if (resonance is not null)
+                        resonance.TemplateId = skillId;
+                }
+                if (preset.WeaponOverrunSuitId > 0)
+                    equip.WeaponOverrunData.ChoseSuit = preset.WeaponOverrunSuitId;
+            }
+
             session.character.Save();
-            session.AppliedTeamPrefabId = teamPrefab.TeamId;
             session.SendPush(new NotifyPartnerDataList
             {
                 PartnerDataList = session.character.Partners
@@ -1861,79 +1922,7 @@ namespace AscNet.GameServer.Handlers
             return true;
         }
 
-        internal static IReadOnlyList<EquipData> BuildTeamPrefabFightEquips(
-            Session session,
-            uint characterId)
-        {
-            List<EquipData> ownedEquips = session.character.Equips
-                .Where(equip => equip.CharacterId == characterId)
-                .ToList();
-            TeamPrefabData? teamPrefab = session.AppliedTeamPrefabId is int teamId
-                ? (session.player.TeamPrefabs ?? []).FirstOrDefault(prefab => prefab.TeamId == teamId)
-                : null;
-            int position = teamPrefab?.TeamData
-                .FirstOrDefault(member => member.Value == characterId).Key ?? 0;
-            if (position <= 0
-                || teamPrefab?.EquipData.TryGetValue(position, out TeamPrefabEquipData? presetEquips) != true
-                || presetEquips is null)
-            {
-                return ownedEquips;
-            }
-
-            Dictionary<uint, TeamPrefabEquipEntry> presetsByEquipId = presetEquips.EquipDataDict.Values
-                .Where(preset => preset.EquipId > 0)
-                .ToDictionary(preset => preset.EquipId);
-            return ownedEquips.Select(equip =>
-            {
-                if (!presetsByEquipId.TryGetValue(equip.Id, out TeamPrefabEquipEntry? preset))
-                    return equip;
-
-                EquipData battleEquip = CloneEquipData(equip);
-                foreach ((int slot, int skillId) in preset.ResonanceDict ?? [])
-                {
-                    ResonanceInfo? resonance = battleEquip.ResonanceInfo
-                        .LastOrDefault(value => value.Slot == slot);
-                    if (resonance is not null)
-                        resonance.TemplateId = skillId;
-                }
-                battleEquip.WeaponOverrunData.ChoseSuit = preset.WeaponOverrunSuitId;
-                return battleEquip;
-            }).ToList();
-        }
-
-        private static EquipData CloneEquipData(EquipData equip) => new()
-        {
-            Id = equip.Id,
-            TemplateId = equip.TemplateId,
-            CharacterId = equip.CharacterId,
-            Level = equip.Level,
-            Exp = equip.Exp,
-            Breakthrough = equip.Breakthrough,
-            ResonanceInfo = equip.ResonanceInfo.Select(CloneResonanceInfo).ToList(),
-            UnconfirmedResonanceInfo = equip.UnconfirmedResonanceInfo.Select(CloneResonanceInfo).ToList(),
-            AwakeSlotList = equip.AwakeSlotList.ToList(),
-            IsLock = equip.IsLock,
-            CreateTime = equip.CreateTime,
-            WeaponOverrunData = new()
-            {
-                Level = equip.WeaponOverrunData.Level,
-                ActiveSuits = equip.WeaponOverrunData.ActiveSuits.ToList(),
-                ChoseSuit = equip.WeaponOverrunData.ChoseSuit
-            },
-            IsRecycle = equip.IsRecycle
-        };
-
-        private static ResonanceInfo CloneResonanceInfo(ResonanceInfo resonance) => new()
-        {
-            Slot = resonance.Slot,
-            Type = resonance.Type,
-            CharacterId = resonance.CharacterId,
-            TemplateId = resonance.TemplateId,
-            UseItemId = resonance.UseItemId,
-            IsUseEquip = resonance.IsUseEquip
-        };
-
-        private static void ApplyTeamPrefabPartnerSkills(
+        internal static void ApplyTeamPrefabPartnerSkills(
             AscNet.Common.Database.Character character,
             PartnerData partner,
             IReadOnlyDictionary<int, List<int>>? skillData)
@@ -2424,7 +2413,7 @@ namespace AscNet.GameServer.Handlers
             return true;
         }
 
-        private static bool IsValidPartnerSkillData(
+        internal static bool IsValidPartnerSkillData(
             PartnerData partner,
             IReadOnlyDictionary<int, List<int>>? skillData,
             out TeamPrefabValidationFailure failure)
@@ -2588,6 +2577,7 @@ namespace AscNet.GameServer.Handlers
                 || Theatre4Module.IsCombatStage(session.fight?.PreFight.PreFightData.StageId ?? 0))
                 return;
             BossModule.CancelFight(session);
+            CerberusGameModule.CancelFight(session);
             session.PendingBossInshotFight = null;
             session.fight = null;
         }
@@ -2604,6 +2594,11 @@ namespace AscNet.GameServer.Handlers
             {
                 if (TryRecoverFailedFightSettle(session, packet, out req))
                 {
+                    if (CerberusGameModule.TrySettleFight(session, req.Result, out FightSettleResponse cerberusFailedResponse))
+                    {
+                        session.SendResponse(cerberusFailedResponse, packet.Id);
+                        return;
+                    }
                     if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreFailedResponse, packet.Id)
                         || Theatre4Module.TrySettleFight(session, req.Result, out originalTheatreFailedResponse, packet.Id))
                     {
@@ -2644,6 +2639,11 @@ namespace AscNet.GameServer.Handlers
             {
                 ClearFailedFightSettle(session);
                 session.SendResponse(new FightSettleResponse { Code = FightAuthorizationError }, packet.Id);
+                return;
+            }
+            if (CerberusGameModule.TrySettleFight(session, req.Result, out FightSettleResponse cerberusResponse))
+            {
+                session.SendResponse(cerberusResponse, packet.Id);
                 return;
             }
             if (TheatreModule.TrySettleFight(session, req.Result, out FightSettleResponse originalTheatreResponse, packet.Id)
@@ -2697,13 +2697,15 @@ namespace AscNet.GameServer.Handlers
             if (session.player.Stronghold.PendingStageId == (int)req.Result.StageId)
             {
                 StrongholdFightResult strongholdResult = StrongholdModule.Settle(session.player, req.Result.IsWin, session);
+                // The fought group is the last result line; earlier lines are FinishRelatedId groups it finished.
+                int settledGroupId = strongholdResult.GroupFightResultInfos.LastOrDefault()?.GroupId ?? 0;
                 StrongholdGroupInfo? groupInfo = session.player.Stronghold.GroupInfos
-                    .FirstOrDefault(group => group.Id == strongholdResult.GroupFightResultInfos.FirstOrDefault()?.GroupId);
+                    .FirstOrDefault(group => group.Id == settledGroupId);
                 if (groupInfo is not null)
                     session.SendPush(new NotifyUpdateStrongholdGroupData { GroupInfo = groupInfo });
-                int settledGroupId = strongholdResult.GroupFightResultInfos.FirstOrDefault()?.GroupId ?? 0;
                 bool groupFinished = settledGroupId > 0 && session.player.Stronghold.FinishGroupIds.Contains(settledGroupId);
                 if (groupFinished)
+                {
                     session.SendPush(new NotifyStrongholdFinishGroupId
                     {
                         FinishGroupIds = session.player.Stronghold.FinishGroupIds.ToList(),
@@ -2711,8 +2713,9 @@ namespace AscNet.GameServer.Handlers
                         FinishGroupInfos = session.player.Stronghold.FinishGroupInfos.ToList(),
                         HistoryFinishGroupInfos = session.player.Stronghold.HistoryFinishGroupInfos.ToList()
                     });
-                if (groupFinished)
-                    session.SendPush(new NotifyDeleteStrongholdGroupData { Id = settledGroupId });
+                    foreach (StrongholdFightResultInfo line in strongholdResult.GroupFightResultInfos)
+                        session.SendPush(new NotifyDeleteStrongholdGroupData { Id = line.GroupId });
+                }
                 session.SendPush(new NotifyStrongholdEnduranceData { Endurance = session.player.Stronghold.Endurance });
                 FightSettleResponse.FightSettleResponseSettle settle = new()
                 {
@@ -2753,6 +2756,11 @@ namespace AscNet.GameServer.Handlers
                 ? previousStageData
                 : session.stage?.Stages.GetValueOrDefault(req.Result.StageId);
             bool isQuickClear = responseStageId != req.Result.StageId;
+            if (CerberusGameModule.IsStage(responseStageId))
+            {
+                session.SendResponse(new FightSettleResponse { Code = FightAuthorizationError }, packet.Id);
+                return;
+            }
             bool isFirstClear = ArenaModule.IsArenaStage(req.Result.StageId)
                 ? !session.player.SimulatedBattlefield.ArenaStageMaxPoints.ContainsKey(req.Result.StageId)
                 : previousStageData is null || !previousStageData.Passed;
@@ -2782,6 +2790,12 @@ namespace AscNet.GameServer.Handlers
                     TaskModule.SendTaskSync(session);
                 }
                 session.SendResponse(awarenessResponse, packet.Id);
+                return;
+            }
+            int reformSettleCode = ReformModule.ValidateSettle(session, req.Result);
+            if (reformSettleCode != 0)
+            {
+                session.SendResponse(new FightSettleResponse { Code = reformSettleCode }, packet.Id);
                 return;
             }
             if (AssignModule.TrySettle(session, req.Result, out FightSettleResponse assignResponse))
@@ -3135,6 +3149,7 @@ namespace AscNet.GameServer.Handlers
                     SimulateTrainFightResult = SimulateTrainModule.BuildFightResult(
                         session.fight?.PreFight.PreFightData,
                         req.Result),
+                    ReformFightResult = ReformModule.RecordWin(session, req.Result),
                 }
             };
 
@@ -3144,9 +3159,11 @@ namespace AscNet.GameServer.Handlers
                 TaskModule.RecordStageParticipation(session, checked((int)req.Result.StageId),
                     acceptedCards.Select(id => checked((int)id)).ToArray(), challengeCount);
             }
+            if (isSuccessfulSettle)
+                MaintainerActionModule.RecordFightWin(session, req.Result);
             session.fight = null;
             session.SendPush(new NotifyStageData() { StageList = new() { stageData } });
-            if (isFirstClear)
+            if (isSuccessfulSettle && (isFirstClear || TableReaderV2.Parse<AscNet.Table.V2.share.fuben.experiment.ExperimentClaimTable>().Any(claim => claim.StageId == stageData.StageId)))
                 AccountModule.PushNewlyFinishedExperiments(session, stageData.StageId);
             if (unlockStagesBefore is not null && unlockStagesAfter is not null)
             {
@@ -3263,7 +3280,7 @@ namespace AscNet.GameServer.Handlers
             };
         }
 
-        private static StageDatum BuildFightSettleStageDatum(
+        internal static StageDatum BuildFightSettleStageDatum(
             uint stageId,
             long starsMark,
             long achievement,

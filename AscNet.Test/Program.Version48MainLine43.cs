@@ -92,13 +92,13 @@ internal partial class Program
         Player lifeReloaded = BsonSerializer.Deserialize<Player>(lifePlayer.ToBson());
         AssertEqual(true, lifeReloaded.LifeTreeData.FinishedChapters.Contains(64), "LifeTree chapter 64 acknowledgement survives reload");
         AssertEqual(1, lifeReloaded.LifeTreeData.UnlockCharacterData[adelyde].UnlockStatus, "Adelyde unlock survives reload");
+    }
 
-        static Stage PassedStages(long uid, IEnumerable<int> ids)
-        {
-            Stage stage = CreateLoginAccountCompatibilityStage(uid);
-            foreach (int id in ids)
-                stage.AddStage(new StageDatum { StageId = id, StarsMark = 7, Passed = true, PassTimesTotal = 1, CreateTime = 1_760_000_000, LastPassTime = 1_760_000_000 });
-            return stage;
-        }
+    private static Stage PassedStages(long uid, IEnumerable<int> ids)
+    {
+        Stage stage = CreateLoginAccountCompatibilityStage(uid);
+        foreach (int id in ids)
+            stage.AddStage(new StageDatum { StageId = id, StarsMark = 7, Passed = true, PassTimesTotal = 1, CreateTime = 1_760_000_000, LastPassTime = 1_760_000_000 });
+        return stage;
     }
 }

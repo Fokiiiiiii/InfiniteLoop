@@ -1,5 +1,5 @@
 
-use std::{sync::{LazyLock, RwLock}, time::Duration};
+use std::{sync::{LazyLock, OnceLock, RwLock}, time::Duration};
 
 use lazy_static::lazy_static;
 use windows::core::PCSTR;
@@ -15,7 +15,10 @@ mod modules;
 mod sdk_identity;
 mod util;
 
-use crate::modules::{cn_identity_line, is_cn_client, spawn_fps_if_enabled, spawn_nofade_if_enabled, CnSdk, Http, MhyContext, ModuleManager};
+use crate::modules::{cn_identity_line, is_cn_client, spawn_graphics_if_enabled, CnSdk, Http, MhyContext, ModuleManager};
+
+/// lucia.dll's own module handle (from DllMain); hudhook needs it to unload cleanly.
+pub(crate) static LUCIA_MODULE: OnceLock<usize> = OnceLock::new();
 
 unsafe fn initialize() -> bool {
     let cn = is_cn_client();
@@ -25,8 +28,7 @@ unsafe fn initialize() -> bool {
         return false;
     };
     diag::log(&diag::ok_line("lucia", "GameAssembly.dll module lookup", &format!("base=0x{:X}", game_assembly.0 as usize)));
-    spawn_nofade_if_enabled();
-    spawn_fps_if_enabled();
+    spawn_graphics_if_enabled();
     let Ok(mut module_manager) = MODULE_MANAGER.write() else {
         diag::log(&diag::failed_line("lucia", "module manager", "lock is poisoned by an earlier crash in this process"));
         return false;
@@ -49,6 +51,7 @@ unsafe fn initialize() -> bool {
 /// (`kurosdk_getConfigInfo`); CN keeps the retail KRSDKEx.dll, so nothing would call `ascnet_patch_initialize`
 /// and lucia must start itself. The short poll keeps the hooks ahead of the SDK's first request.
 unsafe fn startup_thread(probe: bool) {
+    modules::net_audit::install();
     if !probe && !is_cn_client() {
         return;
     }
@@ -70,8 +73,9 @@ pub unsafe extern "system" fn ascnet_patch_initialize() -> i32 {
 
 #[no_mangle]
 #[allow(non_snake_case)]
-unsafe extern "system" fn DllMain(_: HINSTANCE, call_reason: u32, _: *mut ()) -> bool {
+unsafe extern "system" fn DllMain(module: HINSTANCE, call_reason: u32, _: *mut ()) -> bool {
     if call_reason == DLL_PROCESS_ATTACH {
+        let _ = LUCIA_MODULE.set(module.0 as usize);
         // The CN check reads files, so it runs on the thread, outside the loader lock.
         let probe = std::env::var("ASCNET_PATCH_PROBE").as_deref() == Ok("1");
         std::thread::spawn(move || startup_thread(probe));

@@ -260,11 +260,12 @@ namespace AscNet.GameServer.Handlers
             int timePoint = Evaluate(mark.TimePoint, metrics, mark.MaxTimePoint);
             int npcPoint = Evaluate(mark.NpcGroupPoint, metrics, mark.MaxNpcGroupPoint);
             int point = Math.Clamp(enemyPoint + myHpPoint + timePoint + npcPoint, mark.MinPoint, mark.MaxPoint);
-            int oldStage = state.ArenaStageMaxPoints.GetValueOrDefault(result.StageId);
+            // Several areas (e.g. Nihil and an Entropic Distortion tab) share one StageId, so the best is tracked per area only.
             int oldArea = state.ArenaAreaMaxPoints.GetValueOrDefault(areaId);
-            if (point > oldStage)
+            int oldStage = oldArea;
+            if (point > oldArea)
             {
-                state.ArenaStageMaxPoints[result.StageId] = point;
+                state.ArenaStageMaxPoints[result.StageId] = Math.Max(point, state.ArenaStageMaxPoints.GetValueOrDefault(result.StageId));
                 state.ArenaAreaMaxPoints[areaId] = point;
                 state.ArenaPoint = state.ArenaAreaMaxPoints.Values.Sum();
                 foreach (int type in activeAreas.SelectMany(activeAreaId => AreaStages.Value[activeAreaId].DistributeTypes).Distinct())
@@ -413,22 +414,29 @@ namespace AscNet.GameServer.Handlers
             ArenaGroupFightEventTable? group = selectedAreaIndex < groupIds.Count
                 ? FightEventGroups.Value.FirstOrDefault(candidate => candidate.Id == groupIds[selectedAreaIndex])
                 : null;
+            // Client XArenaAgency: ArenaSelectIndex = SelectBuffIndex-1 indexes AreaStage.BuffIds/DistributeTypes (zone tab); each tab carries its own support event.
+            int zoneIndex = request.ArenaSelectIndex;
             if (group is null
-                || request.ArenaSelectIndex < 0
-                || request.ArenaSelectIndex >= group.FightEvents.Count)
+                || zoneIndex < 0
+                || zoneIndex >= area.BuffIds.Count
+                || zoneIndex >= area.DistributeTypes.Count
+                || area.BuffIds[zoneIndex] <= 0)
             {
                 return false;
             }
 
-            response.FightData.EventIds = area.BuffIds
-                .Where(eventId => eventId > 0)
-                .Cast<dynamic>()
-                .Append(group.FightEvents[request.ArenaSelectIndex])
+            int supportEvent = TabSupportEvent(area, group, zoneIndex);
+            response.FightData.EventIds = new List<dynamic> { area.BuffIds[zoneIndex] }
+                .Concat(supportEvent > 0 ? [supportEvent] : Array.Empty<dynamic>())
                 .ToList();
             response.FightData.FightEventsWithLevel = new List<dynamic>();
             if (!ArenaStageDataset.TryHydrate(request.SelectAreaId, request.StageId, area.MarkId, area.Desc, response.FightData))
                 return false;
-            int distributionType = area.DistributeTypes.FirstOrDefault();
+            ChallengeAreaTable reference = Challenges.Value.Single(row => row.ChallengeId == ArenaStageDataset.LevelReferenceChallengeId(
+                request.SelectAreaId, request.StageId, area.MarkId, area.Desc));
+            // AscNet policy (no retail tier->level source exists): NPC levels are the captured ones scaled by ChallengeArea.AvgScore(current)/AvgScore(captured challenge).
+            ArenaStageDataset.ScaleLevels(response.FightData, (double)challenge.AvgScore / reference.AvgScore);
+            int distributionType = area.DistributeTypes[zoneIndex];
             int distributionMaximum = state.ArenaDistributeMaxPoints.GetValueOrDefault(distributionType);
             Dictionary<string, object?> stageParams = response.FightData.StageParams as Dictionary<string, object?>
                 ?? new Dictionary<string, object?>();
@@ -451,7 +459,7 @@ namespace AscNet.GameServer.Handlers
                 ["AreaId"] = areaId, ["Lock"] = 0, ["Point"] = state.ArenaAreaMaxPoints.GetValueOrDefault(areaId),
                 ["LordList"] = new[] { BuildAreaLeader(session, state.ArenaAreaMaxPoints.GetValueOrDefault(areaId)) },
                 ["StageInfos"] = ResolveConfiguredStageId(AreaStages.Value.GetValueOrDefault(areaId)) is { } configuredStageId
-                    && state.ArenaStageMaxPoints.TryGetValue((uint)configuredStageId, out int stagePoint)
+                    && state.ArenaAreaMaxPoints.TryGetValue(areaId, out int stagePoint)
                         ? new List<Dictionary<string, object>> { new() { ["StageId"] = (uint)configuredStageId, ["Point"] = stagePoint } }
                         : null,
             }).ToList();
@@ -467,6 +475,51 @@ namespace AscNet.GameServer.Handlers
                 selected);
             return new AreaDataResponse { Code = 0, TotalPoint = state.ArenaPoint, AreaList = areas, AreaDistributeMaxPointDict = maxima, GroupFightEvents = events };
         }
+        // Retail pairs each zone with support buffs of its element (capture: Laser Alloy -> 4174 Thunderstrike,
+        // Nihil Floating Platform -> 4185 Raven's Dirge), one buff per zone tab: an effect zone's two tabs each get
+        // their own. No table links them, so as AscNet policy a group is eligible when it has one event per tab and
+        // each tab (AreaDistributeType) has an event whose ArenaAreaBuffDetails affix icon is that tab's element; a
+        // Chaos tab (no Chaos support buff exists) accepts any event. When no group matches, any group with one event
+        // per tab is used. The key names below translate AreaDistributeType.Desc into those icon names.
+        private static readonly Dictionary<int, string> DistributeTypeAffix = new()
+        {
+            [1] = "Wuli", [2] = "Bingshuang", [3] = "Huoyan", [4] = "LeiDian", [5] = "Anneng", [6] = "Nihility",
+            [7] = "Dianshu", [8] = "Zhanji", [9] = "Fubing", [10] = "Fenshao", [11] = "Anyan"
+        };
+        private static readonly Lazy<Dictionary<int, string>> SupportBuffAffix = new(() =>
+            TableReaderV2.Parse<ArenaAreaBuffDetailsTable>().ToDictionary(row => row.Id,
+                row => Path.GetFileNameWithoutExtension(row.Icon ?? string.Empty).Replace("IconAffix", "").Replace("Up", "")));
+
+        private static bool MatchesTab(int distributeType, int eventId) =>
+            !DistributeTypeAffix.TryGetValue(distributeType, out string? element)
+            || (SupportBuffAffix.Value.TryGetValue(eventId, out string? affix) && affix == element);
+
+        // Assigns each tab a distinct event that matches it, or null when the group cannot cover every tab.
+        private static int[]? AssignTabEvents(IReadOnlyList<int> tabs, IReadOnlyList<int> events)
+        {
+            if (events.Count != tabs.Count) return null;
+            IEnumerable<IReadOnlyList<int>> orders = events.Count == 2 ? [events, [events[1], events[0]]] : [events];
+            return orders.FirstOrDefault(order => tabs.Select((tab, index) => MatchesTab(tab, order[index])).All(ok => ok))?.ToArray();
+        }
+
+        private static List<int> GroupEvents(ArenaGroupFightEventTable group) => group.FightEvents.Where(eventId => eventId > 0).ToList();
+
+        private static List<ArenaGroupFightEventTable> SupportGroupsFor(int areaId)
+        {
+            List<int> tabs = AreaStages.Value.GetValueOrDefault(areaId)?.DistributeTypes.Where(type => type > 0).ToList() ?? [];
+            List<ArenaGroupFightEventTable> sized = FightEventGroups.Value.Where(group => GroupEvents(group).Count == tabs.Count).ToList();
+            List<ArenaGroupFightEventTable> eligible = sized.Where(group => AssignTabEvents(tabs, GroupEvents(group)) is not null).ToList();
+            return eligible.Count > 0 ? eligible : sized.Count > 0 ? sized : FightEventGroups.Value;
+        }
+
+        // The support event applied in a fight for the selected tab: the group event matched to that tab.
+        private static int TabSupportEvent(AreaStageTable area, ArenaGroupFightEventTable group, int tabIndex)
+        {
+            List<int> events = GroupEvents(group);
+            int[]? assigned = AssignTabEvents(area.DistributeTypes.Where(type => type > 0).ToList(), events);
+            return assigned is not null ? assigned[tabIndex] : events.ElementAtOrDefault(tabIndex);
+        }
+
         private static List<int> SelectedGroupFightEventIds(int activityNo, long playerId, IReadOnlyList<int> selectedAreas)
         {
             if (FightEventGroups.Value.Count == 0)
@@ -474,8 +527,8 @@ namespace AscNet.GameServer.Handlers
 
             return selectedAreas.Select(areaId =>
             {
-                int index = (int)(StableAreaHash(activityNo, playerId, areaId) % (uint)FightEventGroups.Value.Count);
-                return FightEventGroups.Value[index].Id;
+                List<ArenaGroupFightEventTable> groups = SupportGroupsFor(areaId);
+                return groups[(int)(StableAreaHash(activityNo, playerId, areaId) % (uint)groups.Count)].Id;
             }).ToList();
         }
 

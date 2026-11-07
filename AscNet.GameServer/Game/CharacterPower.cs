@@ -98,12 +98,14 @@ internal static partial class CharacterPower
         Dictionary<int, int> result = new();
         if (!PowerCharacterSkills.TryGetValue((int)character.Id, out CharacterSkillTable? skills))
             return result;
-        int npcType = GetPowerNpcType(character);
+        int? npcType = GetPowerNpcType(character);
+        if (npcType is null)
+            return result;
         foreach (var chapter in session.player.Assign.Chapters)
         {
             if (chapter.CharacterId <= 0 || !PowerAssignChapters.TryGetValue(chapter.ChapterId, out AssignChapterTable? chapterRow)
                 || !PowerSkillPlusTypes.TryGetValue(chapterRow.SkillPlusId, out CharacterSkillTypePlusTable? plus)
-                || !plus.CharacterType.Contains(npcType))
+                || !plus.CharacterType.Contains(npcType.Value))
                 continue;
             foreach (int groupId in skills.SkillGroupId)
             {

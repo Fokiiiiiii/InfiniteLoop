@@ -30,6 +30,9 @@ namespace AscNet.Common.Database
         [BsonElement("newbie_reward_records")]
         public List<int> NewbieRewardRecords { get; set; } = new();
 
+        [BsonElement("weekly_task_activeness_progress")]
+        public List<int> WeeklyTaskActivenessProgress { get; set; } = new();
+
         [BsonElement("newbie_honor_reward")]
         public bool NewbieHonorReward { get; set; }
 
@@ -38,6 +41,10 @@ namespace AscNet.Common.Database
 
         [BsonElement("weekly_reset_week")]
         public long WeeklyResetWeek { get; set; } = -1;
+
+        // 0 = periods persisted with the legacy UTC-midnight formula; 1 = Config.tsv DailyResetTimestamp based.
+        [BsonElement("reset_epoch")]
+        public int ResetEpoch { get; set; }
     }
 
     public class BossSingleHistoryRecordState

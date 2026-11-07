@@ -697,6 +697,13 @@ namespace AscNet.GameServer.Handlers
             _ = TryGetChallengeBuffGroup(fight.PreFight.PreFightData.BossSingleChallengeBuffGroup,
                 session.player.SimulatedBattlefield, out pendingBuffGroup, out pendingFeatureIds, out pendingBuffChoices);
             int buffGroup = pendingBuffGroup;
+            // "Current Progress +x%" in the client settlement: ScoreRate (1/100 %) of each selected Type 2 feature,
+            // summed (XUiPanelFubenBossSingleChallengeModePreview / Settlement:_RefreshTotalScoreRate), applies to
+            // the total Progress. The client does no rounding or score math; flooring is AscNet policy.
+            long scoreRate = TableReaderV2.Parse<BossSingleChallengeFeatureTable>()
+                .Where(row => row.Type == 2 && pendingFeatureIds.Contains(row.Id))
+                .Sum(row => (long)(row.ScoreRate ?? 0));
+            bossResult.TotalScore = checked((int)(bossResult.TotalScore + bossResult.TotalScore * scoreRate / 10000));
             session.PendingBossSingleScore = new BossSinglePendingScore
             {
                 StageId = stageId,
@@ -1326,8 +1333,13 @@ namespace AscNet.GameServer.Handlers
             int bossScore = ScoreBySteps(bossLostRatio, bossStep, bossPoints, stage.BossLoseHpScore);
             int passTime = Math.Max(1, stage.PassTimeLimit);
             int timeLeft = Math.Clamp(checked((int)settle.LeftTime), 0, passTime);
-            int timeScore = Math.Min(stage.LeftTimeScore,
-                checked((int)Math.Floor(timeLeft * timeCoefficient * passTime)));
+            // Retail: Chiko Chaos (coefficient 1.0, cap 90000, limit 300) with 288 s left scored 82944 = 288² × 1.0.
+            // In the 4.8 tables every stage's LeftTimeScore cap equals either limit² × coefficient (tiers 4, 8, 9) or
+            // limit × coefficient (the other tiers). The squared law is retail-observed; using the linear law where
+            // the cap fits it is AscNet policy until a retail result for those tiers is available.
+            bool squaredLaw = Math.Abs((double)passTime * passTime * timeCoefficient - stage.LeftTimeScore) < 0.5;
+            double timeUnits = squaredLaw ? (double)timeLeft * timeLeft : timeLeft;
+            int timeScore = Math.Min(stage.LeftTimeScore, checked((int)Math.Floor(timeUnits * timeCoefficient)));
 
             List<double> characterHp = settle.NpcHpInfo?.Values
                 .Where(npc => npc.Type == 1)
@@ -1493,7 +1505,7 @@ namespace AscNet.GameServer.Handlers
                 if (!stage.Stages.TryGetValue(stageId, out StageDatum? datum) || !datum.Passed)
                     continue;
 
-                // TaskModule maps Unix seconds to the weekly period as (timestamp / 86_400 + 3) / 7.
+                // TaskModule maps Unix seconds to the weekly period via Config.tsv DailyResetTimestamp/DayOfWeeklyReset.
                 // Zero, future, or non-current timestamps are ambiguous and cannot prove a legacy pass.
                 bool provenCurrentLegacyPass = legacy
                     && datum.LastPassTime > 0

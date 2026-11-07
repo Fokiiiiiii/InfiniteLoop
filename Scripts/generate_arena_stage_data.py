@@ -47,6 +47,13 @@ def area_stage_profile(area_id: int, stage_id: int) -> tuple[int, str]:
     return int(rows[0]["MarkId"]), rows[0]["Desc"]
 
 
+def captured_challenge_id(capture_dir: Path) -> int:
+    notifies = sorted(capture_dir.glob("*-NotifyArenaActivity.json"))
+    if not notifies:
+        raise ValueError(f"{capture_dir}: a NotifyArenaActivity dump is required to record the captured ChallengeId")
+    return json.loads(notifies[-1].read_text())["ChallengeId"]
+
+
 def generate(capture_dir: Path, stage_id: int | None = None) -> dict[str, Any]:
     prefight_request = captured(capture_dir, "PreFightRequest", stage_id)
     prefight = captured(capture_dir, "PreFightResponse", stage_id)["FightData"]
@@ -93,6 +100,7 @@ def generate(capture_dir: Path, stage_id: int | None = None) -> dict[str, Any]:
             "MarkId": mark_id,
             "Archetype": archetype,
             "ReusableArchetype": True,
+            "LevelReferenceChallengeId": captured_challenge_id(capture_dir),
             "NpcGroupRefs": waves,
             "PassTimeLimit": prefight["PassTimeLimit"],
             "ReviseId": prefight["ReviseId"],

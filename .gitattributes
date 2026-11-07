@@ -2,6 +2,9 @@
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
 * text=auto
+Mods/**/*.lua text eol=lf
+Mods/**/*.diff text eol=lf
+Mods/**/*.tab text eol=crlf
 
 ###############################################################################
 # Set default behavior for command prompt diff.

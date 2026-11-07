@@ -159,7 +159,7 @@ internal static partial class GuildBossModule
             else
             {
                 character = session.character.Characters.Single(row => row.Id == card);
-                equips = FightModule.BuildTeamPrefabFightEquips(session, checked((uint)card));
+                equips = session.character.Equips.Where(equip => equip.CharacterId == checked((uint)card)).ToList();
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 weaponFashion = session.character.WeaponFashions.FirstOrDefault(row =>
                     (row.ExpireTime == 0 || row.ExpireTime > now) && row.UseCharacterList.Contains(card))?.Id ?? 0;

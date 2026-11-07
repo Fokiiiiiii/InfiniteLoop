@@ -84,7 +84,6 @@ namespace AscNet.GameServer.Handlers
         private static readonly Lazy<List<ExperimentLevelTable>> ExperimentLevels = new(() => TableReaderV2.Parse<ExperimentLevelTable>());
 
         // FinishIds feeds CheckExperimentIsFinish (condition 11107, SkinTrial red dot): a level is finished once any authored stage is passed.
-        // ExperimentInfos (StarList reward claims) stays empty: no server star-reward flow exists.
         internal static Dictionary<string, object?> BuildExperimentPayload(Stage stage) => new()
         {
             ["FinishIds"] = ExperimentLevels.Value
@@ -92,22 +91,41 @@ namespace AscNet.GameServer.Handlers
                     .Any(stageId => stageId > 0 && stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed))
                 .Select(level => level.Id)
                 .ToList(),
-            ["ExperimentInfos"] = Array.Empty<object>()
+            ["ExperimentInfos"] = ExperimentLevels.Value
+                .Where(level => TableReaderV2.Parse<AscNet.Table.V2.share.fuben.experiment.ExperimentClaimTable>()
+                    .Any(claim => claim.LevelId == level.Id && stage.Stages.TryGetValue(claim.StageId, out StageDatum? datum) && datum.Passed))
+                .Select(level => BuildExperimentInfo(stage, level.Id)).ToList()
         };
 
-        // In-session twin of FinishIds: XRpc.NotifyUpdateExperimentId {Id, Info?} appends Id once; call only on a stage's first clear.
+        private static Dictionary<string, object?> BuildExperimentInfo(Stage stage, int levelId)
+        {
+            int stageId = TableReaderV2.Parse<AscNet.Table.V2.share.fuben.experiment.ExperimentClaimTable>()
+                .First(claim => claim.LevelId == levelId).StageId;
+            return new()
+            {
+                ["Id"] = levelId,
+                ["StarsMark"] = stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed ? datum.StarsMark : 0L,
+                ["StarList"] = stage.ExperimentStarClaims.GetValueOrDefault(levelId) ?? new List<int>()
+            };
+        }
+
+        // Every star-bearing clear refreshes Info; other trial levels only append their initial FinishIds entry.
         internal static void PushNewlyFinishedExperiments(Session session, long clearedStageId)
         {
             foreach (ExperimentLevelTable level in ExperimentLevels.Value.Where(level => level.SingStageId == clearedStageId || level.MultStageId == clearedStageId))
             {
                 bool finishedBefore = new[] { level.SingStageId, level.MultStageId }.Any(stageId => stageId > 0 && stageId != clearedStageId
                     && session.stage.Stages.TryGetValue(stageId, out StageDatum? datum) && datum.Passed);
-                if (!finishedBefore)
-                    session.SendPush("NotifyUpdateExperimentId", MessagePackPayloads.Serialize(new Dictionary<string, object?> { ["Id"] = level.Id }));
+                bool hasStarRewards = TableReaderV2.Parse<AscNet.Table.V2.share.fuben.experiment.ExperimentClaimTable>().Any(claim => claim.LevelId == level.Id);
+                if (hasStarRewards || !finishedBefore)
+                    session.SendPush("NotifyUpdateExperimentId", MessagePackPayloads.Serialize(new Dictionary<string, object?>
+                    {
+                        ["Id"] = level.Id,
+                        ["Info"] = hasStarRewards ? BuildExperimentInfo(session.stage, level.Id) : null
+                    }));
             }
         }
         private static Dictionary<string, object?> BuildGame2048Payload() => PayloadFromJson("""{"Game2048DataDb":{"ActivityId":4,"StageContext":null,"StageFinish":[]}}""");
-        private static Dictionary<string, object?> BuildGameCollectionPayload() => PayloadFromJson("""{"GameCollectionData":{"ActivityId":1,"GameData":{}}}""");
         private static Dictionary<string, object?> BuildGoldenMinerPayload() => PayloadFromJson("""{"StageDataDb":{"ActivityId":7,"StageScores":0,"TotalMaxScores":0,"TotalMaxScoresCharacter":0,"TotalMaxScoresHexes":null,"TodayPlayGame":0,"TotalPlayCount":0,"CurrentPlayStage":0,"CurrentState":0,"RedEnvelopeProgress":{},"CharacterId":0,"CharacterDbs":[],"FinishStageId":[],"ItemColumns":{},"BuffColumns":{},"UpgradeStrengthens":[],"MinerShopDbs":[],"ItemBuyRecord":{},"StageMapInfos":[{"StageId":1,"MapId":72215},{"StageId":2,"MapId":72814},{"StageId":3,"MapId":72810},{"StageId":4,"MapId":72821},{"StageId":5,"MapId":72830},{"StageId":6,"MapId":72840},{"StageId":7,"MapId":72852},{"StageId":8,"MapId":72860}],"HideTaskInfo":[],"HideStageCount":0,"TotalScore":0,"IsSaveFailed":false,"HexRecords":[],"HexUpgradeRecord":{},"HexHistory":[],"TotalHexCount":0,"FinishTeachMap":[],"IsFinishAllTeach":false,"RandMapIds":[72813,72814,72810,72821,72830,72840,72852,72860,72215],"CoreGenerateResults":[],"CommonGenerateResults":[],"CommonHexSelectCount":0,"CommonHexRefreshCount":0}}""");
         private static Dictionary<string, object?> BuildTaikoMasterPayload() => PayloadFromJson("""{"TaikoMasterData":{"ActivityId":0,"StageDataList":[],"Setting":{"AppearOffset":0,"JudgeOffset":0}}}""");
         private static Dictionary<string, object?> BuildSelfChoiceLottoPayload(Player player) => LottoManager.BuildSelfChoicePayload(player);

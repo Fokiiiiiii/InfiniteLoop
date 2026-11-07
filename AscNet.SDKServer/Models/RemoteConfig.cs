@@ -45,6 +45,13 @@ namespace AscNet.SDKServer.Models
             remoteConfigs.Add(remoteConfig);
         }
 
+        /// <summary>Replaces every row named <paramref name="key"/> with one row of this value.</summary>
+        public static void SetConfig<T>(this List<RemoteConfig> remoteConfigs, string key, T value)
+        {
+            remoteConfigs.RemoveAll(row => row.Key == key);
+            remoteConfigs.AddConfig(key, value);
+        }
+
         private static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
         {
             { typeof(string), "string" },

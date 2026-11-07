@@ -106,7 +106,15 @@ internal partial class PayModule
                 && ReadDynamicInt(reset, "ResetType") == 5 && ReadDynamicInt(reset, "DayCount") > 0
                 && RemainingDays(player, id) > ReadDynamicInt(reset, "DayCount"))
                 throw new PurchaseLimitException($"Monthly pass {id} renewal limit exceeded: {RemainingDays(player, id)} days remaining");
-            pending.DailyPasses[id] = new() { EndDay = end, LastClaimDay = old?.LastClaimDay ?? -1 };
+            long today = PurchaseDay();
+            bool live = old is not null && old.EndDay > today;
+            // Days before an expired entitlement was renewed are not missed sign-ins.
+            pending.DailyPasses[id] = new()
+            {
+                EndDay = end, LastClaimDay = old?.LastClaimDay ?? -1,
+                FirstDay = live && old!.FirstDay > 0 ? old.FirstDay : today,
+                ClaimedDays = live ? [.. old!.ClaimedDays] : []
+            };
         }
         int company = ReadDynamicInt(info, "CompanyPackage");
         if (company > 0)
@@ -189,11 +197,12 @@ internal partial class PayModule
         var result = RewardHandler.ApplyRewardsOnceAndPersist(
             [new RewardGrant(claimKey, rows)], session);
         long before = pass.LastClaimDay;
-        pass.LastClaimDay = day;
+        bool hadDay = pass.ClaimedDays.Contains(day);
+        pass.MarkClaimed(day);
         bool added = signPackage && !pass.RewardIndexList.Contains(index + 1);
         if (added) pass.RewardIndexList.Add(index + 1);
         try { session.player.SaveChecked(); }
-        catch { pass.LastClaimDay = before; if (added) pass.RewardIndexList.Remove(index + 1); throw; }
+        catch { pass.LastClaimDay = before; if (!hadDay) pass.ClaimedDays.Remove(day); if (added) pass.RewardIndexList.Remove(index + 1); throw; }
         return result;
     }
 
@@ -258,9 +267,10 @@ internal partial class PayModule
                     };
                     long oldClaim = pass.LastClaimDay;
                     session.player.Mails.Add(mail);
-                    pass.LastClaimDay = day;
+                    bool hadDay = pass.ClaimedDays.Contains(day);
+                    pass.MarkClaimed(day);
                     try { session.player.SaveChecked(); }
-                    catch { session.player.Mails.Remove(mail); pass.LastClaimDay = oldClaim; throw; }
+                    catch { session.player.Mails.Remove(mail); pass.LastClaimDay = oldClaim; if (!hadDay) pass.ClaimedDays.Remove(day); throw; }
                     changed = true;
                 }
             if (changed && sendPush)
@@ -283,18 +293,17 @@ internal partial class PayModule
         }
     }
 
-    private static void CompleteLocalRecharge(Session session, Packet.Request packet)
+    private static PayInitiatedResponse CompleteLocalRecharge(Session session, string key, string? targetParam)
     {
-        var request = packet.Deserialize<PayInitiatedRequest>();
         PayInitiatedResponse response = new() { Code = 20053031 };
         lock (session.player)
         {
             try
             {
-                PayTable? product = TableReaderV2.Parse<PayTable>().SingleOrDefault(row => row.Key == request.Key);
+                PayTable? product = TableReaderV2.Parse<PayTable>().SingleOrDefault(row => row.Key == key);
                 if (product is not null && product.ShowUIType == 1 && product.MoneyCard > 0
-                    && string.IsNullOrEmpty(request.TargetParam)
-                    && (session.player.PendingRecharge is null || session.player.PendingRecharge.Key == request.Key))
+                    && string.IsNullOrEmpty(targetParam)
+                    && (session.player.PendingRecharge is null || session.player.PendingRecharge.Key == key))
                 {
                     var pending = session.player.PendingRecharge;
                     // Inventory.Do clamps at MaxCount, so refuse before granting; a
@@ -303,14 +312,14 @@ internal partial class PayModule
                     if ((pending is null || !session.inventory.AppliedRewardClaims.Contains(pending.Order, StringComparer.Ordinal))
                         && !HasItemCapacity(session, [new RewardGoodsTable { TemplateId = Inventory.HongKa, Count = count }]))
                     {
-                        session.log.Warn($"Local recharge deferred: {request.Key} exceeds Rainbow Card capacity");
+                        session.log.Warn($"Local recharge deferred: {key} exceeds Rainbow Card capacity");
                         response.Code = 20027011;
                     }
                     else
                     {
                         if (pending is null)
                         {
-                            pending = new() { Key = request.Key, Count = product.MoneyCard,
+                            pending = new() { Key = key, Count = product.MoneyCard,
                                 Order = $"local:{session.player.PlayerData.Id}:{session.player.RechargeSequence}" };
                             session.player.PendingRecharge = pending;
                             try { session.player.SaveChecked(); }
@@ -321,19 +330,23 @@ internal partial class PayModule
                         long sequence = session.player.RechargeSequence;
                         long paid = session.player.AccumulatedPayMoney;
                         long nextPaid = checked(paid + pending.Count);
+                        long totalPaid = session.player.TotalPayMoney;
                         session.player.RechargeSequence = checked(sequence + 1);
                         session.player.AccumulatedPayMoney = nextPaid;
+                        session.player.TotalPayMoney = checked(totalPaid + (long)Math.Round(Convert.ToDecimal(product.ShowAmount) * 100m));
                         session.player.PendingRecharge = null;
                         try { session.player.SaveChecked(); }
                         catch
                         {
                             session.player.RechargeSequence = sequence;
                             session.player.AccumulatedPayMoney = paid;
+                            session.player.TotalPayMoney = totalPaid;
                             session.player.PendingRecharge = pending;
                             throw;
                         }
                         session.SendPush(BuildAccumulatedPayData(session.player));
                         session.SendPush(new NotifyAccumulatedPayMoney { PayMoney = nextPaid });
+                        session.SendPush(BuildNotifyPayInfo(session.player));
                         response.Code = 0;
                         response.GameOrder = pending.Order;
                         response.LocalCompleted = true;
@@ -343,7 +356,7 @@ internal partial class PayModule
                 }
             }
             catch (Exception error) { session.log.Error($"Local recharge failed: {error}"); response.Code = 2; }
-            session.SendResponse(response, packet.Id);
         }
+        return response;
     }
 }

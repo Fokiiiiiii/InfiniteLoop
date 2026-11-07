@@ -44,6 +44,17 @@ public sealed class PlayerPurchaseDailyPass
     public long StartDay { get; set; }
     public List<int> RewardIndexList { get; set; } = new();
     public long LastClaimDay { get; set; } = -1;
+    // First purchase day of the current entitlement (0 = legacy pass, unknown) and the days
+    // whose daily reward was received; Makeup Sign-in Cards fill the unclaimed days between them.
+    public long FirstDay { get; set; }
+    public List<long> ClaimedDays { get; set; } = new();
+
+    public void MarkClaimed(long day)
+    {
+        LastClaimDay = day;
+        if (!ClaimedDays.Contains(day)) ClaimedDays.Add(day);
+        ClaimedDays.RemoveAll(claimed => claimed < day - 62);
+    }
 }
 
 public sealed class PlayerPendingRecharge

@@ -38,6 +38,7 @@ internal static partial class Program
         var rewardRows = TableReaderV2.Parse<WheelchairManualBattlePassRewardTable>();
         var rewards = TableReaderV2.Parse<RewardTable>().ToDictionary(row => row.Id);
         var goods = TableReaderV2.Parse<RewardGoodsTable>();
+        var goodsById = goods.ToDictionary(row => row.Id);
         Type module = RequiredAscNetGameServerType("AscNet.GameServer.Handlers.WheelchairManualModule");
         MethodInfo builder = RequiredMethod(module, "BuildPayload", BindingFlags.Static | BindingFlags.Public,
             [typeof(Session), typeof(DateTimeOffset)]);
@@ -94,7 +95,7 @@ internal static partial class Program
                 Packet.Response response = MessagePackSerializer.Deserialize<Packet.Response>(packet.Content);
                 AssertEqual(sequence, response.Id, "Manual response correlation");
                 AssertEqual(typeof(T).Name, response.Name, "Manual response wire name");
-                AssertNoAvailablePacket(harness, "Manual state updates precede response callback");
+                AssertNoAvailableNonTaskPacket(harness, "Manual state updates precede response callback");
                 return MessagePackSerializer.Deserialize<T>(response.Content);
             }
             throw new InvalidDataException($"Missing {name} response.");
@@ -116,8 +117,10 @@ internal static partial class Program
             .Except(Payload(harness).GetRewardManualRewardIds).OrderBy(id => id).ToArray();
         List<RewardGoods> AssertClaim(int tier, int[] expected)
         {
-            var expectedGoods = expected.SelectMany(id => goods.Where(row => rewards[rewardRows.Single(reward => reward.Id == id).RewardId].SubIds.Contains(row.Id)))
-                .Select(row => new RewardGoods { TemplateId = row.TemplateId, Count = row.Count });
+            // Indexed lookups: this runs between two live requests, and the session drops a socket idle for 10 s.
+            var expectedGoods = expected.SelectMany(id => rewards[rewardRows.Single(reward => reward.Id == id).RewardId].SubIds
+                    .Where(goodsById.ContainsKey).Select(subId => goodsById[subId]))
+                .Select(row => new RewardGoods { TemplateId = row.TemplateId, Count = row.Count }).ToList();
             var result = Claim(tier, out var push);
             AssertEqual(0, result.Code, "Manual tier claim succeeds");
             AssertEqual(Signature(expectedGoods), Signature(result.RewardList), "Manual claim grants every eligible table reward");
@@ -375,8 +378,8 @@ internal static partial class Program
             AssertEqual(true, before.GetValueOrDefault(box.Id) >= request.Count, "Parent award stocks auto box before callback");
             int sequence = ++packetId;
             harness.WriteClientBytes(LoopbackSessionHarness.SerializeClientRequestFrame(nameof(ItemUseRequest), sequence, request));
-            var notification = ReadPushPayload<NotifyItemDataList>(harness, nameof(NotifyItemDataList), "Parent award auto-use inventory");
-            var response = ReadResponsePayload<ItemUseResponse>(harness, sequence, nameof(ItemUseResponse), "Parent award auto-use response");
+            var notification = ReadPushPayload<NotifyItemDataList>(harness, nameof(NotifyItemDataList), "Parent award auto-use inventory", maxPacketsToRead: 8);
+            var response = ReadResponsePayload<ItemUseResponse>(harness, sequence, nameof(ItemUseResponse), "Parent award auto-use response", maxPacketsToRead: 8);
             AssertEqual(0, response.Code, "Parent award auto-use succeeds");
             AssertEqual(request.Count * policy.Count, response.RewardGoodsList.Sum(row => row.Count),
                 "Parent auto boxes grant table-policy quantity exactly once");
@@ -393,9 +396,20 @@ internal static partial class Program
                     "Parent auto-use consumes and grants exactly once");
             foreach (var item in notification.ItemDataList)
                 AssertEqual(before.GetValueOrDefault(item.Id), item.Count, "Parent auto-use pushes final balance");
-            AssertNoAvailablePacket(harness, "Parent auto-use completes before client callback");
+            AssertNoAvailableNonTaskPacket(harness, "Parent auto-use completes before client callback");
             opened.AddRange(response.RewardGoodsList);
         }
         return opened;
+    }
+
+    // Session.InvokeRequestHandlerLocked sends a NotifyTask snapshot delta *after* every response whenever task
+    // progress changed (item balances, clock). That trailing push is by design and races any DataAvailable check,
+    // so only non-task packets count as "before the client callback".
+    private static void AssertNoAvailableNonTaskPacket(LoopbackSessionHarness harness, string name)
+    {
+        while (harness.TryReadAvailablePacket(name, out Packet packet))
+            if (packet.Type != Packet.ContentType.Push
+                || MessagePackSerializer.Deserialize<Packet.Push>(packet.Content).Name != nameof(NotifyTask))
+                throw new InvalidDataException($"{name}: unexpected {packet.Type} packet.");
     }
 }
