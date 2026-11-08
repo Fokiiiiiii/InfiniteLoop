@@ -377,7 +377,7 @@ class PrebuiltServerTests(unittest.TestCase):
         build.assert_not_called()
         self.assertEqual(server.resolve(), working_directory)
         self.assertEqual(
-            ["dotnet", str(server / "AscNet.dll"), "--urls", "http://127.0.0.1:18080"],
+            ["dotnet", str(working_directory / "AscNet.dll"), "--urls", "http://127.0.0.1:18080"],
             command,
         )
 
