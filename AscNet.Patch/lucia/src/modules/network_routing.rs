@@ -3,17 +3,21 @@ fn owned_path(path: &str) -> bool {
     let notice = path
         .strip_prefix("client/notice/config/")
         .and_then(|path| path.rsplit('/').next());
-    path.starts_with("client/config/")
-        || path.starts_with("client/notice/html/")
-        || matches!(
-            notice,
-            Some(
-                "LoginNotice.json"
-                    | "GameNotice.json"
-                    | "SecondMenuNotice.json"
-                    | "PopUpPicNotice.json"
-                    | "ScrollPicNotice.json"
-                    | "ScrollTextNotice.json"
+    let jp_config_tab = path.contains("/com.kurogame.punishing.grayraven.jp/")
+        && path.ends_with("/standalone/config.tab");
+    !jp_config_tab
+        && (path.starts_with("client/config/")
+            || path.starts_with("client/notice/html/")
+            || matches!(
+                notice,
+                Some(
+                    "LoginNotice.json"
+                        | "GameNotice.json"
+                        | "SecondMenuNotice.json"
+                        | "PopUpPicNotice.json"
+                        | "ScrollPicNotice.json"
+                        | "ScrollTextNotice.json"
+                )
             )
         )
 }
@@ -44,7 +48,11 @@ pub(crate) fn redirected_url(origin: &str, url: &str) -> Option<String> {
     let suffix = &url[path..];
     // Client log/feedback uploads (EN/TW `*zspnslog.*` hosts) stay on the local server.
     let host = url[scheme + 3..path].split(':').next().unwrap_or_default();
-    if host.contains("zspnslog.") && suffix.split(['?', '#']).next() == Some("/feedback") {
+    let request_path = suffix.split(['?', '#']).next().unwrap_or(suffix);
+    if matches!(request_path, "/api/Login/Login" | "/api/Login/Login-cn") {
+        return Some(format!("{origin}{suffix}"));
+    }
+    if host.contains("zspnslog.") && request_path == "/feedback" {
         return Some(format!("{origin}{suffix}"));
     }
     owned_path(suffix.strip_prefix("/prod/")?)
@@ -71,6 +79,18 @@ mod tests {
 
     #[test]
     fn routes_only_server_owned_client_files() {
+        assert_eq!(
+            redirected_url(
+                ORIGIN,
+                "http://prod-jpcdn-ak.pgr-game.com/prod/client/config/cdn-key/com.kurogame.punishing.grayraven.jp/4.9.0/standalone/config.tab?v=1"
+            ),
+            None
+        );
+        assert_eq!(
+            redirected_url(ORIGIN, "http://prod-encdn-ak.pgr-game.com/prod/client/config/cdn-key/com.kurogame.punishing.grayraven.en/4.9.0/standalone/config.tab"),
+            Some(format!("{ORIGIN}/prod/client/config/cdn-key/com.kurogame.punishing.grayraven.en/4.9.0/standalone/config.tab"))
+        );
+
         for path in [
             "client/config/bootstrap.json",
             "client/notice/config/cdn-key/package/version/LoginNotice.json",
@@ -120,6 +140,16 @@ mod tests {
             assert_eq!(redirected_url(ORIGIN, url), Some(format!("{ORIGIN}{suffix}")));
         }
         assert_eq!(redirected_url(ORIGIN, "http://prod.twzspnslog.pgr-game.com:50000/other"), None);
+        for url in [
+            "https://gate.pgr-game.com/api/Login/Login?loginType=5&userId=1&token=test",
+            "http://8.209.200.222:2333/api/Login/Login?loginType=5&userId=1&token=test",
+            "https://gate.kurogame.net/api/Login/Login-cn?userId=1",
+        ] {
+            let path = &url[url.find("/api/").unwrap()..];
+            assert_eq!(redirected_url(ORIGIN, url), Some(format!("{ORIGIN}{path}")));
+        }
+        assert_eq!(redirected_url(ORIGIN, "https://cdn.example/api/Login/Login"), Some(format!("{ORIGIN}/api/Login/Login")));
+        assert_eq!(redirected_url(ORIGIN, "https://cdn.example/api/Login/Logout"), None);
         assert_eq!(redirected_url(ORIGIN, "https://cdn.example/feedback"), None);
     }
 
@@ -138,11 +168,13 @@ mod tests {
                 "client/notice/config/{}/{}/4.8.0/GameNotice.json",
             ] {
                 let path = file.replacen("{}", key, 1).replacen("{}", package, 1);
-                assert_eq!(
-                    redirected_url(ORIGIN, &format!("http://{host}/prod/{path}")),
-                    Some(format!("{ORIGIN}/prod/{path}")),
-                    "{host} {path}"
-                );
+                let url = format!("http://{host}/prod/{path}");
+                let redirected = redirected_url(ORIGIN, &url);
+                if package.ends_with(".jp") && file.starts_with("client/config/") {
+                    assert_eq!(redirected, None, "{host} {path}");
+                } else {
+                    assert_eq!(redirected, Some(format!("{ORIGIN}/prod/{path}")), "{host} {path}");
+                }
             }
             assert_eq!(redirected_url(ORIGIN, &format!("http://{host}/prod/client/notice/pic/banner.png")), None);
         }
@@ -159,11 +191,13 @@ mod tests {
                 "client/notice/config/{}/{}/4.8.0/GameNotice.json",
             ] {
                 let path = file.replacen("{}", key, 1).replacen("{}", package, 1);
-                assert_eq!(
-                    redirected_url(ORIGIN, &format!("http://{host}/prod/{path}")),
-                    Some(format!("{ORIGIN}/prod/{path}")),
-                    "{host} {path}"
-                );
+                let url = format!("http://{host}/prod/{path}");
+                let redirected = redirected_url(ORIGIN, &url);
+                if package.ends_with(".jp") && file.starts_with("client/config/") {
+                    assert_eq!(redirected, None, "{host} {path}");
+                } else {
+                    assert_eq!(redirected, Some(format!("{ORIGIN}/prod/{path}")), "{host} {path}");
+                }
                 assert_eq!(client_package(&format!("http://{host}/prod/{path}")), Some((key, package)));
             }
             assert_eq!(redirected_url(ORIGIN, &format!("http://{host}/prod/client/notice/pic/banner.png")), None);
