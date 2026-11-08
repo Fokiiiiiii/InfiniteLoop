@@ -341,6 +341,66 @@ class ClientRegionTests(unittest.TestCase):
             self.assertEqual(("kr", run_steam.REGION_IDENTITIES["kr"], "table"), run_steam.resolve_region(client, "kr"))
 
 
+class PrebuiltServerTests(unittest.TestCase):
+    def test_prebuilt_server_runs_ascnet_dll_without_dotnet_run(self):
+        with tempfile.TemporaryDirectory() as root:
+            server = Path(root)
+            (server / "AscNet.dll").write_bytes(b"prebuilt")
+
+            command = run_steam.ascnet_run_command(
+                "dotnet", "http://127.0.0.1:18080", server
+            )
+
+        self.assertEqual(
+            ["dotnet", str(server / "AscNet.dll"), "--urls", "http://127.0.0.1:18080"],
+            command,
+        )
+
+    def test_prebuilt_server_directory_option_is_parsed(self):
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(
+                sys,
+                "argv",
+                ["run_steam.py", "--prebuilt-server-directory", root],
+            ):
+                args = run_steam.parse_args()
+        self.assertEqual(Path(root), args.prebuilt_server_directory)
+
+    def test_prebuilt_mode_skips_local_build(self):
+        with tempfile.TemporaryDirectory() as root:
+            server = Path(root)
+            (server / "AscNet.dll").write_bytes(b"prebuilt")
+            with patch.object(run_steam, "build_ascnet") as build:
+                command, working_directory = run_steam.prepare_ascnet_server(
+                    "dotnet", "http://127.0.0.1:18080", {}, server
+                )
+        build.assert_not_called()
+        self.assertEqual(server.resolve(), working_directory)
+        self.assertEqual(
+            ["dotnet", str(server / "AscNet.dll"), "--urls", "http://127.0.0.1:18080"],
+            command,
+        )
+
+    def test_source_mode_keeps_existing_build_flow(self):
+        with patch.object(run_steam, "build_ascnet") as build:
+            command, working_directory = run_steam.prepare_ascnet_server(
+                "dotnet", "http://127.0.0.1:18080", {}, None
+            )
+        build.assert_called_once_with("dotnet", {})
+        self.assertEqual(run_steam.ROOT, working_directory)
+        self.assertEqual(
+            ["dotnet", "run", "--no-build", "--project", "AscNet/AscNet.csproj", "--", "--urls", "http://127.0.0.1:18080"],
+            command,
+        )
+
+    def test_prebuilt_server_requires_ascnet_dll(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaisesRegex(FileNotFoundError, "AscNet.dll"):
+                run_steam.ascnet_run_command(
+                    "dotnet", "http://127.0.0.1:18080", Path(root)
+                )
+
+
 class WineLaunchEnvTests(unittest.TestCase):
     def test_version_override_is_merged_once(self):
         self.assertEqual(run_steam.merge_version_dll_override(""), "version=n,b")

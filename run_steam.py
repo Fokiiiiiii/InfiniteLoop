@@ -124,6 +124,7 @@ def parse_args() -> argparse.Namespace:
         help="Capture raw chunks only for the JP game TCP socket to .runtime/jp-game-tcp.jsonl.",
     )
     parser.add_argument("--dotnet", default=os.environ.get("DOTNET"), help="dotnet executable. Defaults to DOTNET, PATH, then /Users/reiserfs/.dotnet/dotnet")
+    parser.add_argument("--prebuilt-server-directory", type=Path, help="Run an existing AscNet.dll from this directory without running dotnet build.")
     parser.add_argument("--mitm", default=os.environ.get("MITMPROXY"), help="mitmproxy/mitmdump executable. Defaults to MITMPROXY, mitmdump, then mitmproxy")
     parser.add_argument("--with-mongo", action="store_true", help="Start a local mongod for AscNet login/player data if MongoDB is not already reachable.")
     parser.add_argument("--mongod", default=os.environ.get("MONGOD"), help="mongod executable. Defaults to MONGOD, then PATH.")
@@ -350,13 +351,29 @@ def build_ascnet(dotnet: str, env: dict[str, str]) -> None:
             raise SystemExit(completed.returncode)
 
 
-def ascnet_run_command(dotnet: str, sdk_url: str) -> list[str]:
+def ascnet_run_command(dotnet: str, sdk_url: str, prebuilt_server_directory: Path | None = None) -> list[str]:
+    if prebuilt_server_directory is not None:
+        server_dll = Path(prebuilt_server_directory) / "AscNet.dll"
+        if not server_dll.is_file():
+            raise FileNotFoundError(f"prebuilt server is missing {server_dll}")
+        return [dotnet, str(server_dll), "--urls", sdk_url]
     return [dotnet, "run", "--no-build", "--project", "AscNet/AscNet.csproj", "--", "--urls", sdk_url]
 
 
-def popen(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.Popen[bytes]:
+def prepare_ascnet_server(dotnet: str, sdk_url: str, env: dict[str, str], prebuilt_server_directory: Path | None) -> tuple[list[str], Path]:
+    if prebuilt_server_directory is None:
+        build_ascnet(dotnet, env)
+        return ascnet_run_command(dotnet, sdk_url), ROOT
+    server_directory = Path(prebuilt_server_directory).expanduser().resolve()
+    if not server_directory.is_dir() or not (server_directory / "AscNet.dll").is_file():
+        raise SystemExit(f"Prebuilt server directory must contain AscNet.dll: {server_directory}")
+    print(f"Using prebuilt AscNet server: {server_directory}", flush=True)
+    return ascnet_run_command(dotnet, sdk_url, server_directory), server_directory
+
+
+def popen(cmd: list[str], *, env: dict[str, str] | None = None, cwd: Path | None = None) -> subprocess.Popen[bytes]:
     print("+ " + " ".join(cmd), flush=True)
-    return subprocess.Popen(cmd, cwd=ROOT, env=env)
+    return subprocess.Popen(cmd, cwd=ROOT if cwd is None else cwd, env=env)
 
 
 def smoke_check(sdk_url: str, timeout: float, profile=None) -> None:
@@ -700,8 +717,10 @@ def main() -> int:
     if cache_dir and not args.no_repair_krsdk_cache and not args.seed_krsdk_cache:
         repair_krsdk_login_cache(cache_dir)
     try:
-        build_ascnet(dotnet, env)
-        ascnet = popen(ascnet_run_command(dotnet, args.sdk_url), env=env)
+        command, server_cwd = prepare_ascnet_server(
+            dotnet, args.sdk_url, env, args.prebuilt_server_directory
+        )
+        ascnet = popen(command, env=env, cwd=server_cwd)
         processes.append(ascnet)
 
         sdk_address = urllib.parse.urlparse(args.sdk_url)
