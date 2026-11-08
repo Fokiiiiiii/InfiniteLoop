@@ -25,7 +25,7 @@ pub enum PatchState {
 }
 
 impl PatchState {
-    pub(crate) fn can_be_installed_from_play(&self) -> bool {
+    pub fn can_be_installed_from_play(&self) -> bool {
         matches!(
             self,
             Self::Current | Self::Unpatched | Self::AdoptionRequired | Self::UpdateAvailable
