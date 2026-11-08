@@ -51,6 +51,7 @@ jobs:
           }
           "needed=true" >> $env:GITHUB_OUTPUT
           Write-Host "Launcher release $version needs to be built or completed."
+          exit 0
       - name: Find and verify upstream launcher package
         id: upstream
         if: steps.release.outputs.needed == 'true'
