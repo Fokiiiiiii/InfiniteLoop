@@ -24,6 +24,38 @@ pub enum PatchState {
     RepairRequired(String),
 }
 
+impl PatchState {
+    pub(crate) fn can_be_installed_from_play(&self) -> bool {
+        matches!(
+            self,
+            Self::Current | Self::Unpatched | Self::AdoptionRequired | Self::UpdateAvailable
+        )
+    }
+}
+
+#[cfg(test)]
+mod play_patch_state_tests {
+    use super::PatchState;
+
+    #[test]
+    fn play_accepts_patch_states_the_launcher_can_install() {
+        for state in [
+            PatchState::Current,
+            PatchState::Unpatched,
+            PatchState::AdoptionRequired,
+            PatchState::UpdateAvailable,
+        ] {
+            assert!(state.can_be_installed_from_play());
+        }
+    }
+
+    #[test]
+    fn play_rejects_unsupported_and_repair_required_patch_states() {
+        assert!(!PatchState::Unsupported("unsupported".into()).can_be_installed_from_play());
+        assert!(!PatchState::RepairRequired("repair required".into()).can_be_installed_from_play());
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct State {

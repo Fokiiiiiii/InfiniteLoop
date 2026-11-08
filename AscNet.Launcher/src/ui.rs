@@ -1808,14 +1808,10 @@ unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
                 }
                 if m.settings.selected_game.is_none() {
                     client::ID_OPEN
-                } else if m.update_available == Some(true)
-                    || m.build.is_none()
-                    || m.package.is_none()
-                    || !matches!(m.patch, Some(PatchState::Current))
-                {
-                    ID_ACTION
-                } else {
+                } else if can_play(&m).is_ok() {
                     ID_PLAY
+                } else {
+                    ID_ACTION
                 }
             };
             command(hwnd, state, target, BN_CLICKED as u16);
@@ -1901,8 +1897,33 @@ unsafe fn command(hwnd: HWND, state: &mut Window, id: i32, notification: u16) {
                 start_refresh(hwnd, true, false)
             }
         }
-        ID_ACTION | ID_RERUN_SETUP => {
-            if commit_inputs(hwnd, state)
+        ID_ACTION => {
+            if !commit_inputs(hwnd, state) {
+                return;
+            }
+            let existing_build = {
+                let m = state.model.lock().unwrap();
+                m.settings.selected_game.is_some() && m.build.is_some() && m.package.is_some()
+            };
+            if existing_build {
+                start_play(hwnd, state);
+            } else if MessageBoxW(
+                hwnd,
+                w!("Setup runs source code from the configured repository and installs missing Git, .NET, MongoDB, Rust, and C++ build tools. Windows may request administrator approval.\r\n\r\nContinue?"),
+                w!("AscNet local setup"),
+                MB_OKCANCEL | MB_ICONWARNING,
+            ) == IDOK
+            {
+                start_prepare(hwnd, state)
+            }
+        }
+        ID_RERUN_SETUP => {
+            let can_setup = {
+                let m = state.model.lock().unwrap();
+                m.build.is_none() || m.package.is_none()
+            };
+            if can_setup
+                && commit_inputs(hwnd, state)
                 && MessageBoxW(
                     hwnd,
                     w!("Setup runs source code from the configured repository and installs missing Git, .NET, MongoDB, Rust, and C++ build tools. Windows may request administrator approval.\r\n\r\nContinue?"),
@@ -2184,10 +2205,14 @@ fn start_play(hwnd: HWND, state: &mut Window) {
             let patch = install::inspect(&game, &package);
             install::log_action("Play", &game, Some(&package), patch.as_ref().ok());
             let patch = patch?;
-            if !matches!(patch, PatchState::Current) {
-                anyhow::bail!("Run Setup / Update to install the current local patch")
+            if !patch.can_be_installed_from_play() {
+                anyhow::bail!("The local patch is unsupported or requires repair")
             }
             install::install_with_consent(&game, &package, &mut |s| post_progress(hwnd, &events, &s))?;
+            let patch = install::inspect(&game, &package)?;
+            if !matches!(patch, PatchState::Current) {
+                anyhow::bail!("Patch installation did not produce a current patch")
+            }
             let mut runtime =
                 LocalRuntime::start(&build, &mut |s| post_progress(hwnd, &events, s))?;
             let origin = local_origin(&build)?;
@@ -2273,7 +2298,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
             };
             drop(m);
             append_log(hwnd, state, &message);
-            start_refresh(hwnd, true, true);
+            start_refresh(hwnd, true, false);
             return;
         }
         Ok(WorkResult::Refresh {
@@ -2341,6 +2366,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
         }) => {
             m.build = Some(build);
             m.package = Some(package);
+            m.patch = Some(PatchState::Current);
             m.runtime = Some(runtime);
             m.server = Some(server);
         }
@@ -2379,7 +2405,7 @@ unsafe fn finish_work(hwnd: HWND, state: &mut Window, work: Work) {
 }
 
 unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
-    let (update_available, runtime, stopping, busy, can_restore, can_launch, status_line) = {
+    let (update_available, runtime, stopping, busy, can_restore, can_launch, has_build, status_line) = {
         let m = model.lock().unwrap();
         (
             m.update_available,
@@ -2388,6 +2414,7 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
             m.busy,
             m.settings.selected_game.is_some(),
             can_play(&m).is_ok(),
+            m.build.is_some() && m.package.is_some(),
             status_line(&m),
         )
     };
@@ -2395,7 +2422,9 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
     set_text(
         hwnd,
         ID_ACTION,
-        if update_available == Some(true) {
+        if has_build {
+            "&Play / Patch"
+        } else if update_available == Some(true) {
             "&Update"
         } else {
             "&Setup / Update"
@@ -2403,7 +2432,7 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
     );
     let services = runtime || stopping;
     set_enabled(hwnd, ID_ACTION, !busy && !services);
-    set_enabled(hwnd, ID_RERUN_SETUP, !busy && !services);
+    set_enabled(hwnd, ID_RERUN_SETUP, !busy && !services && !has_build);
     set_enabled(hwnd, ID_RESTORE, !busy && !stopping && can_restore);
     set_enabled(hwnd, ID_PLAY, !busy && can_launch);
     let home_text = if busy {
@@ -2414,12 +2443,12 @@ unsafe fn update_view(hwnd: HWND, model: &Arc<Mutex<Model>>) {
         "RUNNING"
     } else if !can_restore {
         "SELECT GAME"
+    } else if can_launch {
+        "PLAY"
     } else if update_available == Some(true) {
         "UPDATE"
-    } else if !can_launch {
-        "SETUP"
     } else {
-        "PLAY"
+        "SETUP"
     };
     set_text(hwnd, ID_HOME_ACTION, home_text);
     set_enabled(hwnd, ID_HOME_ACTION, !busy && !services);
@@ -2471,8 +2500,10 @@ fn can_play(m: &Model) -> Result<()> {
     m.package
         .as_ref()
         .context("Run Setup / Update to build the local patch")?;
-    if !matches!(m.patch, Some(PatchState::Current)) {
-        anyhow::bail!("Run Setup / Update to install the current local patch")
+    if let Some(patch) = &m.patch {
+        if !patch.can_be_installed_from_play() {
+            anyhow::bail!("The local patch is unsupported or requires repair")
+        }
     }
     if m.stopping {
         anyhow::bail!("The local server is stopping")

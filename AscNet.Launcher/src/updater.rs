@@ -9,6 +9,7 @@ use crate::package::sha256_file;
 // The script is not started. Setup runs inside this executable.
 const FILES: [&str; 7] = ["AscNetLauncher.exe", "background.bmp", "background.mp4", "background.wav", "launcher.json", "setup-local.ps1", "supported-client.json"];
 const MAX_ARCHIVE: u64 = 128 * 1024 * 1024;
+const MAX_UPDATE_MANIFEST: usize = 16 * 1024;
 const MAX_EXPANDED: u64 = 256 * 1024 * 1024;
 const TRANSACTION: &str = ".ascnet-launcher-update";
 // Retained in the executable and checked without executing downloaded code.
@@ -79,33 +80,35 @@ fn client() -> Result<reqwest::blocking::Client> {
 }
 
 #[derive(Deserialize)]
-struct ApiRelease { tag_name: String, draft: bool, prerelease: bool, assets: Vec<ApiAsset> }
-#[derive(Deserialize)]
-struct ApiAsset { name: String, browser_download_url: String, size: u64, digest: Option<String>, state: String }
+#[serde(deny_unknown_fields)]
+struct UpdateManifest { version: String, tag: String, sha256: String, size: u64 }
+
+fn release_from_manifest(repository: &str, current: &semver::Version, bytes: &[u8]) -> Result<Option<Release>> {
+    ensure!(bytes.len() <= MAX_UPDATE_MANIFEST, "release metadata exceeds limit");
+    let manifest: UpdateManifest = serde_json::from_slice(bytes).context("invalid launcher update manifest")?;
+    let version = stable_version(&manifest.version).context("manifest version must be stable semver")?;
+    ensure!(stable_version(&manifest.tag).as_ref() == Some(&version), "manifest tag and version do not match");
+    ensure!(manifest.size > 0 && manifest.size <= MAX_ARCHIVE, "invalid release asset size");
+    ensure!(manifest.sha256.len() == 64 && manifest.sha256.bytes().all(|b| b.is_ascii_hexdigit()), "invalid release SHA-256 digest");
+    if version <= *current { return Ok(None); }
+    let repository = repository_path(repository)?;
+    let url = format!("https://github.com/{repository}/releases/download/{}/AscNetLauncher.zip", manifest.tag);
+    Ok(Some(Release { version: version.to_string(), url, digest: manifest.sha256.to_ascii_lowercase(), size: manifest.size }))
+}
 
 pub fn check(repository: &str, current_version: &str) -> Result<Option<Release>> {
-    let repository = repository_path(repository)?;
+    let repository_path = repository_path(repository)?;
+    let repository = format!("https://github.com/{repository_path}");
     let current = stable_version(current_version).context("compiled launcher version is not stable semver")?;
-    let mut response = client()?.get(format!("https://api.github.com/repos/{repository}/releases?per_page=100"))
-        .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").send()?.error_for_status()?;
+    let url = format!("{repository}/releases/latest/download/launcher-update.json");
+    let mut response = client()?.get(url).send()?.error_for_status()?;
     let length = response.content_length();
-    let bytes = crate::download::read_body(&mut response, length, 2 * 1024 * 1024)?;
-    ensure!(bytes.len() <= 2 * 1024 * 1024, "release metadata exceeds limit");
+    let bytes = crate::download::read_body(&mut response, length, MAX_UPDATE_MANIFEST)?;
+    ensure!(bytes.len() <= MAX_UPDATE_MANIFEST, "release metadata exceeds limit");
     if let Some(n) = length {
         ensure!(bytes.len() as u64 == n, "release metadata ended after {} bytes, expected {n}", bytes.len());
     }
-    let releases: Vec<ApiRelease> = serde_json::from_slice(&bytes)?;
-    let Some((version, release)) = releases.into_iter().filter(|r| !r.draft && !r.prerelease)
-        .filter_map(|r| stable_version(&r.tag_name).map(|v| (v, r))).filter(|(v, _)| v > &current).max_by(|a,b| a.0.cmp(&b.0)) else { return Ok(None) };
-    let assets: Vec<_> = release.assets.into_iter().filter(|a| a.name == "AscNetLauncher.zip").collect();
-    ensure!(assets.len() == 1, "release must contain exactly one AscNetLauncher.zip");
-    let asset = &assets[0];
-    ensure!(asset.state == "uploaded" && asset.size > 0 && asset.size <= MAX_ARCHIVE, "invalid release asset size/state");
-    let digest = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")).context("GitHub asset SHA-256 digest is required")?;
-    ensure!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()), "invalid GitHub SHA-256 digest");
-    let expected = format!("https://github.com/{repository}/releases/download/{}/AscNetLauncher.zip", release.tag_name);
-    ensure!(asset.browser_download_url == expected, "release asset URL does not match repository/tag");
-    Ok(Some(Release { version: version.to_string(), url: expected, digest: digest.to_ascii_lowercase(), size: asset.size }))
+    release_from_manifest(&repository, &current, &bytes)
 }
 
 fn regular(path: &Path) -> Result<()> {
@@ -495,6 +498,45 @@ pub fn startup() -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn release_manifest_is_bound_to_a_stable_fork_tag_and_digest() {
+        let current = stable_version("1.0.23").unwrap();
+        let digest = "a".repeat(64);
+        let bytes = format!(
+            r#"{{"version":"1.0.24","tag":"1.0.24","sha256":"{digest}","size":123}}"#
+        );
+        let repository = "https://github.com/Fokiiiiiii/InfiniteLoop";
+        let release = release_from_manifest(repository, &current, bytes.as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(release.version, "1.0.24");
+        assert_eq!(release.digest, digest);
+        assert_eq!(release.size, 123);
+        assert_eq!(
+            release.url,
+            "https://github.com/Fokiiiiiii/InfiniteLoop/releases/download/1.0.24/AscNetLauncher.zip"
+        );
+        assert!(release_from_manifest(repository, &stable_version("1.0.24").unwrap(), bytes.as_bytes())
+            .unwrap().is_none());
+    }
+
+    #[test]
+    fn release_manifest_rejects_invalid_metadata() {
+        let current = stable_version("1.0.23").unwrap();
+        let digest = "a".repeat(64);
+        let repository = "https://github.com/Fokiiiiiii/InfiniteLoop";
+        for invalid in [
+            format!(r#"{{"version":"1.0.24","tag":"1.0.23","sha256":"{digest}","size":123}}"#),
+            format!(r#"{{"version":"1.0.24","tag":"1.0.24","sha256":"bad","size":123}}"#),
+            format!(r#"{{"version":"1.0.24","tag":"1.0.24","sha256":"{digest}","size":0}}"#),
+            format!(r#"{{"version":"1.0.24-rc.1","tag":"1.0.24-rc.1","sha256":"{digest}","size":123}}"#),
+        ] {
+            assert!(release_from_manifest(repository, &current, invalid.as_bytes()).is_err());
+        }
+        assert!(release_from_manifest(repository, &current, &vec![b' '; MAX_UPDATE_MANIFEST + 1]).is_err());
+        assert!(release_from_manifest("https://github.com.evil/Fokiiiiiii/InfiniteLoop", &current, b"{}").is_err());
+    }
+
     #[test]
     fn stable_versions_and_repository_boundaries() {
         assert!(stable_version("v1.0.3").unwrap() > stable_version("1.0.2").unwrap());

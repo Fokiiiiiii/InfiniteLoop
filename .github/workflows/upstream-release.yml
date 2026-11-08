@@ -1,4 +1,4 @@
-name: Sync upstream launcher release
+name: Build and publish Windows launcher
 on:
   workflow_dispatch:
   schedule:
@@ -16,10 +16,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  mirror:
+  release:
     if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main') }}
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,54 +28,121 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - name: Find and verify upstream release asset
-        id: upstream
+      - name: Check launcher version and release state
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = python -c "import tomllib; print(tomllib.load(open('AscNet.Launcher/Cargo.toml', 'rb'))['package']['version'])"
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^v?[0-9]+\.[0-9]+\.[0-9]+$') { throw "Invalid launcher package version: $version" }
+          "tag=$version" >> $env:GITHUB_OUTPUT
+          $existingJson = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$version" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $existing = $existingJson | ConvertFrom-Json
+            $assets = @($existing.assets | Where-Object { $_.state -eq "uploaded" })
+            $hasArchive = @($assets | Where-Object { $_.name -eq "AscNetLauncher.zip" }).Count -eq 1
+            $hasManifest = @($assets | Where-Object { $_.name -eq "launcher-update.json" }).Count -eq 1
+            if (-not $existing.draft -and -not $existing.prerelease -and $hasArchive -and $hasManifest) {
+              "needed=false" >> $env:GITHUB_OUTPUT
+              Write-Host "Launcher release $version is already published with both assets."
+              exit 0
+            }
+          }
+          "needed=true" >> $env:GITHUB_OUTPUT
+          Write-Host "Launcher release $version needs to be built or completed."
+      - name: Find and verify upstream launcher package
+        id: upstream
+        if: steps.release.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
         run: |
           $releaseJson = gh api repos/reiserFSs/InfiniteLoop/releases/latest
-          if ($LASTEXITCODE -ne 0) { throw "Failed to query the upstream release." }
+          if ($LASTEXITCODE -ne 0) { throw "Failed to query the upstream launcher release." }
           $release = $releaseJson | ConvertFrom-Json
-          $tag = [string]$release.tag_name
-          if ($tag -notmatch '^v?[0-9]+\.[0-9]+\.[0-9]+$') { throw "Unexpected upstream release tag: $tag" }
+          $upstreamTag = [string]$release.tag_name
+          if ($upstreamTag -notmatch '^v?[0-9]+\.[0-9]+\.[0-9]+$') { throw "Unexpected upstream release tag: $upstreamTag" }
           $assets = @($release.assets | Where-Object { $_.name -eq "AscNetLauncher.zip" -and $_.state -eq "uploaded" })
-          if ($assets.Count -ne 1) { throw "Upstream release $tag must contain one uploaded AscNetLauncher.zip." }
+          if ($assets.Count -ne 1) { throw "Upstream release $upstreamTag must contain one uploaded AscNetLauncher.zip." }
           $digest = [string]$assets[0].digest
-          if ($digest -notmatch '^sha256:[0-9a-fA-F]{64}$') { throw "Upstream release $tag has no valid SHA-256 asset digest." }
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
-            "needed=false" >> $env:GITHUB_OUTPUT
-            Write-Host "Release $tag is already mirrored."
-            exit 0
-          }
+          if ($digest -notmatch '^sha256:[0-9a-fA-F]{64}$' -or [int64]$assets[0].size -le 0 -or [int64]$assets[0].size -gt 134217728) { throw "Upstream launcher asset metadata is invalid." }
           $downloadDir = Join-Path $env:RUNNER_TEMP "upstream"
           New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
-          gh release download $tag --repo reiserFSs/InfiniteLoop --pattern AscNetLauncher.zip --dir $downloadDir
-          if ($LASTEXITCODE -ne 0) { throw "Failed to download upstream release $tag." }
+          gh release download $upstreamTag --repo reiserFSs/InfiniteLoop --pattern AscNetLauncher.zip --dir $downloadDir
+          if ($LASTEXITCODE -ne 0) { throw "Failed to download upstream launcher $upstreamTag." }
           $archive = Join-Path $downloadDir "AscNetLauncher.zip"
           $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $digest.Substring(7).ToLowerInvariant()) { throw "Upstream release asset SHA-256 mismatch." }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          if ($actual -ne $digest.Substring(7).ToLowerInvariant()) { throw "Upstream launcher asset SHA-256 mismatch." }
+          "tag=$upstreamTag" >> $env:GITHUB_OUTPUT
           "archive=$archive" >> $env:GITHUB_OUTPUT
-          "needed=true" >> $env:GITHUB_OUTPUT
-      - name: Point the packaged updater at this repository
-        id: prepare
-        if: steps.upstream.outputs.needed == 'true'
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        if: steps.release.outputs.needed == 'true'
+        with:
+          toolchain: stable
+          build-warnings: allow
+          cache-workspaces: AscNet.Launcher -> AscNet.Launcher/target
+      - name: Build the fork launcher on Windows
+        if: steps.release.outputs.needed == 'true'
+        id: binary
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: pwsh
         run: |
-          $archive = Join-Path $env:RUNNER_TEMP "upstream\AscNetLauncher.zip"
+          cargo build --manifest-path AscNet.Launcher/Cargo.toml --release
+          if ($LASTEXITCODE -ne 0) { throw "Windows launcher build failed." }
+          $launcher = Join-Path $PWD "AscNet.Launcher\target\release\ascnet-launcher.exe"
+          if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) { throw "The Windows launcher executable is missing." }
+          $bytes = [IO.File]::ReadAllBytes($launcher)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw "The built launcher is not a Windows executable." }
+          python -c 'import pathlib, sys; data = pathlib.Path(sys.argv[1]).read_bytes(); marker = f"ASCNET_LAUNCHER_VERSION={sys.argv[2]}\0".encode(); assert marker in data' "$launcher" "$env:TAG"
+          if ($LASTEXITCODE -ne 0) { throw "The built launcher version marker does not match the release tag." }
+          "path=$launcher" >> $env:GITHUB_OUTPUT
+      - name: Package upstream assets with the fork launcher
+        id: package
+        if: steps.release.outputs.needed == 'true'
+        env:
+          UPSTREAM_ARCHIVE: ${{ steps.upstream.outputs.archive }}
+          LAUNCHER_EXE: ${{ steps.binary.outputs.path }}
+        shell: pwsh
+        run: |
           $output = Join-Path $env:RUNNER_TEMP "AscNetLauncher.zip"
-          python Scripts/prepare_upstream_launcher_release.py $archive $output $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE -ne 0) { throw "Failed to prepare the upstream launcher package." }
+          python Scripts/prepare_upstream_launcher_release.py "$env:UPSTREAM_ARCHIVE" "$output" $env:GITHUB_REPOSITORY --launcher-exe "$env:LAUNCHER_EXE"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to prepare the launcher package." }
           "archive=$output" >> $env:GITHUB_OUTPUT
-      - name: Publish prebuilt launcher to this repository
-        if: steps.upstream.outputs.needed == 'true'
+      - name: Create update manifest
+        id: manifest
+        if: steps.release.outputs.needed == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        shell: pwsh
+        run: |
+          $archiveItem = Get-Item -LiteralPath $env:ARCHIVE
+          if ($archiveItem.Length -le 0 -or $archiveItem.Length -gt 134217728) { throw "Prepared launcher archive size is invalid." }
+          $hash = (Get-FileHash -LiteralPath $env:ARCHIVE -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = @{ version = $env:TAG; tag = $env:TAG; sha256 = $hash; size = [int64]$archiveItem.Length } | ConvertTo-Json -Compress
+          $path = Join-Path $env:RUNNER_TEMP "launcher-update.json"
+          [IO.File]::WriteAllText($path, $manifest, [Text.UTF8Encoding]::new($false))
+          "path=$path" >> $env:GITHUB_OUTPUT
+      - name: Publish launcher release
+        if: steps.release.outputs.needed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.upstream.outputs.tag }}
-          ARCHIVE: ${{ steps.prepare.outputs.archive }}
+          TAG: ${{ steps.release.outputs.tag }}
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+        shell: pwsh
         run: |
-          $notes = "Prebuilt launcher mirrored from reiserFSs/InfiniteLoop release $env:TAG. The package updater points to $env:GITHUB_REPOSITORY (main)."
-          $arguments = @("release", "create", $env:TAG, $env:ARCHIVE, "--repo", $env:GITHUB_REPOSITORY, "--title", "AscNet Launcher v$env:TAG", "--notes", $notes)
-          & gh @arguments
-          if ($LASTEXITCODE -ne 0) { throw "Failed to publish the prebuilt launcher release." }
-          Write-Host "Published upstream launcher $env:TAG to $env:GITHUB_REPOSITORY."
+          $notes = "Windows CI build of fork launcher $env:TAG. Package assets mirror reiserFSs/InfiniteLoop release $env:UPSTREAM_TAG; updates are served by $env:GITHUB_REPOSITORY."
+          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $env:ARCHIVE $env:MANIFEST --repo $env:GITHUB_REPOSITORY --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload launcher release assets." }
+            gh release edit $env:TAG --repo $env:GITHUB_REPOSITORY --title "AscNet Launcher v$env:TAG" --notes $notes --draft=false --prerelease=false
+          } else {
+            gh release create $env:TAG $env:ARCHIVE $env:MANIFEST --repo $env:GITHUB_REPOSITORY --title "AscNet Launcher v$env:TAG" --notes $notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Failed to publish launcher release $env:TAG." }
+          Write-Host "Published Windows launcher $env:TAG with a SHA-256 update manifest."

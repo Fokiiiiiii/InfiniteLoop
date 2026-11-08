@@ -64,6 +64,18 @@ class PrepareUpstreamLauncherReleaseTests(unittest.TestCase):
                 if name not in ("launcher.json", "supported-client.json"):
                     self.assertEqual(f"prebuilt:{name}".encode(), archive.read(name))
 
+    def test_replaces_launcher_with_windows_ci_binary(self):
+        built_launcher = self.root / "AscNetLauncher.exe"
+        built_bytes = b"MZ-fork-built-launcher"
+        built_launcher.write_bytes(built_bytes)
+
+        prepare_archive(
+            self.source, self.output, "Fokiiiiiii/InfiniteLoop", built_launcher
+        )
+
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertEqual(built_bytes, archive.read("AscNetLauncher.exe"))
+
     def test_rejects_client_older_than_4_9(self):
         self._write_source(client_version="4.8.0")
         with self.assertRaisesRegex(ValueError, "4.9"):

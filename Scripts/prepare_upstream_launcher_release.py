@@ -43,9 +43,12 @@ def _json_object(data: bytes, label: str) -> dict[str, object]:
 
 
 def prepare_archive(
-    source_zip: Path, output_zip: Path, target_repository: str
+    source_zip: Path,
+    output_zip: Path,
+    target_repository: str,
+    launcher_exe: Path | None = None,
 ) -> tuple[str, dict[str, str]]:
-    """Copy the upstream package unchanged except for its updater repository."""
+    """Repack the upstream assets, fork updater config, and optional CI-built executable."""
     if not REPOSITORY_PATTERN.fullmatch(target_repository):
         raise ValueError("target repository must be owner/name")
     if source_zip.resolve() == output_zip.resolve():
@@ -65,6 +68,16 @@ def prepare_archive(
         if any(entry.flag_bits & 1 for entry in entries):
             raise ValueError("encrypted launcher archive members are not accepted")
         files = {name: source.read(name) for name in PACKAGE_FILES}
+
+    if launcher_exe is not None:
+        if not launcher_exe.is_file():
+            raise ValueError("replacement launcher executable does not exist")
+        launcher_bytes = launcher_exe.read_bytes()
+        if len(launcher_bytes) < 2 or not launcher_bytes.startswith(b"MZ"):
+            raise ValueError("replacement launcher is not a Windows executable")
+        files["AscNetLauncher.exe"] = launcher_bytes
+        if sum(len(data) for data in files.values()) > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("prepared launcher archive expands beyond the size limit")
 
     supported = _json_object(files["supported-client.json"], "supported-client.json")
     application_version = _version(
@@ -107,6 +120,9 @@ def prepare_archive(
         if len(result_names) != len(PACKAGE_FILES) or set(result_names) != set(PACKAGE_FILES):
             output_zip.unlink(missing_ok=True)
             raise ValueError("prepared launcher archive failed its file-list check")
+        if output_zip.stat().st_size > MAX_ARCHIVE_BYTES:
+            output_zip.unlink(missing_ok=True)
+            raise ValueError("prepared launcher archive exceeds the size limit")
 
     return ".".join(map(str, application_version)), regional_versions
 
@@ -116,9 +132,10 @@ def main() -> None:
     parser.add_argument("source_zip", type=Path)
     parser.add_argument("output_zip", type=Path)
     parser.add_argument("target_repository")
+    parser.add_argument("--launcher-exe", type=Path)
     args = parser.parse_args()
     version, regions = prepare_archive(
-        args.source_zip, args.output_zip, args.target_repository
+        args.source_zip, args.output_zip, args.target_repository, args.launcher_exe
     )
     print(
         f"Prepared upstream launcher client {version} for "
