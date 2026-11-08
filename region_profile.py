@@ -165,11 +165,11 @@ JP_PROFILE = RegionProfile(
     config_smoke_targets=(
         ConfigSmokeTarget(
             "jp-client",
-            "/prod/client/config/BYf6VZR7DluwhM64/com.kurogame.punishing.grayraven.jp/4.8.0/standalone/config.tab",
+            "/prod/client/config/u6ubWH4wy50y8LDz/com.kurogame.punishing.grayraven.jp/4.9.0/standalone/config.tab",
             "Channel\tint\t5",
             base_url="https://prod-jpcdn-tx.kurogame.net",
-            application_version="4.8.0",
-            document_version=None,
+            application_version="4.9.0",
+            document_version="4.9.8",
         ),
     ),
     metadata_status="observed",

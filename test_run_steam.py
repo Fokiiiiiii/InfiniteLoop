@@ -96,11 +96,12 @@ class RegionProfileRunnerTests(unittest.TestCase):
             args = run_steam.parse_args()
         self.assertTrue(args.tcp_capture)
 
-    def test_jp_smoke_targets_48_without_global_document_assumptions(self):
+    def test_jp_smoke_targets_49_client_bootstrap_route(self):
         target = run_steam.get_region_profile("jp").config_smoke_targets[0]
-        self.assertEqual("4.8.0", target.application_version)
-        self.assertIsNone(target.document_version)
-        self.assertIn("/4.8.0/standalone/config.tab", target.path)
+        self.assertEqual("4.9.0", target.application_version)
+        self.assertEqual("4.9.8", target.document_version)
+        self.assertIn("u6ubWH4wy50y8LDz", target.path)
+        self.assertIn("/4.9.0/standalone/config.tab", target.path)
         self.assertEqual("Channel\tint\t5", target.channel_assertion)
         self.assertEqual("https://prod-jpcdn-tx.kurogame.net", target.base_url)
 
@@ -117,9 +118,9 @@ class RegionProfileRunnerTests(unittest.TestCase):
             def read(self):
                 return (
                     "Key\tType\tValue\r\n"
-                    "ApplicationVersion\tstring\t4.8.0\r\n"
-                    "DocumentVersion\tstring\t4.8.13\r\n"
-                    "LaunchModuleVersion\tstring\t4.8.12\r\n"
+                    "ApplicationVersion\tstring\t4.9.0\r\n"
+                    "DocumentVersion\tstring\t4.9.8\r\n"
+                    "LaunchModuleVersion\tstring\t4.9.8\r\n"
                     "Channel\tint\t5\r\n"
                     "ServerListStr\tstring\t日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
                     "ChannelServerListStr\tstring\tdefault#日本サーバー#http://8.209.200.222:2333/api/Login/Login\r\n"
@@ -131,7 +132,7 @@ class RegionProfileRunnerTests(unittest.TestCase):
 
         requested_url = open_request.call_args.args[0]
         self.assertEqual(target.base_url + target.path, requested_url)
-        self.assertIn("Smoke OK [jp-client] upstream (DocumentVersion 4.8.13; LaunchModuleVersion 4.8.12):", stdout.getvalue())
+        self.assertIn("Smoke OK [jp-client] upstream: " + target.base_url + target.path, stdout.getvalue())
 
     def test_tw_authoritative_smoke_is_not_faked_locally(self):
         with patch("sys.stdout", new_callable=io.StringIO) as stdout:
