@@ -147,6 +147,25 @@ jobs:
         run: cargo test --manifest-path AscNet.Launcher/Cargo.toml
       - name: Test patch
         run: cargo test --manifest-path AscNet.Patch/Cargo.toml
+      - name: Build Windows patch DLL
+        run: cargo build --manifest-path AscNet.Patch/Cargo.toml --release
+      - name: Validate patch DLL
+        shell: pwsh
+        run: |
+          $source = "AscNet.Patch\target\release\lucia.dll"
+          if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "lucia.dll is missing from the Windows build." }
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $source))
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw "lucia.dll is not a Windows PE file." }
+          $directory = Join-Path $env:RUNNER_TEMP "ascnet-patch"
+          New-Item -ItemType Directory -Force -Path $directory | Out-Null
+          Copy-Item -LiteralPath $source -Destination (Join-Path $directory "lucia.dll")
+          Get-FileHash -LiteralPath (Join-Path $directory "lucia.dll") -Algorithm SHA256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ascnet-patch-lucia-${{ github.sha }}
+          path: ${{ runner.temp }}\ascnet-patch\lucia.dll
+          if-no-files-found: error
+          retention-days: 7
 
   python:
     name: Windows Python bridge and release packaging tests
